@@ -77,13 +77,13 @@ export default function LandingPage({ onShowLogin, onShowRegister }) {
                 onClick={onShowRegister}
                 className="px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold text-lg transition-all shadow-lg hover:shadow-xl hover:scale-105"
               >
-                Get Started Free
+              Register
               </button>
               <button
                 onClick={onShowLogin}
                 className="px-8 py-4 bg-white text-slate-700 rounded-lg hover:bg-slate-50 font-semibold text-lg transition-all shadow-md hover:shadow-lg border border-slate-200"
               >
-                Sign In
+               Login
               </button>
             </div>
           </div>
@@ -109,23 +109,7 @@ export default function LandingPage({ onShowLogin, onShowRegister }) {
         </div>
       </section>
 
-      <section className="bg-white py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto text-center">
-          <h2 className="text-4xl font-bold text-slate-900 mb-6">
-            Ready to Modernize Your School?
-          </h2>
-          <p className="text-xl text-slate-600 mb-10 max-w-2xl mx-auto">
-            Join hundreds of educational institutions already using EduAxis to
-            streamline their operations and enhance learning experiences.
-          </p>
-          <button
-            onClick={onShowRegister}
-            className="px-10 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold text-lg transition-all shadow-lg hover:shadow-xl hover:scale-105"
-          >
-            Start Your Free Trial
-          </button>
-        </div>
-      </section>
+  
 
       <footer className="bg-slate-900 text-slate-300 py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto text-center">
