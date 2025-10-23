@@ -1,12 +1,15 @@
-import { db } from '../models/database.js';
+import User from '../models/User.js';
+import Course from '../models/Course.js';
 
 // Get admin dashboard data
 export const getDashboard = async (req, res) => {
   try {
-    const totalStudents = db.users.filter(u => u.role === 'student').length;
-    const totalTeachers = db.users.filter(u => u.role === 'teacher').length;
-    const totalCourses = db.courses.length;
-    
+    const [totalStudents, totalTeachers, totalCourses] = await Promise.all([
+      User.countDocuments({ role: 'student' }),
+      User.countDocuments({ role: 'teacher' }),
+      Course.countDocuments({})
+    ]);
+
     res.json({
       overview: {
         totalStudents,
@@ -24,14 +27,17 @@ export const getDashboard = async (req, res) => {
 // Get system stats
 export const getStats = async (req, res) => {
   try {
-    const students = db.users.filter(u => u.role === 'student').length;
-    const teachers = db.users.filter(u => u.role === 'teacher').length;
-    
+    const [students, teachers, courses] = await Promise.all([
+      User.countDocuments({ role: 'student' }),
+      User.countDocuments({ role: 'teacher' }),
+      Course.countDocuments({})
+    ]);
+
     res.json({
       stats: {
         students,
         teachers,
-        courses: db.courses.length,
+        courses,
         classes: 28,
         attendance: 94,
         revenue: 2500000
@@ -45,7 +51,17 @@ export const getStats = async (req, res) => {
 // Get all users
 export const getUsers = async (req, res) => {
   try {
-    const users = db.users.map(user => user.toJSON());
+    const { role, q } = req.query;
+    const filter = {};
+    if (role && role !== 'all') filter.role = role;
+    if (q && q.trim()) {
+      filter.$or = [
+        { name: { $regex: q, $options: 'i' } },
+        { email: { $regex: q, $options: 'i' } }
+      ];
+    }
+
+    const users = await User.find(filter).select('-password').sort({ createdAt: -1 });
     res.json({ users });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -56,23 +72,37 @@ export const getUsers = async (req, res) => {
 export const createUser = async (req, res) => {
   try {
     const { name, email, role, password, phone, dateOfBirth } = req.body;
-    
-    const newUser = db.addUser({
+
+    // Basic validation
+    if (!name || !email || !password) {
+      return res.status(400).json({ success: false, message: 'Name, email and password are required' });
+    }
+
+    const exists = await User.findOne({ email: email.toLowerCase() });
+    if (exists) {
+      return res.status(400).json({ success: false, message: 'User already exists with this email' });
+    }
+
+    const newUser = await User.create({
       name,
       email,
-      password,
-      role,
+      password, // TODO: hash in production
+      role: (role || 'student').toLowerCase(),
       phone,
-      dateOfBirth
+      dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
     });
-    
+
     res.json({
       success: true,
       message: 'User created successfully',
       user: newUser.toJSON()
     });
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(e => e.message).join(', ');
+      return res.status(400).json({ success: false, message: messages });
+    }
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
 
@@ -81,20 +111,28 @@ export const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
-    
-    const updatedUser = db.updateUser(id, updates);
-    
+
+    if (updates.email) updates.email = updates.email.toLowerCase();
+    if (updates.role) updates.role = updates.role.toLowerCase();
+    if (updates.dateOfBirth) updates.dateOfBirth = new Date(updates.dateOfBirth);
+
+    const updatedUser = await User.findByIdAndUpdate(id, updates, { new: true, runValidators: true }).select('-password');
+
     if (!updatedUser) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
-    
+
     res.json({
       success: true,
       message: 'User updated successfully',
-      user: updatedUser.toJSON()
+      user: updatedUser
     });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(e => e.message).join(', ');
+      return res.status(400).json({ success: false, message: messages });
+    }
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
 
@@ -102,26 +140,27 @@ export const updateUser = async (req, res) => {
 export const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = db.deleteUser(id);
-    
+    const deleted = await User.findByIdAndDelete(id);
+
     if (!deleted) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
-    
+
     res.json({
       success: true,
       message: 'User deleted successfully',
       id
     });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
 
 // Get all courses
 export const getCourses = async (req, res) => {
   try {
-    res.json({ courses: db.courses });
+    const courses = await Course.find({}).sort({ createdAt: -1 });
+    res.json({ courses });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -131,8 +170,8 @@ export const getCourses = async (req, res) => {
 export const createCourse = async (req, res) => {
   try {
     const { name, code, teacherId, description, teacher, credits, semester } = req.body;
-    
-    const newCourse = db.addCourse({
+
+    const newCourse = await Course.create({
       name,
       code,
       teacherId,
@@ -141,14 +180,18 @@ export const createCourse = async (req, res) => {
       credits,
       semester
     });
-    
+
     res.json({
       success: true,
       message: 'Course created successfully',
       course: newCourse
     });
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(e => e.message).join(', ');
+      return res.status(400).json({ success: false, message: messages });
+    }
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
 
