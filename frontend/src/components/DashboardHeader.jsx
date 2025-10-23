@@ -33,8 +33,8 @@ export default function DashboardHeader({ title, userRole }) {
 
   return (
     <nav className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+      <div className="w-full px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16 ml-5">
           {/* Left: Logo and Title */}
           <div className="flex items-center space-x-2">
             <GraduationCap className={`w-8 h-8 ${styles.iconColor}`} />
@@ -44,7 +44,7 @@ export default function DashboardHeader({ title, userRole }) {
           {/* Right: User Info and Logout */}
           <div className="flex items-center space-x-4">
             {/* User Info */}
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-3 ">
               <div className="text-right">
                 <p className="text-sm font-medium text-slate-900">{user?.name || 'User'}</p>
                 <p className="text-xs text-slate-600">
@@ -60,7 +60,7 @@ export default function DashboardHeader({ title, userRole }) {
             {/* Logout Button */}
             <button
               onClick={handleLogout}
-              className="flex items-center space-x-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors duration-200"
+              className="flex items-center space-x-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors duration-200 "
               title="Logout"
             >
               <LogOut className="w-4 h-4" />
