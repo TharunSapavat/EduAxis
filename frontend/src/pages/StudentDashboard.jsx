@@ -1,4 +1,4 @@
-import { BookOpen, Users, Calendar, FileText, BarChart3, ClipboardList, Bell, Library, DollarSign, Home, X } from 'lucide-react';
+import { BookOpen, Users, Calendar, FileText, BarChart3, ClipboardList, Bell, Library, DollarSign, Home, X, Notebook } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { studentAPI } from '../services/api';
 import { useState, useEffect } from 'react';
@@ -58,7 +58,7 @@ export default function StudentDashboard() {
     { id: 'assignments', icon: FileText, title: 'Assignments', description: 'Submit and track assignments' },
     { id: 'timetable', icon: Calendar, title: 'Timetable', description: 'View class schedule' },
     { id: 'announcements', icon: Bell, title: 'Announcements', description: 'Stay updated' },
-    { id: 'library', icon: Library, title: 'Library', description: 'Access resources' },
+    { id: 'upload notes', icon: Notebook, title: 'Upload Notes', description: 'Upload your class notes' },
     { id: 'fees', icon: DollarSign, title: 'Fees', description: 'View and pay fees' },
   ];
 
