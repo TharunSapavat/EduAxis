@@ -90,6 +90,8 @@ export const studentAPI = {
   getTimetable: () => api.get('/student/timetable'),
   getAnnouncements: () => api.get('/student/announcements'),
   getFees: () => api.get('/student/fees'),
+  makePayment: (paymentData) => api.post('/student/payment', paymentData),
+  downloadReceipt: (paymentId) => api.get(`/student/receipt/${paymentId}`),
 };
 
 // Teacher APIs
@@ -115,6 +117,19 @@ export const adminAPI = {
   createCourse: (courseData) => api.post('/admin/courses', courseData),
   getClasses: () => api.get('/admin/classes'),
   getReports: () => api.get('/admin/reports'),
+  
+  // Fee Management
+  getFees: () => api.get('/admin/fees'),
+  createFee: (feeData) => api.post('/admin/fees', feeData),
+  updateFee: (id, feeData) => api.put(`/admin/fees/${id}`, feeData),
+  deleteFee: (id) => api.delete(`/admin/fees/${id}`),
+  
+  // Payment Management
+  getPayments: (params) => api.get('/admin/payments', { params }),
+  createPayment: (paymentData) => api.post('/admin/payments', paymentData),
+  getPaymentStats: () => api.get('/admin/payments/stats'),
+  exportPayments: (params) => api.get('/admin/payments/export', { params }),
+  sendFeeReminders: (feeId) => api.post('/admin/fees/reminders', { feeId }),
 };
 
 export default api;

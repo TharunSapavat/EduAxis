@@ -3,6 +3,8 @@ import Course from '../models/Course.js';
 import Assignment from '../models/Assignment.js';
 import Announcement from '../models/Announcement.js';
 import Attendance from '../models/Attendance.js';
+import Fee from '../models/Fee.js';
+import Payment from '../models/Payment.js';
 
 // Get student dashboard data
 export const getDashboard = async (req, res) => {
@@ -273,14 +275,181 @@ export const getAnnouncements = async (req, res) => {
   }
 };
 
-// Get student fees
+// Get fees for student
 export const getFees = async (req, res) => {
-  res.json({
-    fees: {
-      total: 50000,
-      paid: 30000,
-      pending: 20000,
-      dueDate: '2025-11-30'
+  try {
+    const studentId = req.headers['x-user-id'] || req.query.studentId;
+
+    if (!studentId) {
+      return res.status(400).json({ success: false, message: 'Student ID is required' });
     }
-  });
+
+    // Get student
+    const student = await User.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    // Get all active fees
+    const activeFees = await Fee.find({ status: 'active' }).sort({ dueDate: 1 });
+
+    // Get student's payment history
+    const payments = await Payment.find({ studentId }).sort({ paymentDate: -1 });
+
+    // Calculate totals
+    const totalFeeAmount = activeFees.reduce((sum, fee) => sum + fee.amount, 0);
+    const totalPaid = payments
+      .filter(p => p.status === 'completed')
+      .reduce((sum, p) => sum + p.amount, 0);
+    const pending = totalFeeAmount - totalPaid;
+
+    // Calculate late fees
+    const now = new Date();
+    const lateFeesAmount = activeFees
+      .filter(fee => new Date(fee.dueDate) < now)
+      .reduce((sum, fee) => {
+        const paidForThisFee = payments.find(p => p.feeId.toString() === fee._id.toString() && p.status === 'completed');
+        if (!paidForThisFee) {
+          const daysLate = Math.floor((now - new Date(fee.dueDate)) / (1000 * 60 * 60 * 24));
+          return sum + (daysLate * 10); // $10 per day late
+        }
+        return sum;
+      }, 0);
+
+    res.json({
+      success: true,
+      fees: activeFees,
+      payments,
+      summary: {
+        totalFees: totalFeeAmount,
+        totalPaid,
+        pending,
+        lateFees: lateFeesAmount,
+        totalDue: pending + lateFeesAmount
+      }
+    });
+  } catch (error) {
+    console.error('Get fees error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// Make payment
+export const makePayment = async (req, res) => {
+  try {
+    const studentId = req.headers['x-user-id'] || req.body.studentId;
+    const { feeId, amount, paymentMethod, transactionId, remarks } = req.body;
+
+    if (!studentId || !feeId || !amount || !paymentMethod) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Student ID, Fee ID, amount, and payment method are required' 
+      });
+    }
+
+    const student = await User.findById(studentId);
+    const fee = await Fee.findById(feeId);
+
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    if (!fee) {
+      return res.status(404).json({ success: false, message: 'Fee not found' });
+    }
+
+    // Check if already paid
+    const existingPayment = await Payment.findOne({ 
+      studentId, 
+      feeId, 
+      status: 'completed' 
+    });
+
+    if (existingPayment) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'This fee has already been paid' 
+      });
+    }
+
+    // Calculate late fee if applicable
+    const now = new Date();
+    const dueDate = new Date(fee.dueDate);
+    let lateFee = 0;
+    
+    if (now > dueDate) {
+      const daysLate = Math.floor((now - dueDate) / (1000 * 60 * 60 * 24));
+      lateFee = daysLate * 10; // $10 per day
+    }
+
+    const totalAmount = parseFloat(amount) + lateFee;
+
+    const payment = await Payment.create({
+      studentId,
+      studentName: student.name,
+      studentEmail: student.email,
+      feeId,
+      feeTitle: fee.title,
+      amount: totalAmount,
+      paymentMethod,
+      transactionId,
+      status: 'completed',
+      remarks: remarks || (lateFee > 0 ? `Includes late fee: ₹${lateFee}` : undefined)
+    });
+
+    // TODO: Send email notification
+
+    res.json({
+      success: true,
+      message: 'Payment successful',
+      payment,
+      lateFee
+    });
+  } catch (error) {
+    console.error('Make payment error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// Download receipt
+export const downloadReceipt = async (req, res) => {
+  try {
+    const { paymentId } = req.params;
+
+    const payment = await Payment.findById(paymentId)
+      .populate('studentId', 'name email phone studentId')
+      .populate('feeId', 'title amount description');
+
+    if (!payment) {
+      return res.status(404).json({ success: false, message: 'Payment not found' });
+    }
+
+    // Return payment data for frontend to generate PDF
+    res.json({
+      success: true,
+      receipt: {
+        receiptNumber: payment.receiptNumber,
+        date: payment.paymentDate,
+        student: {
+          name: payment.studentName,
+          email: payment.studentEmail,
+          id: payment.studentId?.studentId
+        },
+        fee: {
+          title: payment.feeTitle,
+          amount: payment.feeId?.amount || payment.amount
+        },
+        payment: {
+          amount: payment.amount,
+          method: payment.paymentMethod,
+          transactionId: payment.transactionId,
+          status: payment.status
+        },
+        remarks: payment.remarks
+      }
+    });
+  } catch (error) {
+    console.error('Download receipt error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
 };
