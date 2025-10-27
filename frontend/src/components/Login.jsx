@@ -35,6 +35,8 @@ export default function Login({ onClose, onSwitchToRegister }) {
       const response = await authAPI.login(formData);
       
       if (response.data.success) {
+        // Cookie is set automatically by backend!
+        // Just pass user data
         login(response.data.user);
         onClose();
       } else {

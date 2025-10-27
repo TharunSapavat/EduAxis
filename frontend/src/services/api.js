@@ -8,21 +8,13 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
   timeout: 10000, // 10 seconds timeout
+  withCredentials: true, // Send cookies with requests
 });
 
-// Request interceptor - Add auth token if available
+// Request interceptor - Cookies are sent automatically
 api.interceptors.request.use(
   (config) => {
-    const user = localStorage.getItem('user');
-    if (user) {
-      try {
-        const userData = JSON.parse(user);
-        // Add user ID or token to headers (for future JWT implementation)
-        config.headers['X-User-ID'] = userData._id || userData.id;
-      } catch (error) {
-        console.error('Error parsing user data:', error);
-      }
-    }
+    // No need to manually add token - cookies are sent automatically!
     return config;
   },
   (error) => {
@@ -42,7 +34,7 @@ api.interceptors.response.use(
       
       switch (status) {
         case 401:
-          // Unauthorized - clear user session
+          // Unauthorized - clear user session (cookie is cleared by backend)
           console.error('Unauthorized access - logging out');
           localStorage.removeItem('user');
           window.location.href = '/';

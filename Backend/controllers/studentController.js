@@ -278,17 +278,7 @@ export const getAnnouncements = async (req, res) => {
 // Get fees for student
 export const getFees = async (req, res) => {
   try {
-    const studentId = req.headers['x-user-id'] || req.query.studentId;
-
-    if (!studentId) {
-      return res.status(400).json({ success: false, message: 'Student ID is required' });
-    }
-
-    // Get student
-    const student = await User.findById(studentId);
-    if (!student) {
-      return res.status(404).json({ success: false, message: 'Student not found' });
-    }
+    const studentId = req.user._id; // Get from authenticated user
 
     // Get all active fees
     const activeFees = await Fee.find({ status: 'active' }).sort({ dueDate: 1 });
@@ -337,7 +327,8 @@ export const getFees = async (req, res) => {
 // Make payment
 export const makePayment = async (req, res) => {
   try {
-    const studentId = req.headers['x-user-id'] || req.body.studentId;
+    const studentId = req.user._id; // Get from authenticated user
+    const student = req.user; // User already loaded by middleware
     const { feeId, amount, paymentMethod, transactionId, remarks } = req.body;
 
     if (!studentId || !feeId || !amount || !paymentMethod) {
@@ -346,13 +337,7 @@ export const makePayment = async (req, res) => {
         message: 'Student ID, Fee ID, amount, and payment method are required' 
       });
     }
-
-    const student = await User.findById(studentId);
     const fee = await Fee.findById(feeId);
-
-    if (!student) {
-      return res.status(404).json({ success: false, message: 'Student not found' });
-    }
 
     if (!fee) {
       return res.status(404).json({ success: false, message: 'Fee not found' });

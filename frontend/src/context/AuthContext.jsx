@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { authAPI } from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -17,36 +18,52 @@ export const AuthProvider = ({ children }) => {
 
   // Restore user from localStorage on mount
   useEffect(() => {
-    try {
-      const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-        const userData = JSON.parse(storedUser);
-        setUser(userData);
-        setIsAuthenticated(true);
+    const restoreSession = async () => {
+      try {
+        // Cookie is automatically sent with requests
+        // Just restore user data from localStorage
+        const storedUser = localStorage.getItem('user');
+        
+        if (storedUser) {
+          const userData = JSON.parse(storedUser);
+          setUser(userData);
+          setIsAuthenticated(true);
+        }
+      } catch (error) {
+        console.error('Error restoring user session:', error);
+        localStorage.removeItem('user');
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Error restoring user session:', error);
-      localStorage.removeItem('user');
-    } finally {
-      setLoading(false);
-    }
+    };
+
+    restoreSession();
   }, []);
 
   const login = (userData) => {
     if (!userData) {
-      console.error('Invalid user data');
+      console.error('User data is required');
       return;
     }
     
     setUser(userData);
     setIsAuthenticated(true);
+    // Cookie is set automatically by backend, we just store user info
     localStorage.setItem('user', JSON.stringify(userData));
   };
 
-  const logout = () => {
-    setUser(null);
-    setIsAuthenticated(false);
-    localStorage.removeItem('user');
+  const logout = async () => {
+    try {
+      // Call backend to clear cookie
+      await authAPI.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      // Clear frontend state regardless of API call result
+      setUser(null);
+      setIsAuthenticated(false);
+      localStorage.removeItem('user');
+    }
   };
 
   const hasRole = (role) => {

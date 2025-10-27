@@ -11,8 +11,13 @@ import {
   makePayment,
   downloadReceipt
 } from '../controllers/studentController.js';
+import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// Protect all student routes - require authentication and student role
+router.use(authMiddleware);
+router.use(roleMiddleware('student'));
 
 router.get('/dashboard', getDashboard);
 router.get('/courses', getCourses);

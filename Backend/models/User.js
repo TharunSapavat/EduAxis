@@ -1,4 +1,6 @@
 import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
 const userSchema = new mongoose.Schema({
   name: {
@@ -52,8 +54,15 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Pre-save hook to generate studentId or teacherId
-userSchema.pre('save', function(next) {
+// Pre-save hook to hash password and generate IDs
+userSchema.pre('save', async function(next) {
+  // Hash password if modified
+  if (this.isModified('password')) {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+  }
+
+  // Generate student/teacher IDs
   if (this.isNew) {
     if (this.role === 'student' && !this.studentId) {
       this.studentId = `STU${Date.now()}`;
@@ -61,8 +70,28 @@ userSchema.pre('save', function(next) {
       this.teacherId = `TCH${Date.now()}`;
     }
   }
+  
   next();
 });
+
+// Method to compare password
+userSchema.methods.comparePassword = async function(candidatePassword) {
+  return await bcrypt.compare(candidatePassword, this.password);
+};
+
+// Method to generate JWT token
+userSchema.methods.generateAuthToken = function() {
+  const token = jwt.sign(
+    { 
+      _id: this._id,
+      email: this.email,
+      role: this.role 
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+  return token;
+};
 
 // Method to hide password in JSON responses
 userSchema.methods.toJSON = function() {

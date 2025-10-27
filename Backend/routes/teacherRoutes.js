@@ -8,8 +8,13 @@ import {
   getAssignments,
   postAnnouncement
 } from '../controllers/teacherController.js';
+import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// Protect all teacher routes - require authentication and teacher role
+router.use(authMiddleware);
+router.use(roleMiddleware('teacher'));
 
 router.get('/dashboard', getDashboard);
 router.get('/courses', getCourses);

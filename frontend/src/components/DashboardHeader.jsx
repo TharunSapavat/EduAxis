@@ -4,9 +4,9 @@ import { useAuth } from '../context/AuthContext';
 export default function DashboardHeader({ title, userRole }) {
   const { user, logout } = useAuth();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (confirm('Are you sure you want to logout?')) {
-      logout();
+      await logout();
     }
   };
 
