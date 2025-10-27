@@ -13,6 +13,14 @@ export const register = async (req, res) => {
       });
     }
 
+    // Validate password length
+    if (password.length < 6) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Password must be at least 6 characters long' 
+      });
+    }
+
     // Check if user exists
     const userExists = await User.findOne({ email: email.toLowerCase() });
     if (userExists) {
@@ -22,20 +30,31 @@ export const register = async (req, res) => {
       });
     }
 
-    // Create new user (pre-save hook will generate studentId/teacherId)
+    // Create new user (password will be hashed by pre-save hook)
     const newUser = await User.create({
       name,
       email,
-      password, // TODO: Hash this with bcrypt in production
+      password,
       role: role || 'student',
       phone,
       dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined
     });
 
+    // Generate JWT token
+    const token = newUser.generateAuthToken();
+
+    // Set cookie with the token
+    res.cookie('authToken', token, {
+      httpOnly: true,      // Cookie cannot be accessed by JavaScript (secure)
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      sameSite: 'lax'      // CSRF protection
+    });
+
     res.status(201).json({
       success: true,
       message: 'User registered successfully',
-      user: newUser.toJSON()
+      user: newUser.toJSON(),
+      token
     });
   } catch (error) {
     console.error('Register error:', error);
@@ -70,7 +89,7 @@ export const login = async (req, res) => {
       });
     }
 
-    // Find user by email
+    // Find user by email (include password for comparison)
     const user = await User.findOne({ email: email.toLowerCase() });
     
     if (!user) {
@@ -88,8 +107,10 @@ export const login = async (req, res) => {
       });
     }
 
-    // Compare password (TODO: Use bcrypt.compare in production)
-    if (user.password !== password) {
+    // Compare password using bcrypt
+    const isPasswordValid = await user.comparePassword(password);
+    
+    if (!isPasswordValid) {
       return res.status(401).json({ 
         success: false,
         message: 'Invalid email or password' 
@@ -104,10 +125,21 @@ export const login = async (req, res) => {
       });
     }
 
+    // Generate JWT token
+    const token = user.generateAuthToken();
+
+    // Set cookie with the token
+    res.cookie('authToken', token, {
+      httpOnly: true,      // Cookie cannot be accessed by JavaScript (secure)
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      sameSite: 'lax'      // CSRF protection
+    });
+
     res.json({
       success: true,
       message: 'Login successful',
-      user: user.toJSON()
+      user: user.toJSON(),
+      token
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -121,38 +153,32 @@ export const login = async (req, res) => {
 
 // Logout user
 export const logout = async (req, res) => {
-  // In production, invalidate JWT token or clear session
+  // Clear the cookie with same options used when setting it
+  res.clearCookie('authToken', {
+    httpOnly: true,
+    sameSite: 'lax'
+  });
+  
   res.json({ 
     success: true, 
     message: 'Logout successful' 
   });
 };
 
-// Get current user
+// Get current user (from JWT token)
 export const getCurrentUser = async (req, res) => {
   try {
-    // TODO: In production, get user ID from JWT token
-    const userId = req.query.userId || req.body.userId;
-    
-    if (!userId) {
-      return res.status(400).json({ 
+    // User is already attached by auth middleware
+    if (!req.user) {
+      return res.status(401).json({ 
         success: false,
-        message: 'User ID is required' 
+        message: 'Not authenticated' 
       });
     }
 
-    const user = await User.findById(userId);
-    
-    if (!user) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'User not found' 
-      });
-    }
-
-    res.json({ 
+    res.json({
       success: true,
-      user: user.toJSON() 
+      user: req.user
     });
   } catch (error) {
     console.error('Get current user error:', error);

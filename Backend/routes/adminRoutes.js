@@ -20,8 +20,13 @@ import {
   exportPayments,
   sendFeeReminders
 } from '../controllers/adminController.js';
+import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// Protect all admin routes - require authentication and admin role
+router.use(authMiddleware);
+router.use(roleMiddleware('admin'));
 
 router.get('/dashboard', getDashboard);
 router.get('/stats', getStats);
