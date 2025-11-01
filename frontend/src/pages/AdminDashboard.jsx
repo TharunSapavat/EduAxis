@@ -30,7 +30,9 @@ export default function AdminDashboard() {
     amount: '',
     description: '',
     dueDate: '',
-    semester: 'Annual'
+    semester: 'Annual',
+    appliesTo: 'all',
+    grades: []
   });
   const [paymentSearchQuery, setPaymentSearchQuery] = useState('');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState('all');
@@ -140,8 +142,8 @@ export default function AdminDashboard() {
     try {
       const res = await adminAPI.createFee(feeFormData);
       if (res.data.success) {
-        setShowFeeForm(false);
-        setFeeFormData({ title: '', amount: '', description: '', dueDate: '', semester: 'Annual' });
+  setShowFeeForm(false);
+  setFeeFormData({ title: '', amount: '', description: '', dueDate: '', semester: 'Annual', appliesTo: 'all', grades: [] });
         fetchFees();
         alert('Fee created successfully!');
       }
@@ -640,6 +642,9 @@ export default function AdminDashboard() {
                       <div className="text-xs text-slate-500 space-y-1">
                         <p>Due: {new Date(fee.dueDate).toLocaleDateString()}</p>
                         <p>Semester: {fee.semester}</p>
+                        <p>
+                          Scope: {fee.appliesTo === 'all' ? 'All students' : `Grades: ${(fee.grades || []).join(', ')}`}
+                        </p>
                       </div>
                     </div>
                   ))}
@@ -837,6 +842,58 @@ export default function AdminDashboard() {
                           <option value="Summer">Summer</option>
                         </select>
                       </div>
+
+                      {/* Applies To: All vs Grade-specific */}
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Applies To</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setFeeFormData({ ...feeFormData, appliesTo: 'all', grades: [] })}
+                            className={`py-2 px-4 rounded-lg font-medium transition-all ${feeFormData.appliesTo === 'all' ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-700'}`}
+                          >
+                            All Students
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFeeFormData({ ...feeFormData, appliesTo: 'grade-specific' })}
+                            className={`py-2 px-4 rounded-lg font-medium transition-all ${feeFormData.appliesTo === 'grade-specific' ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-700'}`}
+                          >
+                            Specific Grades
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Grade multi-select when grade-specific */}
+                      {feeFormData.appliesTo === 'grade-specific' && (
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Select Grades</label>
+                          <div className="grid grid-cols-6 gap-2">
+                            {[...Array(12)].map((_, i) => {
+                              const g = String(i + 1);
+                              const selected = feeFormData.grades.includes(g);
+                              return (
+                                <button
+                                  type="button"
+                                  key={g}
+                                  onClick={() => {
+                                    const grades = selected
+                                      ? feeFormData.grades.filter(x => x !== g)
+                                      : [...feeFormData.grades, g];
+                                    setFeeFormData({ ...feeFormData, grades });
+                                  }}
+                                  className={`text-sm py-2 rounded border ${selected ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}`}
+                                >
+                                  {g}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {feeFormData.grades.length === 0 && (
+                            <p className="text-xs text-slate-500 mt-1">Select at least one grade.</p>
+                          )}
+                        </div>
+                      )}
 
                       <button
                         type="submit"

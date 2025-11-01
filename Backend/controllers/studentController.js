@@ -279,9 +279,17 @@ export const getAnnouncements = async (req, res) => {
 export const getFees = async (req, res) => {
   try {
     const studentId = req.user._id; // Get from authenticated user
+    const student = req.user; // Already loaded by middleware
 
-    // Get all active fees
-    const activeFees = await Fee.find({ status: 'active' }).sort({ dueDate: 1 });
+    // Get fees that apply to this student's grade
+    // Either fees for all students OR fees for this specific grade
+    const activeFees = await Fee.find({ 
+      status: 'active',
+      $or: [
+        { appliesTo: 'all' },
+        { appliesTo: 'grade-specific', grades: student.grade }
+      ]
+    }).sort({ dueDate: 1 });
 
     // Get student's payment history
     const payments = await Payment.find({ studentId }).sort({ paymentDate: -1 });
@@ -308,6 +316,8 @@ export const getFees = async (req, res) => {
 
     res.json({
       success: true,
+      studentGrade: student.grade,
+      studentSection: student.section,
       fees: activeFees,
       payments,
       summary: {

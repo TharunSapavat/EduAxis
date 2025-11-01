@@ -3,7 +3,7 @@ import User from '../models/User.js';
 // Register new user
 export const register = async (req, res) => {
   try {
-    const { name, email, password, role, phone, dateOfBirth } = req.body;
+    const { name, email, password, role, phone, dateOfBirth, grade, section, subject, gradesTeaching } = req.body;
 
     // Validate required fields
     if (!name || !email || !password) {
@@ -30,15 +30,40 @@ export const register = async (req, res) => {
       });
     }
 
-    // Create new user (password will be hashed by pre-save hook)
-    const newUser = await User.create({
+    // If student, require grade; section is optional (admin can assign later)
+    const effectiveRole = role || 'student';
+
+    if (effectiveRole === 'student') {
+      const validGrades = ['1','2','3','4','5','6','7','8','9','10','11','12'];
+      if (!grade || !validGrades.includes(String(grade))) {
+        return res.status(400).json({ success: false, message: 'Grade is required and must be between 1-12' });
+      }
+      const validSections = ['A','B','C','D'];
+      if (section && !validSections.includes(String(section))) {
+        return res.status(400).json({ success: false, message: 'Section must be A-D when provided' });
+      }
+    }
+
+    // Prepare payload
+    const payload = {
       name,
       email,
       password,
-      role: role || 'student',
+      role: effectiveRole,
       phone,
-      dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined
-    });
+      dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
+    };
+
+    if (effectiveRole === 'student') {
+      payload.grade = String(grade);
+      if (section) payload.section = String(section);
+    } else if (effectiveRole === 'teacher') {
+      if (subject) payload.subject = subject;
+      if (Array.isArray(gradesTeaching)) payload.gradesTeaching = gradesTeaching.map(String);
+    }
+
+    // Create new user (password will be hashed by pre-save hook)
+    const newUser = await User.create(payload);
 
     // Generate JWT token
     const token = newUser.generateAuthToken();
