@@ -197,7 +197,7 @@ export default function StudentDashboard() {
         return (
           <div>
             {/* Welcome Section */}
-            <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-8 mb-6 text-white">
+            <div className="bg-linear-to-r from-blue-600 to-blue-700 rounded-2xl p-8 mb-6 text-white">
               <h1 className="text-3xl font-bold mb-2">
                 Welcome back, {user?.name || 'Student'}!
               </h1>
@@ -702,7 +702,7 @@ export default function StudentDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50 to-slate-100">
       {/* Header */}
       <DashboardHeader title="Student Portal" userRole="student" />
 

@@ -5,6 +5,8 @@ import Announcement from '../models/Announcement.js';
 import Attendance from '../models/Attendance.js';
 import Fee from '../models/Fee.js';
 import Payment from '../models/Payment.js';
+import Submission from '../models/Submission.js';
+import Timetable from '../models/Timetable.js';
 
 // Get student dashboard data
 export const getDashboard = async (req, res) => {
@@ -221,17 +223,62 @@ export const getAssignments = async (req, res) => {
 // Get student timetable
 export const getTimetable = async (req, res) => {
   try {
-    // TODO: Implement timetable model and fetch student's schedule
-    const timetable = [
-      { day: 'Monday', time: '9:00 AM', subject: 'Mathematics', room: 'A101' },
-      { day: 'Monday', time: '11:00 AM', subject: 'Physics', room: 'B202' },
-      { day: 'Tuesday', time: '10:00 AM', subject: 'Chemistry', room: 'C303' },
-      { day: 'Wednesday', time: '9:00 AM', subject: 'English', room: 'A105' }
-    ];
-    
+    const student = req.user; // User is already loaded by auth middleware
+    const { day } = req.query; // Optional: Get timetable for specific day
+
+    // Find active timetable for student's grade and section
+    const timetableDoc = await Timetable.findOne({
+      grade: student.grade,
+      section: student.section,
+      isActive: true,
+      effectiveFrom: { $lte: new Date() },
+      $or: [
+        { effectiveTo: null },
+        { effectiveTo: { $gte: new Date() } }
+      ]
+    })
+    .populate('schedule.courseId', 'name code')
+    .populate('schedule.teacherId', 'name email');
+
+    if (!timetableDoc) {
+      // Return sample timetable if no timetable found
+      return res.json({ 
+        success: true,
+        timetable: {
+          grade: student.grade,
+          section: student.section,
+          schedule: [
+            { day: 'Monday', startTime: '09:00', endTime: '10:00', subject: 'Mathematics', room: 'A101', type: 'lecture' },
+            { day: 'Monday', startTime: '10:00', endTime: '11:00', subject: 'Physics', room: 'B202', type: 'lecture' },
+            { day: 'Tuesday', startTime: '10:00', endTime: '11:00', subject: 'Chemistry', room: 'C303', type: 'lab' },
+            { day: 'Wednesday', startTime: '09:00', endTime: '10:00', subject: 'English', room: 'A105', type: 'lecture' }
+          ],
+          message: 'Sample timetable - actual timetable not yet configured'
+        }
+      });
+    }
+
+    // If specific day requested, filter schedule
+    let schedule = timetableDoc.schedule;
+    if (day) {
+      schedule = timetableDoc.getDaySchedule(day);
+    }
+
+    // Get today's schedule
+    const todaySchedule = timetableDoc.getTodaySchedule();
+
     res.json({ 
       success: true,
-      timetable 
+      timetable: {
+        grade: timetableDoc.grade,
+        section: timetableDoc.section,
+        academicYear: timetableDoc.academicYear,
+        semester: timetableDoc.semester,
+        schedule: schedule,
+        todaySchedule: todaySchedule,
+        effectiveFrom: timetableDoc.effectiveFrom,
+        effectiveTo: timetableDoc.effectiveTo
+      }
     });
   } catch (error) {
     console.error('Get timetable error:', error);
@@ -446,5 +493,221 @@ export const downloadReceipt = async (req, res) => {
   } catch (error) {
     console.error('Download receipt error:', error);
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// Get course details
+export const getCourseDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const course = await Course.findById(id)
+      .populate('teacherId', 'name email');
+
+    if (!course) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Course not found' 
+      });
+    }
+
+    // Get assignments for this course
+    const assignments = await Assignment.find({ 
+      courseId: id,
+      status: 'active'
+    }).sort({ dueDate: -1 }).limit(5);
+
+    // Get announcements for this course
+    const announcements = await Announcement.find({
+      courseId: id,
+      isActive: true
+    }).sort({ createdAt: -1 }).limit(5);
+
+    res.json({
+      success: true,
+      course: {
+        ...course.toObject(),
+        recentAssignments: assignments,
+        recentAnnouncements: announcements
+      }
+    });
+  } catch (error) {
+    console.error('Get course details error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
+};
+
+// Submit assignment
+export const submitAssignment = async (req, res) => {
+  try {
+    const studentId = req.user._id;
+    const { assignmentId, content, attachments } = req.body;
+
+    if (!assignmentId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Assignment ID is required' 
+      });
+    }
+
+    // Check if assignment exists
+    const assignment = await Assignment.findById(assignmentId);
+    if (!assignment) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Assignment not found' 
+      });
+    }
+
+    // Check if already submitted
+    const existingSubmission = await Submission.findOne({ 
+      assignmentId, 
+      studentId 
+    });
+
+    if (existingSubmission) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Assignment already submitted. Contact your teacher to resubmit.' 
+      });
+    }
+
+    // Check if submission is late
+    const now = new Date();
+    const isLate = now > assignment.dueDate;
+
+    // Create submission
+    const submission = await Submission.create({
+      assignmentId,
+      studentId,
+      content,
+      attachments: attachments || [],
+      status: isLate ? 'late' : 'submitted',
+      submittedAt: now
+    });
+
+    res.json({
+      success: true,
+      message: isLate 
+        ? 'Assignment submitted late. Late submission noted.' 
+        : 'Assignment submitted successfully',
+      submission
+    });
+  } catch (error) {
+    console.error('Submit assignment error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
+};
+
+// Get submission details for a specific assignment
+export const getSubmissionDetails = async (req, res) => {
+  try {
+    const studentId = req.user._id;
+    const { assignmentId } = req.params;
+
+    const submission = await Submission.findOne({ 
+      assignmentId, 
+      studentId 
+    })
+      .populate('assignmentId', 'title description dueDate totalMarks')
+      .populate('gradedBy', 'name');
+
+    if (!submission) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'No submission found for this assignment' 
+      });
+    }
+
+    res.json({
+      success: true,
+      submission
+    });
+  } catch (error) {
+    console.error('Get submission details error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
+};
+
+// Get library resources
+export const getLibraryResources = async (req, res) => {
+  try {
+    const studentId = req.user._id;
+    const student = req.user;
+
+    // TODO: Create a proper LibraryResource model
+    // For now, return sample data structure
+    const resources = [
+      {
+        id: '1',
+        title: 'Mathematics Textbook - Grade ' + student.grade,
+        type: 'Textbook',
+        subject: 'Mathematics',
+        format: 'PDF',
+        availableOnline: true,
+        downloadUrl: '/api/library/download/1',
+        description: 'Official mathematics textbook for your grade'
+      },
+      {
+        id: '2',
+        title: 'Science Lab Manual',
+        type: 'Lab Manual',
+        subject: 'Science',
+        format: 'PDF',
+        availableOnline: true,
+        downloadUrl: '/api/library/download/2',
+        description: 'Comprehensive lab manual with experiments'
+      },
+      {
+        id: '3',
+        title: 'English Literature Collection',
+        type: 'E-Book',
+        subject: 'English',
+        format: 'EPUB',
+        availableOnline: true,
+        downloadUrl: '/api/library/download/3',
+        description: 'Collection of classic literature pieces'
+      }
+    ];
+
+    // Borrowed books
+    const borrowedBooks = [
+      {
+        id: 'b1',
+        title: 'History of Ancient Civilizations',
+        borrowedDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        status: 'active'
+      }
+    ];
+
+    res.json({
+      success: true,
+      library: {
+        availableResources: resources,
+        borrowedBooks,
+        borrowingLimit: 5,
+        currentBorrowed: borrowedBooks.length
+      }
+    });
+  } catch (error) {
+    console.error('Get library resources error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: error.message 
+    });
   }
 };
