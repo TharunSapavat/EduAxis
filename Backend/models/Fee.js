@@ -38,7 +38,10 @@ const feeSchema = new mongoose.Schema({
     enum: ['all', 'grade-specific'],
     default: 'all'
   },
-  grades: [String] // e.g., ['9th', '10th', '11th', '12th']
+  grades: [{
+    type: String,
+    enum: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']
+  }] // Which grades this fee applies to
 }, {
   timestamps: true
 });
