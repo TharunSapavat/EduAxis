@@ -647,12 +647,15 @@ export const getLibraryResources = async (req, res) => {
     const studentId = req.user._id;
     const student = req.user;
 
+    // Get student's grade or default to '10'
+    const studentGrade = student.grade || '10';
+
     // TODO: Create a proper LibraryResource model
     // For now, return sample data structure
     const resources = [
       {
         id: '1',
-        title: 'Mathematics Textbook - Grade ' + student.grade,
+        title: 'Mathematics Textbook - Grade ' + studentGrade,
         type: 'Textbook',
         subject: 'Mathematics',
         format: 'PDF',

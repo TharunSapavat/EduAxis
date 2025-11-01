@@ -231,12 +231,16 @@ export default function StudentDashboard() {
     try {
       setCoursesLoading(true);
       const response = await studentAPI.getCourses();
+      console.log('Courses response:', response.data);
       if (response.data.success) {
         setCourses(response.data.courses || []);
+      } else {
+        showNotification(response.data.message || 'Failed to load courses', 'error');
       }
     } catch (error) {
       console.error('Error fetching courses:', error);
-      showNotification('Failed to load courses', 'error');
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to load courses';
+      showNotification(errorMsg, 'error');
     } finally {
       setCoursesLoading(false);
     }
@@ -330,12 +334,16 @@ export default function StudentDashboard() {
     try {
       setLibraryLoading(true);
       const response = await studentAPI.getLibrary();
+      console.log('Library response:', response.data);
       if (response.data.success) {
         setLibrary(response.data.library);
+      } else {
+        showNotification(response.data.message || 'Failed to load library', 'error');
       }
     } catch (error) {
       console.error('Error fetching library:', error);
-      showNotification('Failed to load library', 'error');
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to load library';
+      showNotification(errorMsg, 'error');
     } finally {
       setLibraryLoading(false);
     }
