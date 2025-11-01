@@ -2,8 +2,61 @@ import { useState, useEffect } from 'react';
 import { Users, BookOpen, Calendar, FileText, BarChart3, Settings, Shield, Database, DollarSign, Library, GraduationCap, ClipboardList, Home, X, Search, Filter, Eye, Mail, Phone, MapPin, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { adminAPI } from '../services/api';
+import { useForm } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
+import * as yup from 'yup';
 import DashboardHeader from '../components/DashboardHeader';
 import DashboardFooter from '../components/DashboardFooter';
+
+// Fee form validation schema
+const feeSchema = yup.object({
+  title: yup
+    .string()
+    .required('Fee title is required')
+    .min(3, 'Title must be at least 3 characters')
+    .max(100, 'Title must not exceed 100 characters')
+    .matches(/^[a-zA-Z0-9\s\-_.,]+$/, 'Title can only contain letters, numbers, spaces, and basic punctuation')
+    .test('no-leading-trailing-spaces', 'Title cannot start or end with spaces', 
+      value => value ? value.trim() === value : true),
+  amount: yup
+    .number()
+    .required('Amount is required')
+    .positive('Amount must be a positive number')
+    .min(1, 'Amount must be at least 1')
+    .max(1000000, 'Amount must not exceed 1,000,000')
+    .typeError('Amount must be a valid number'),
+  description: yup
+    .string()
+    .max(500, 'Description must not exceed 500 characters')
+    .notRequired(),
+  dueDate: yup
+    .string()
+    .required('Due date is required')
+    .test('future-date', 'Due date must be today or in the future', function(value) {
+      if (!value) return false;
+      const dueDate = new Date(value);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      dueDate.setHours(0, 0, 0, 0);
+      return dueDate >= today;
+    }),
+  semester: yup
+    .string()
+    .oneOf(['Annual', 'Fall', 'Spring', 'Summer'], 'Please select a valid semester')
+    .required('Semester is required'),
+  appliesTo: yup
+    .string()
+    .oneOf(['all', 'grade-specific'], 'Invalid option')
+    .required('Please specify who this fee applies to'),
+  grades: yup
+    .array()
+    .of(yup.string().matches(/^(1|2|3|4|5|6|7|8|9|10|11|12)$/, 'Invalid grade'))
+    .when('appliesTo', {
+      is: 'grade-specific',
+      then: (schema) => schema.min(1, 'Select at least one grade'),
+      otherwise: (schema) => schema.notRequired()
+    })
+}).required();
 
 export default function AdminDashboard() {
   const { user } = useAuth();
@@ -25,21 +78,36 @@ export default function AdminDashboard() {
   const [payments, setPayments] = useState([]);
   const [filteredPayments, setFilteredPayments] = useState([]);
   const [showFeeForm, setShowFeeForm] = useState(false);
-  const [feeFormData, setFeeFormData] = useState({
-    title: '',
-    amount: '',
-    description: '',
-    dueDate: '',
-    semester: 'Annual',
-    appliesTo: 'all',
-    grades: []
-  });
   const [paymentSearchQuery, setPaymentSearchQuery] = useState('');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState('all');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('all');
   const [feesLoading, setFeesLoading] = useState(false);
   const [paymentsLoading, setPaymentsLoading] = useState(false);
   const [paymentStats, setPaymentStats] = useState({ total: 0, completed: 0, totalAmount: 0 });
+
+  // Fee form with React Hook Form
+  const {
+    register: registerFee,
+    handleSubmit: handleFeeFormSubmit,
+    watch: watchFee,
+    setValue: setFeeValue,
+    reset: resetFeeForm,
+    formState: { errors: feeErrors }
+  } = useForm({
+    resolver: yupResolver(feeSchema),
+    defaultValues: {
+      title: '',
+      amount: '',
+      description: '',
+      dueDate: '',
+      semester: 'Annual',
+      appliesTo: 'all',
+      grades: []
+    }
+  });
+
+  const feeAppliesTo = watchFee('appliesTo');
+  const feeGrades = watchFee('grades');
 
   // Fetch users from API
   useEffect(() => {
@@ -137,13 +205,12 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleCreateFee = async (e) => {
-    e.preventDefault();
+  const handleCreateFee = async (data) => {
     try {
-      const res = await adminAPI.createFee(feeFormData);
+      const res = await adminAPI.createFee(data);
       if (res.data.success) {
-  setShowFeeForm(false);
-  setFeeFormData({ title: '', amount: '', description: '', dueDate: '', semester: 'Annual', appliesTo: 'all', grades: [] });
+        setShowFeeForm(false);
+        resetFeeForm();
         fetchFees();
         alert('Fee created successfully!');
       }
@@ -771,9 +838,12 @@ export default function AdminDashboard() {
             {/* Fee Form Modal */}
             {showFeeForm && (
               <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md relative">
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md relative max-h-[90vh] overflow-y-auto">
                   <button
-                    onClick={() => setShowFeeForm(false)}
+                    onClick={() => {
+                      setShowFeeForm(false);
+                      resetFeeForm();
+                    }}
                     className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"
                   >
                     <X className="w-6 h-6" />
@@ -781,59 +851,69 @@ export default function AdminDashboard() {
 
                   <div className="p-8">
                     <h2 className="text-2xl font-bold text-slate-900 mb-6">Set New Fee</h2>
-                    <form onSubmit={handleCreateFee} className="space-y-4">
+                    <form onSubmit={handleFeeFormSubmit(handleCreateFee)} className="space-y-4">
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Fee Title</label>
                         <input
                           type="text"
-                          required
-                          value={feeFormData.title}
-                          onChange={(e) => setFeeFormData({ ...feeFormData, title: e.target.value })}
-                          className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          {...registerFee('title')}
+                          className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                            feeErrors.title ? 'border-red-500' : 'border-slate-300'
+                          }`}
                           placeholder="e.g., Tuition Fee - Fall 2025"
                         />
+                        {feeErrors.title && (
+                          <p className="mt-1 text-sm text-red-600">{feeErrors.title.message}</p>
+                        )}
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Amount ($)</label>
                         <input
                           type="number"
-                          required
-                          min="0"
-                          value={feeFormData.amount}
-                          onChange={(e) => setFeeFormData({ ...feeFormData, amount: e.target.value })}
-                          className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          step="0.01"
+                          {...registerFee('amount')}
+                          className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                            feeErrors.amount ? 'border-red-500' : 'border-slate-300'
+                          }`}
                           placeholder="5000"
                         />
+                        {feeErrors.amount && (
+                          <p className="mt-1 text-sm text-red-600">{feeErrors.amount.message}</p>
+                        )}
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
                         <textarea
-                          value={feeFormData.description}
-                          onChange={(e) => setFeeFormData({ ...feeFormData, description: e.target.value })}
+                          {...registerFee('description')}
                           className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                           rows="3"
                           placeholder="Optional description"
                         />
+                        {feeErrors.description && (
+                          <p className="mt-1 text-sm text-red-600">{feeErrors.description.message}</p>
+                        )}
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Due Date</label>
                         <input
                           type="date"
-                          required
-                          value={feeFormData.dueDate}
-                          onChange={(e) => setFeeFormData({ ...feeFormData, dueDate: e.target.value })}
-                          className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          {...registerFee('dueDate')}
+                          className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                            feeErrors.dueDate ? 'border-red-500' : 'border-slate-300'
+                          }`}
                         />
+                        {feeErrors.dueDate && (
+                          <p className="mt-1 text-sm text-red-600">{feeErrors.dueDate.message}</p>
+                        )}
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Semester</label>
                         <select
-                          value={feeFormData.semester}
-                          onChange={(e) => setFeeFormData({ ...feeFormData, semester: e.target.value })}
+                          {...registerFee('semester')}
                           className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                         >
                           <option value="Annual">Annual</option>
@@ -841,6 +921,9 @@ export default function AdminDashboard() {
                           <option value="Spring">Spring</option>
                           <option value="Summer">Summer</option>
                         </select>
+                        {feeErrors.semester && (
+                          <p className="mt-1 text-sm text-red-600">{feeErrors.semester.message}</p>
+                        )}
                       </div>
 
                       {/* Applies To: All vs Grade-specific */}
@@ -849,38 +932,44 @@ export default function AdminDashboard() {
                         <div className="grid grid-cols-2 gap-2">
                           <button
                             type="button"
-                            onClick={() => setFeeFormData({ ...feeFormData, appliesTo: 'all', grades: [] })}
-                            className={`py-2 px-4 rounded-lg font-medium transition-all ${feeFormData.appliesTo === 'all' ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-700'}`}
+                            onClick={() => {
+                              setFeeValue('appliesTo', 'all');
+                              setFeeValue('grades', []);
+                            }}
+                            className={`py-2 px-4 rounded-lg font-medium transition-all ${feeAppliesTo === 'all' ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-700'}`}
                           >
                             All Students
                           </button>
                           <button
                             type="button"
-                            onClick={() => setFeeFormData({ ...feeFormData, appliesTo: 'grade-specific' })}
-                            className={`py-2 px-4 rounded-lg font-medium transition-all ${feeFormData.appliesTo === 'grade-specific' ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-700'}`}
+                            onClick={() => setFeeValue('appliesTo', 'grade-specific')}
+                            className={`py-2 px-4 rounded-lg font-medium transition-all ${feeAppliesTo === 'grade-specific' ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-700'}`}
                           >
                             Specific Grades
                           </button>
                         </div>
+                        {feeErrors.appliesTo && (
+                          <p className="mt-1 text-sm text-red-600">{feeErrors.appliesTo.message}</p>
+                        )}
                       </div>
 
                       {/* Grade multi-select when grade-specific */}
-                      {feeFormData.appliesTo === 'grade-specific' && (
+                      {feeAppliesTo === 'grade-specific' && (
                         <div>
                           <label className="block text-sm font-medium text-slate-700 mb-1">Select Grades</label>
                           <div className="grid grid-cols-6 gap-2">
                             {[...Array(12)].map((_, i) => {
                               const g = String(i + 1);
-                              const selected = feeFormData.grades.includes(g);
+                              const selected = feeGrades.includes(g);
                               return (
                                 <button
                                   type="button"
                                   key={g}
                                   onClick={() => {
                                     const grades = selected
-                                      ? feeFormData.grades.filter(x => x !== g)
-                                      : [...feeFormData.grades, g];
-                                    setFeeFormData({ ...feeFormData, grades });
+                                      ? feeGrades.filter(x => x !== g)
+                                      : [...feeGrades, g];
+                                    setFeeValue('grades', grades);
                                   }}
                                   className={`text-sm py-2 rounded border ${selected ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}`}
                                 >
@@ -889,8 +978,8 @@ export default function AdminDashboard() {
                               );
                             })}
                           </div>
-                          {feeFormData.grades.length === 0 && (
-                            <p className="text-xs text-slate-500 mt-1">Select at least one grade.</p>
+                          {feeErrors.grades && (
+                            <p className="mt-1 text-sm text-red-600">{feeErrors.grades.message}</p>
                           )}
                         </div>
                       )}

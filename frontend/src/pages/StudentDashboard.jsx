@@ -2,8 +2,29 @@ import { BookOpen, Users, Calendar, FileText, BarChart3, ClipboardList, Bell, Li
 import { useAuth } from '../context/AuthContext';
 import { studentAPI } from '../services/api';
 import { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
+import * as yup from 'yup';
 import DashboardHeader from '../components/DashboardHeader';
 import DashboardFooter from '../components/DashboardFooter';
+
+// Payment form validation schema
+const paymentSchema = yup.object({
+  paymentMethod: yup
+    .string()
+    .oneOf(['Cash', 'Credit Card', 'Debit Card', 'Bank Transfer', 'Online Payment', 'UPI', 'Check'], 
+      'Please select a valid payment method')
+    .required('Payment method is required'),
+  transactionId: yup
+    .string()
+    .max(100, 'Transaction ID must not exceed 100 characters')
+    .matches(/^[a-zA-Z0-9\-_]*$/, 'Transaction ID can only contain letters, numbers, hyphens, and underscores')
+    .notRequired(),
+  remarks: yup
+    .string()
+    .max(500, 'Remarks must not exceed 500 characters')
+    .notRequired()
+}).required();
 
 export default function StudentDashboard() {
   const { user } = useAuth();
@@ -30,13 +51,23 @@ export default function StudentDashboard() {
   });
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [selectedFee, setSelectedFee] = useState(null);
-  const [paymentFormData, setPaymentFormData] = useState({
-    paymentMethod: 'Cash',
-    transactionId: '',
-    remarks: ''
-  });
   const [feesLoading, setFeesLoading] = useState(false);
   const [notification, setNotification] = useState(null);
+
+  // Payment form with React Hook Form
+  const {
+    register: registerPayment,
+    handleSubmit: handlePaymentFormSubmit,
+    reset: resetPaymentForm,
+    formState: { errors: paymentErrors }
+  } = useForm({
+    resolver: yupResolver(paymentSchema),
+    defaultValues: {
+      paymentMethod: 'Cash',
+      transactionId: '',
+      remarks: ''
+    }
+  });
 
   // Auto-hide notification after 5 seconds
   useEffect(() => {
@@ -87,9 +118,7 @@ export default function StudentDashboard() {
     }
   };
 
-  const handlePaymentSubmit = async (e) => {
-    e.preventDefault();
-    
+  const handlePaymentSubmit = async (data) => {
     if (!selectedFee) return;
 
     try {
@@ -108,9 +137,9 @@ export default function StudentDashboard() {
       const paymentData = {
         feeId: selectedFee._id,
         amount: selectedFee.amount,
-        paymentMethod: paymentFormData.paymentMethod,
-        transactionId: paymentFormData.transactionId,
-        remarks: paymentFormData.remarks
+        paymentMethod: data.paymentMethod,
+        transactionId: data.transactionId,
+        remarks: data.remarks
       };
 
       const response = await studentAPI.makePayment(paymentData);
@@ -123,11 +152,7 @@ export default function StudentDashboard() {
         );
         setShowPaymentForm(false);
         setSelectedFee(null);
-        setPaymentFormData({
-          paymentMethod: 'Cash',
-          transactionId: '',
-          remarks: ''
-        });
+        resetPaymentForm();
         fetchFeeData(); // Refresh fee data
       }
     } catch (error) {
@@ -601,16 +626,16 @@ export default function StudentDashboard() {
                         </div>
                       </div>
 
-                    <form onSubmit={handlePaymentSubmit} className="space-y-4">
+                    <form onSubmit={handlePaymentFormSubmit(handlePaymentSubmit)} className="space-y-4">
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">
                           Payment Method *
                         </label>
                         <select
-                          value={paymentFormData.paymentMethod}
-                          onChange={(e) => setPaymentFormData({...paymentFormData, paymentMethod: e.target.value})}
-                          className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          required
+                          {...registerPayment('paymentMethod')}
+                          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                            paymentErrors.paymentMethod ? 'border-red-500' : 'border-slate-300'
+                          }`}
                         >
                           <option value="Cash">Cash</option>
                           <option value="Credit Card">Credit Card</option>
@@ -620,6 +645,9 @@ export default function StudentDashboard() {
                           <option value="UPI">UPI</option>
                           <option value="Check">Check</option>
                         </select>
+                        {paymentErrors.paymentMethod && (
+                          <p className="mt-1 text-sm text-red-600">{paymentErrors.paymentMethod.message}</p>
+                        )}
                       </div>
 
                       <div>
@@ -628,11 +656,13 @@ export default function StudentDashboard() {
                         </label>
                         <input
                           type="text"
-                          value={paymentFormData.transactionId}
-                          onChange={(e) => setPaymentFormData({...paymentFormData, transactionId: e.target.value})}
+                          {...registerPayment('transactionId')}
                           className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           placeholder="Enter transaction ID if applicable"
                         />
+                        {paymentErrors.transactionId && (
+                          <p className="mt-1 text-sm text-red-600">{paymentErrors.transactionId.message}</p>
+                        )}
                       </div>
 
                       <div>
@@ -640,12 +670,14 @@ export default function StudentDashboard() {
                           Remarks (Optional)
                         </label>
                         <textarea
-                          value={paymentFormData.remarks}
-                          onChange={(e) => setPaymentFormData({...paymentFormData, remarks: e.target.value})}
+                          {...registerPayment('remarks')}
                           className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           rows="3"
                           placeholder="Any additional notes"
                         />
+                        {paymentErrors.remarks && (
+                          <p className="mt-1 text-sm text-red-600">{paymentErrors.remarks.message}</p>
+                        )}
                       </div>
 
                       <div className="flex gap-3 pt-4">
@@ -654,6 +686,7 @@ export default function StudentDashboard() {
                           onClick={() => {
                             setShowPaymentForm(false);
                             setSelectedFee(null);
+                            resetPaymentForm();
                           }}
                           className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium"
                         >
