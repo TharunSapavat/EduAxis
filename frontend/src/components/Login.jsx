@@ -1,60 +1,38 @@
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { yupResolver } from '@hookform/resolvers/yup';
-import * as yup from 'yup';
 import { X, Mail, Lock, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { authAPI } from '../services/api';
 
-// Validation schema
-const loginSchema = yup.object({
-  email: yup
-    .string()
-    .required('Email is required')
-    .email('Please enter a valid email address')
-    .matches(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Invalid email format')
-    .max(100, 'Email must not exceed 100 characters')
-    .test('no-spaces', 'Email cannot contain spaces', value => value ? !value.includes(' ') : true),
-  password: yup
-    .string()
-    .required('Password is required')
-    .min(6, 'Password must be at least 6 characters long')
-    .max(50, 'Password must not exceed 50 characters')
-    .matches(/^(?=.*[a-zA-Z])/, 'Password must contain at least one letter'),
-  role: yup
-    .string()
-    .oneOf(['student', 'teacher', 'admin'], 'Please select a valid role')
-    .required('Role is required')
-}).required();
-
 export default function Login({ onClose, onSwitchToRegister }) {
   const { login } = useAuth();
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    role: 'student'
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const {
-    register,
-    handleSubmit,
-    watch,
-    setValue,
-    formState: { errors }
-  } = useForm({
-    resolver: yupResolver(loginSchema),
-    defaultValues: {
-      email: '',
-      password: '',
-      role: 'student'
-    }
-  });
-
-  const currentRole = watch('role');
-
-  const onSubmit = async (data) => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     setLoading(true);
     setError('');
     
+    // Client-side validation
+    if (!formData.email || !formData.password) {
+      setError('Please enter both email and password');
+      setLoading(false);
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      setLoading(false);
+      return;
+    }
+    
     try {
-      const response = await authAPI.login(data);
+      const response = await authAPI.login(formData);
       
       if (response.data.success) {
         // Cookie is set automatically by backend!
@@ -95,7 +73,7 @@ export default function Login({ onClose, onSwitchToRegister }) {
             <p className="text-slate-600 mt-2">Sign in to your EduAxis account</p>
           </div>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
                 {error}
@@ -111,9 +89,9 @@ export default function Login({ onClose, onSwitchToRegister }) {
                   <button
                     key={role}
                     type="button"
-                    onClick={() => setValue('role', role)}
+                    onClick={() => setFormData({ ...formData, role })}
                     className={`py-2 px-4 rounded-lg font-medium transition-all ${
-                      currentRole === role
+                      formData.role === role
                         ? 'bg-blue-600 text-white shadow-md'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
@@ -122,9 +100,6 @@ export default function Login({ onClose, onSwitchToRegister }) {
                   </button>
                 ))}
               </div>
-              {errors.role && (
-                <p className="mt-1 text-sm text-red-600">{errors.role.message}</p>
-              )}
             </div>
 
             <div>
@@ -134,18 +109,14 @@ export default function Login({ onClose, onSwitchToRegister }) {
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <input
-                  type="text"
-                  {...register('email')}
-                  className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all ${
-                    errors.email ? 'border-red-500' : 'border-slate-300'
-                  }`}
+                  type="email"
+                  required
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                   placeholder="your.email@example.com"
-                  autoComplete="email"
                 />
               </div>
-              {errors.email && (
-                <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
-              )}
             </div>
 
             <div>
@@ -156,16 +127,13 @@ export default function Login({ onClose, onSwitchToRegister }) {
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <input
                   type="password"
-                  {...register('password')}
-                  className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all ${
-                    errors.password ? 'border-red-500' : 'border-slate-300'
-                  }`}
+                  required
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                   placeholder="Enter your password"
                 />
               </div>
-              {errors.password && (
-                <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
-              )}
             </div>
 
             <div className="flex items-center justify-between">

@@ -73,7 +73,7 @@ export const getUsers = async (req, res) => {
 // Create new user
 export const createUser = async (req, res) => {
   try {
-    const { name, email, role, password, phone, dateOfBirth } = req.body;
+    const { name, email, role, password, phone, dateOfBirth, grade, section } = req.body;
 
     // Basic validation
     if (!name || !email || !password) {
@@ -85,14 +85,20 @@ export const createUser = async (req, res) => {
       return res.status(400).json({ success: false, message: 'User already exists with this email' });
     }
 
-    const newUser = await User.create({
+    const userData = {
       name,
       email,
       password, // TODO: hash in production
       role: (role || 'student').toLowerCase(),
       phone,
       dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
-    });
+    };
+
+    // Add student-specific fields
+    if (grade) userData.grade = grade;
+    if (section) userData.section = section;
+
+    const newUser = await User.create(userData);
 
     res.json({
       success: true,

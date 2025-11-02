@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, BookOpen, Calendar, FileText, BarChart3, Settings, Shield, Database, DollarSign, Library, GraduationCap, ClipboardList, Home, X, Search, Filter, Eye, Mail, Phone, MapPin, Trash2 } from 'lucide-react';
+import { Users, BookOpen, Calendar, FileText, BarChart3, Settings, Shield, Database, DollarSign, Library, GraduationCap, ClipboardList, Home, X, Search, Filter, Eye, Mail, Phone, MapPin, Trash2, UserPlus, Lock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { adminAPI } from '../services/api';
 import { useForm } from 'react-hook-form';
@@ -7,6 +7,82 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import DashboardHeader from '../components/DashboardHeader';
 import DashboardFooter from '../components/DashboardFooter';
+
+// User creation validation schema
+const userSchema = yup.object({
+  name: yup
+    .string()
+    .required('Name is required')
+    .min(2, 'Name must be at least 2 characters long')
+    .max(50, 'Name must not exceed 50 characters')
+    .matches(/^[a-zA-Z\s]+$/, 'Name must contain only letters and spaces')
+    .test('no-leading-trailing-spaces', 'Name cannot start or end with spaces', 
+      value => value ? value.trim() === value : true),
+  email: yup
+    .string()
+    .required('Email is required')
+    .email('Please enter a valid email address')
+    .matches(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Invalid email format')
+    .max(100, 'Email must not exceed 100 characters')
+    .test('no-spaces', 'Email cannot contain spaces', value => value ? !value.includes(' ') : true),
+  phone: yup
+    .string()
+    .required('Phone number is required')
+    .matches(/^\d{10}$/, 'Phone number must be exactly 10 digits')
+    .length(10, 'Phone number must be exactly 10 digits'),
+  dateOfBirth: yup
+    .string()
+    .required('Date of birth is required')
+    .matches(/^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-\d{4}$/, 'Date must be in DD-MM-YYYY format')
+    .test('valid-date', 'Please enter a valid date', function(value) {
+      if (!value) return false;
+      const [day, month, year] = value.split('-').map(Number);
+      const date = new Date(year, month - 1, day);
+      return date.getDate() === day && date.getMonth() === month - 1 && date.getFullYear() === year;
+    })
+    .test('age', 'User must be at least 5 years old', function(value) {
+      if (!value) return false;
+      const [day, month, year] = value.split('-').map(Number);
+      const birthDate = new Date(year, month - 1, day);
+      const today = new Date();
+      const age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        return age - 1 >= 5;
+      }
+      return age >= 5;
+    })
+    .test('max-age', 'Please enter a valid date of birth', function(value) {
+      if (!value) return false;
+      const [day, month, year] = value.split('-').map(Number);
+      const birthDate = new Date(year, month - 1, day);
+      const today = new Date();
+      return birthDate <= today;
+    }),
+  role: yup
+    .string()
+    .oneOf(['student', 'teacher', 'admin'], 'Please select a valid role')
+    .required('Role is required'),
+  password: yup
+    .string()
+    .required('Password is required')
+    .min(6, 'Password must be at least 6 characters long')
+    .max(50, 'Password must not exceed 50 characters')
+    .matches(/^(?=.*[a-zA-Z])(?=.*\d)/, 'Password must contain at least one letter and one number'),
+  grade: yup
+    .string()
+    .when('role', {
+      is: 'student',
+      then: (schema) => schema
+        .required('Grade is required for students')
+        .matches(/^(1|2|3|4|5|6|7|8|9|10|11|12)$/, 'Please select a valid grade'),
+      otherwise: (schema) => schema.notRequired()
+    }),
+  section: yup
+    .string()
+    .matches(/^[A-D]?$/, 'Section must be A, B, C, or D')
+    .notRequired()
+}).required();
 
 // Fee form validation schema
 const feeSchema = yup.object({
@@ -70,8 +146,33 @@ export default function AdminDashboard() {
   const [roleFilter, setRoleFilter] = useState('all');
   const [selectedUser, setSelectedUser] = useState(null);
   const [showUserDetails, setShowUserDetails] = useState(false);
+  const [showUserForm, setShowUserForm] = useState(false);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersError, setUsersError] = useState('');
+
+  // User form with React Hook Form
+  const {
+    register: registerUser,
+    handleSubmit: handleUserFormSubmit,
+    watch: watchUser,
+    setValue: setUserValue,
+    reset: resetUserForm,
+    formState: { errors: userErrors }
+  } = useForm({
+    resolver: yupResolver(userSchema),
+    defaultValues: {
+      name: '',
+      email: '',
+      password: '',
+      role: 'student',
+      phone: '',
+      dateOfBirth: '',
+      grade: '',
+      section: ''
+    }
+  });
+
+  const currentUserRole = watchUser('role');
 
   // Fee Management States
   const [fees, setFees] = useState([]);
@@ -109,39 +210,41 @@ export default function AdminDashboard() {
   const feeAppliesTo = watchFee('appliesTo');
   const feeGrades = watchFee('grades');
 
-  // Fetch users from API
+  // Fetch users function (defined here so handleCreateUser can use it)
+  const fetchUsers = async () => {
+    setUsersLoading(true);
+    setUsersError('');
+    try {
+      const res = await adminAPI.getUsers();
+      // Expecting res.data to be either { users: [...] } or [...]
+      const raw = Array.isArray(res.data) ? res.data : (res.data?.users || []);
+      // Normalize to UI shape
+      const normalized = raw.map((u) => ({
+        id: u._id || u.id,
+        name: u.name || `${u.firstName || ''} ${u.lastName || ''}`.trim(),
+        email: u.email,
+        role: (u.role || u.type || 'student').toLowerCase(),
+        phone: u.phone || u.mobile || 'N/A',
+        status: (u.status || 'active').toLowerCase(),
+        dateOfBirth: u.dateOfBirth || u.dob || '—',
+        enrollmentDate: u.enrollmentDate || u.joinedAt || u.createdAt || '—',
+        joinDate: u.joinDate || u.hiredAt || u.createdAt || '—',
+        grade: u.grade || u.classLevel || undefined,
+        subject: u.subject || u.department || undefined,
+        address: u.address || '—',
+      }));
+      setUsers(normalized);
+      setFilteredUsers(normalized);
+    } catch (err) {
+      console.error('Failed to fetch users:', err);
+      setUsersError(err.response?.data?.message || err.message || 'Failed to fetch users');
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  // Fetch users from API on mount
   useEffect(() => {
-    const fetchUsers = async () => {
-      setUsersLoading(true);
-      setUsersError('');
-      try {
-        const res = await adminAPI.getUsers();
-        // Expecting res.data to be either { users: [...] } or [...]
-        const raw = Array.isArray(res.data) ? res.data : (res.data?.users || []);
-        // Normalize to UI shape
-        const normalized = raw.map((u) => ({
-          id: u._id || u.id,
-          name: u.name || `${u.firstName || ''} ${u.lastName || ''}`.trim(),
-          email: u.email,
-          role: (u.role || u.type || 'student').toLowerCase(),
-          phone: u.phone || u.mobile || 'N/A',
-          status: (u.status || 'active').toLowerCase(),
-          dateOfBirth: u.dateOfBirth || u.dob || '—',
-          enrollmentDate: u.enrollmentDate || u.joinedAt || u.createdAt || '—',
-          joinDate: u.joinDate || u.hiredAt || u.createdAt || '—',
-          grade: u.grade || u.classLevel || undefined,
-          subject: u.subject || u.department || undefined,
-          address: u.address || '—',
-        }));
-        setUsers(normalized);
-        setFilteredUsers(normalized);
-      } catch (err) {
-        console.error('Failed to fetch users:', err);
-        setUsersError(err.response?.data?.message || err.message || 'Failed to fetch users');
-      } finally {
-        setUsersLoading(false);
-      }
-    };
     fetchUsers();
   }, []);
 
@@ -262,6 +365,74 @@ export default function AdminDashboard() {
     setShowUserDetails(true);
   };
 
+  const handleCreateUser = async (data) => {
+    try {
+      setUsersLoading(true);
+      
+      console.log('Form data received:', JSON.stringify(data, null, 2)); // Debug log
+      
+      // Convert DD-MM-YYYY to YYYY-MM-DD for backend
+      const dateOfBirthFormatted = data.dateOfBirth
+        ? data.dateOfBirth.split('-').reverse().join('-')
+        : undefined;
+      
+      // Build user data based on role
+      const userData = {
+        name: data.name,
+        email: data.email,
+        password: data.password,
+        role: data.role,
+        phone: data.phone,
+        dateOfBirth: dateOfBirthFormatted
+      };
+      
+      // Only include grade and section for students
+      if (data.role === 'student') {
+        userData.grade = data.grade || undefined;
+        userData.section = data.section || undefined;
+      }
+      
+      console.log('Sending to backend:', JSON.stringify(userData, null, 2)); // Debug log
+      
+      const response = await adminAPI.createUser(userData);
+      
+      if (response.data.success) {
+        setShowUserForm(false);
+        resetUserForm();
+        fetchUsers();
+        alert('User created successfully!');
+      }
+    } catch (err) {
+      console.error('Failed to create user:', err);
+      alert(err.response?.data?.message || 'Failed to create user');
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async (userId) => {
+    if (!window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      setUsersLoading(true);
+      const response = await adminAPI.deleteUser(userId);
+      
+      if (response.data.success) {
+        setShowUserDetails(false);
+        setSelectedUser(null);
+        fetchUsers();
+        alert('User deleted successfully!');
+      }
+    } catch (err) {
+      console.error('Failed to delete user:', err);
+      alert(err.response?.data?.message || 'Failed to delete user');
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
   const modules = [
     { id: 'home', icon: Home, title: 'Home', description: 'Overview and statistics' },
     { id: 'users', icon: Users, title: 'User Management', description: 'Manage students, teachers & staff' },
@@ -325,7 +496,7 @@ export default function AdminDashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-slate-600 text-sm">Total Revenue</p>
-                    <p className="text-3xl font-bold text-purple-600 mt-1">$485K</p>
+                    <p className="text-3xl font-bold text-purple-600 mt-1">₹485K</p>
                   </div>
                   <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
                     <DollarSign className="w-6 h-6 text-purple-600" />
@@ -374,8 +545,11 @@ export default function AdminDashboard() {
                   <h2 className="text-2xl font-bold text-slate-900">User Management</h2>
                   <p className="text-slate-600 mt-1">Manage students, teachers, and staff members</p>
                 </div>
-                <button className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2">
-                  <Users className="w-4 h-4" />
+                <button 
+                  onClick={() => setShowUserForm(true)}
+                  className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
+                >
+                  <UserPlus className="w-4 h-4" />
                   <span>Add New User</span>
                 </button>
               </div>
@@ -490,13 +664,22 @@ export default function AdminDashboard() {
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            <button
-                              onClick={() => handleViewDetails(user)}
-                              className="text-purple-600 hover:text-purple-900 font-medium flex items-center space-x-1"
-                            >
-                              <Eye className="w-4 h-4" />
-                              <span>View Details</span>
-                            </button>
+                            <div className="flex items-center space-x-3">
+                              <button
+                                onClick={() => handleViewDetails(user)}
+                                className="text-purple-600 hover:text-purple-900 font-medium flex items-center space-x-1"
+                              >
+                                <Eye className="w-4 h-4" />
+                                <span>View</span>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteUser(user.id)}
+                                className="text-red-600 hover:text-red-900 font-medium flex items-center space-x-1"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                <span>Delete</span>
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))
@@ -630,11 +813,211 @@ export default function AdminDashboard() {
                         <button className="flex-1 bg-slate-100 text-slate-700 py-2 rounded-lg hover:bg-slate-200 transition-colors font-medium">
                           View History
                         </button>
-                        <button className="px-4 bg-red-100 text-red-700 py-2 rounded-lg hover:bg-red-200 transition-colors font-medium">
-                          Delete
+                        <button 
+                          onClick={() => handleDeleteUser(selectedUser.id)}
+                          className="px-4 bg-red-100 text-red-700 py-2 rounded-lg hover:bg-red-200 transition-colors font-medium flex items-center space-x-1"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          <span>Delete</span>
                         </button>
                       </div>
                     </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Add User Modal */}
+            {showUserForm && (
+              <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl relative max-h-[90vh] overflow-y-auto">
+                  <button
+                    onClick={() => {
+                      setShowUserForm(false);
+                      resetUserForm();
+                    }}
+                    className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors z-10"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+
+                  <div className="p-8">
+                    <div className="text-center mb-8">
+                      <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <UserPlus className="w-8 h-8 text-purple-600" />
+                      </div>
+                      <h2 className="text-3xl font-bold text-slate-900">Add New User</h2>
+                      <p className="text-slate-600 mt-2">Create a new account for student, teacher, or admin</p>
+                    </div>
+
+                    <form onSubmit={handleUserFormSubmit(handleCreateUser)} className="space-y-5">
+                      {/* Role Selection */}
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                          User Role
+                        </label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {['student', 'teacher', 'admin'].map((role) => (
+                            <button
+                              key={role}
+                              type="button"
+                              onClick={() => setUserValue('role', role)}
+                              className={`py-2 px-4 rounded-lg font-medium transition-all ${
+                                currentUserRole === role
+                                  ? 'bg-purple-600 text-white shadow-md'
+                                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                              }`}
+                            >
+                              {role.charAt(0).toUpperCase() + role.slice(1)}
+                            </button>
+                          ))}
+                        </div>
+                        {userErrors.role && (
+                          <p className="mt-1 text-sm text-red-600">{userErrors.role.message}</p>
+                        )}
+                      </div>
+
+                      {/* Full Name */}
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Full Name</label>
+                        <input
+                          type="text"
+                          {...registerUser('name')}
+                          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all ${
+                            userErrors.name ? 'border-red-500' : 'border-slate-300'
+                          }`}
+                          placeholder="John Doe"
+                        />
+                        {userErrors.name && (
+                          <p className="mt-1 text-sm text-red-600">{userErrors.name.message}</p>
+                        )}
+                      </div>
+
+                      {/* Email */}
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Email Address</label>
+                        <input
+                          type="text"
+                          {...registerUser('email')}
+                          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all ${
+                            userErrors.email ? 'border-red-500' : 'border-slate-300'
+                          }`}
+                          placeholder="user@example.com"
+                          autoComplete="email"
+                        />
+                        {userErrors.email && (
+                          <p className="mt-1 text-sm text-red-600">{userErrors.email.message}</p>
+                        )}
+                      </div>
+
+                      {/* Phone and DOB in Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">Phone Number</label>
+                          <input
+                            type="text"
+                            {...registerUser('phone')}
+                            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all ${
+                              userErrors.phone ? 'border-red-500' : 'border-slate-300'
+                            }`}
+                            placeholder="1234567890"
+                            maxLength={10}
+                          />
+                          {userErrors.phone && (
+                            <p className="mt-1 text-sm text-red-600">{userErrors.phone.message}</p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">Date of Birth (DD-MM-YYYY)</label>
+                          <input
+                            type="text"
+                            {...registerUser('dateOfBirth')}
+                            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all ${
+                              userErrors.dateOfBirth ? 'border-red-500' : 'border-slate-300'
+                            }`}
+                            placeholder="DD-MM-YYYY"
+                            maxLength={10}
+                          />
+                          {userErrors.dateOfBirth && (
+                            <p className="mt-1 text-sm text-red-600">{userErrors.dateOfBirth.message}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Student-specific fields */}
+                      {currentUserRole === 'student' && (
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Grade</label>
+                            <select
+                              {...registerUser('grade')}
+                              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all bg-white ${
+                                userErrors.grade ? 'border-red-500' : 'border-slate-300'
+                              }`}
+                            >
+                              <option value="">Select grade</option>
+                              {[...Array(12)].map((_, i) => (
+                                <option key={i+1} value={String(i+1)}>{i+1}</option>
+                              ))}
+                            </select>
+                            {userErrors.grade && (
+                              <p className="mt-1 text-sm text-red-600">{userErrors.grade.message}</p>
+                            )}
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Section (optional)</label>
+                            <select
+                              {...registerUser('section')}
+                              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all bg-white"
+                            >
+                              <option value="">Select section</option>
+                              {['A','B','C','D'].map(sec => (
+                                <option key={sec} value={sec}>{sec}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Password */}
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Password</label>
+                        <input
+                          type="password"
+                          {...registerUser('password')}
+                          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all ${
+                            userErrors.password ? 'border-red-500' : 'border-slate-300'
+                          }`}
+                          placeholder="Create a strong password"
+                        />
+                        {userErrors.password && (
+                          <p className="mt-1 text-sm text-red-600">{userErrors.password.message}</p>
+                        )}
+                      </div>
+
+                      {/* Submit Buttons */}
+                      <div className="flex gap-3 pt-4">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowUserForm(false);
+                            resetUserForm();
+                          }}
+                          className="flex-1 px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={usersLoading}
+                          className="flex-1 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {usersLoading ? 'Creating User...' : 'Create User'}
+                        </button>
+                      </div>
+                    </form>
                   </div>
                 </div>
               </div>
