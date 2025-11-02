@@ -7,6 +7,8 @@ import {
   deleteUser,
   getCourses,
   createCourse,
+  updateCourse,
+  deleteCourse,
   getClasses,
   getReports,
   getStats,
@@ -36,6 +38,8 @@ router.put('/users/:id', updateUser);
 router.delete('/users/:id', deleteUser);
 router.get('/courses', getCourses);
 router.post('/courses', createCourse);
+router.put('/courses/:id', updateCourse);
+router.delete('/courses/:id', deleteCourse);
 router.get('/classes', getClasses);
 router.get('/reports', getReports);
 

@@ -1,11 +1,14 @@
-import { db } from '../models/database.js';
+import Course from '../models/Course.js';
+import User from '../models/User.js';
 
 // Get teacher dashboard data
 export const getDashboard = async (req, res) => {
   try {
-    const teacherId = req.query.teacherId || '2';
-    const teacherCourses = db.findCoursesByTeacher(teacherId);
-    const totalStudents = teacherCourses.reduce((sum, course) => sum + course.students, 0);
+    const teacherId = req.user?.id;
+    
+    // Find courses assigned to this teacher
+    const teacherCourses = await Course.find({ teacherId });
+    const totalStudents = teacherCourses.reduce((sum, course) => sum + (course.students || 0), 0);
     
     res.json({
       stats: {
@@ -23,12 +26,21 @@ export const getDashboard = async (req, res) => {
 // Get teacher courses
 export const getCourses = async (req, res) => {
   try {
-    const teacherId = req.query.teacherId || '2';
-    const courses = db.findCoursesByTeacher(teacherId);
+    const teacherId = req.user?.id;
     
-    res.json({ courses });
+    // Find all courses assigned to this teacher
+    const courses = await Course.find({ teacherId }).sort({ grade: 1, name: 1 });
+    
+    res.json({ 
+      success: true,
+      courses 
+    });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error', 
+      error: error.message 
+    });
   }
 };
 

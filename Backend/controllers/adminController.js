@@ -177,7 +177,16 @@ export const getCourses = async (req, res) => {
 // Create new course
 export const createCourse = async (req, res) => {
   try {
-    const { name, code, teacherId, description, teacher, credits, semester } = req.body;
+    const { name, code, description, teacher, credits, grade } = req.body;
+
+    // Find teacher by name if provided
+    let teacherId = null;
+    if (teacher && teacher !== 'TBD' && teacher.trim() !== '') {
+      const teacherUser = await User.findOne({ name: teacher, role: 'teacher' });
+      if (teacherUser) {
+        teacherId = teacherUser._id;
+      }
+    }
 
     const newCourse = await Course.create({
       name,
@@ -186,7 +195,7 @@ export const createCourse = async (req, res) => {
       teacher: teacher || 'TBD',
       description,
       credits,
-      semester
+      grade
     });
 
     res.json({
@@ -199,6 +208,65 @@ export const createCourse = async (req, res) => {
       const messages = Object.values(error.errors).map(e => e.message).join(', ');
       return res.status(400).json({ success: false, message: messages });
     }
+    if (error.code === 11000) {
+      return res.status(400).json({ success: false, message: 'Course code already exists' });
+    }
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// Update course
+export const updateCourse = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+
+    // Find teacher by name if teacher field is being updated
+    if (updates.teacher && updates.teacher !== 'TBD' && updates.teacher.trim() !== '') {
+      const teacherUser = await User.findOne({ name: updates.teacher, role: 'teacher' });
+      if (teacherUser) {
+        updates.teacherId = teacherUser._id;
+      }
+    }
+
+    const course = await Course.findByIdAndUpdate(id, updates, { new: true, runValidators: true });
+    
+    if (!course) {
+      return res.status(404).json({ success: false, message: 'Course not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Course updated successfully',
+      course
+    });
+  } catch (error) {
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(e => e.message).join(', ');
+      return res.status(400).json({ success: false, message: messages });
+    }
+    if (error.code === 11000) {
+      return res.status(400).json({ success: false, message: 'Course code already exists' });
+    }
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// Delete course
+export const deleteCourse = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const course = await Course.findByIdAndDelete(id);
+    
+    if (!course) {
+      return res.status(404).json({ success: false, message: 'Course not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Course deleted successfully'
+    });
+  } catch (error) {
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
