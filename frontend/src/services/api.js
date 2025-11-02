@@ -107,6 +107,8 @@ export const adminAPI = {
   deleteUser: (id) => api.delete(`/admin/users/${id}`),
   getCourses: () => api.get('/admin/courses'),
   createCourse: (courseData) => api.post('/admin/courses', courseData),
+  updateCourse: (id, courseData) => api.put(`/admin/courses/${id}`, courseData),
+  deleteCourse: (id) => api.delete(`/admin/courses/${id}`),
   getClasses: () => api.get('/admin/classes'),
   getReports: () => api.get('/admin/reports'),
   

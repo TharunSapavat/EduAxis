@@ -39,10 +39,11 @@ const courseSchema = new mongoose.Schema({
     max: [6, 'Credits cannot exceed 6'],
     default: 3
   },
-  semester: {
+  grade: {
     type: Number,
-    min: 1,
-    default: 1
+    required: [true, 'Grade is required'],
+    min: [1, 'Grade must be at least 1'],
+    max: [12, 'Grade cannot exceed 12']
   },
   status: {
     type: String,
