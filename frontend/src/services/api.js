@@ -124,6 +124,12 @@ export const adminAPI = {
   getPaymentStats: () => api.get('/admin/payments/stats'),
   exportPayments: (params) => api.get('/admin/payments/export', { params }),
   sendFeeReminders: (feeId) => api.post('/admin/fees/reminders', { feeId }),
+  
+  // Class Management
+  getClassOverview: () => api.get('/admin/class/overview'),
+  getStudentAnalytics: (params) => api.get('/admin/class/students', { params }),
+  getAtRiskStudents: () => api.get('/admin/class/at-risk'),
+  getStudentDetails: (id) => api.get(`/admin/class/students/${id}`),
 };
 
 export default api;
