@@ -1092,7 +1092,7 @@ export default function StudentDashboard() {
             ) : (
               <div>
                 {/* Timetable Info */}
-                <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-6 mb-6 text-white">
+                <div className="bg-linear-to-r from-blue-600 to-blue-700 rounded-xl p-6 mb-6 text-white">
                   <h2 className="text-xl font-bold mb-2">
                     Grade {timetable.grade} - Section {timetable.section}
                   </h2>
