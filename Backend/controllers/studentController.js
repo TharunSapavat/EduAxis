@@ -92,7 +92,8 @@ export const getCourses = async (req, res) => {
 // Get student grades
 export const getGrades = async (req, res) => {
   try {
-    const studentId = req.query.studentId;
+    // Prefer explicit query param; fall back to auth user
+    const studentId = req.query.studentId || req.user?._id;
 
     if (!studentId) {
       return res.status(400).json({ 
@@ -101,25 +102,36 @@ export const getGrades = async (req, res) => {
       });
     }
 
-    // Get graded assignments
-    const gradedAssignments = await Assignment.find({
+    // Pull graded submissions for this student and join assignment/course where available
+    const gradedSubmissions = await Submission.find({
       studentId,
       status: 'graded'
-    }).populate('courseId', 'name code');
+    })
+      .populate({
+        path: 'assignmentId',
+        select: 'title totalMarks subject courseId',
+        populate: { path: 'courseId', select: 'name code' }
+      })
+      .sort({ gradedAt: -1, updatedAt: -1 });
 
-    const grades = gradedAssignments.map(assignment => ({
-      subject: assignment.courseId?.name || assignment.subject,
-      marks: assignment.marks,
-      total: assignment.totalMarks,
-      grade: calculateGrade(assignment.marks, assignment.totalMarks),
-      assignment: assignment.title,
-      date: assignment.submittedAt
-    }));
-
-    res.json({ 
-      success: true,
-      grades 
+    const grades = gradedSubmissions.map((submission) => {
+      const a = submission.assignmentId || {};
+      const course = a.courseId || {};
+      const subjectName = course.name || a.subject || 'N/A';
+      const totalMarks = a.totalMarks || 100;
+      return {
+        subject: subjectName,
+        assignment: a.title || 'Assignment',
+        marks: submission.marks ?? 0,
+        total: totalMarks,
+        grade: calculateGrade(submission.marks ?? 0, totalMarks),
+        date: submission.gradedAt || submission.updatedAt || submission.createdAt,
+        courseCode: course.code || undefined,
+        feedback: submission.feedback || undefined,
+      };
     });
+
+    res.json({ success: true, grades });
   } catch (error) {
     console.error('Get grades error:', error);
     res.status(500).json({ 
