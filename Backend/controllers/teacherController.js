@@ -2,6 +2,7 @@ import { db } from '../models/database.js';
 import Submission from '../models/Submission.js';
 import Assignment from '../models/Assignment.js';
 import User from '../models/User.js';
+import Attendance from '../models/Attendance.js';
 
 // Get teacher dashboard data
 export const getDashboard = async (req, res) => {
@@ -49,25 +50,51 @@ export const getStudents = async (req, res) => {
 // Mark attendance
 export const markAttendance = async (req, res) => {
   try {
+    const teacherId = req.user?._id;
     const { studentId, courseId, status, date, remarks } = req.body;
-    const teacherId = req.body.teacherId || '2';
-    
-    const attendance = db.markAttendance({
-      studentId,
-      courseId,
-      status,
-      date,
-      markedBy: teacherId,
-      remarks
-    });
-    
+
+    if (!studentId || !courseId || !status) {
+      return res.status(400).json({ success: false, message: 'studentId, courseId and status are required' });
+    }
+    if (!['present', 'absent', 'late', 'excused'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid status value' });
+    }
+
+    // Normalize date to day granularity to prevent duplicates for same day
+    const d = date ? new Date(date) : new Date();
+    const dateNormalized = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+
+    // Upsert attendance record for the day
+    const attendance = await Attendance.findOneAndUpdate(
+      { studentId, courseId, date: dateNormalized },
+      {
+        $set: {
+          status,
+          remarks: remarks || '',
+          markedBy: teacherId
+        }
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    ).populate('courseId', 'name code');
+
+    // Emit realtime update to clients
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('attendanceUpdated', {
+        studentId: String(studentId),
+        courseId: String(courseId),
+        record: attendance
+      });
+    }
+
     res.json({
       success: true,
       message: 'Attendance marked successfully',
       data: attendance
     });
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    console.error('Mark attendance error:', error);
+    res.status(400).json({ success: false, message: error.message });
   }
 };
 

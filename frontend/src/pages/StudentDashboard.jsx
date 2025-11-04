@@ -1,7 +1,8 @@
 import { BookOpen, Users, Calendar, FileText, BarChart3, ClipboardList, Bell, Library, DollarSign, Home, X, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { studentAPI } from '../services/api';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { io } from 'socket.io-client';
 import DashboardHeader from '../components/DashboardHeader';
 import DashboardFooter from '../components/DashboardFooter';
 
@@ -33,6 +34,8 @@ export default function StudentDashboard() {
   const [announcementsLoading, setAnnouncementsLoading] = useState(false);
   const [library, setLibrary] = useState(null);
   const [libraryLoading, setLibraryLoading] = useState(false);
+  const socketRef = useRef(null);
+  const [socketConnected, setSocketConnected] = useState(false);
 
   // Course Details Modal States
   const [showCourseModal, setShowCourseModal] = useState(false);
@@ -80,6 +83,23 @@ export default function StudentDashboard() {
     }
   }, [user]);
 
+  // Initialize Socket.IO connection once
+  useEffect(() => {
+    if (!socketRef.current) {
+      const socket = io('http://localhost:5000', { withCredentials: true });
+      socketRef.current = socket;
+      socket.on('connect', () => setSocketConnected(true));
+      socket.on('disconnect', () => setSocketConnected(false));
+    }
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+        setSocketConnected(false);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     if (user && activeModule === 'fees') {
       fetchFeeData();
@@ -116,6 +136,23 @@ export default function StudentDashboard() {
         break;
     }
   }, [user, activeModule]);
+
+  // Realtime: Listen for attendance updates and refresh when relevant
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket || activeModule !== 'attendance') return;
+    const handler = (payload) => {
+      const myId = user?._id || user?.id || user?.studentId;
+      if (!myId) return;
+      if (String(payload.studentId) === String(myId)) {
+        fetchAttendance();
+      }
+    };
+    socket.on('attendanceUpdated', handler);
+    return () => {
+      socket.off('attendanceUpdated', handler);
+    };
+  }, [activeModule, user]);
 
   const fetchFeeData = async () => {
     try {
