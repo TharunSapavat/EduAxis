@@ -111,6 +111,8 @@ export const adminAPI = {
   deleteUser: (id) => api.delete(`/admin/users/${id}`),
   getCourses: () => api.get('/admin/courses'),
   createCourse: (courseData) => api.post('/admin/courses', courseData),
+  updateCourse: (id, courseData) => api.put(`/admin/courses/${id}`, courseData),
+  deleteCourse: (id) => api.delete(`/admin/courses/${id}`),
   getClasses: () => api.get('/admin/classes'),
   getReports: () => api.get('/admin/reports'),
   
@@ -126,6 +128,12 @@ export const adminAPI = {
   getPaymentStats: () => api.get('/admin/payments/stats'),
   exportPayments: (params) => api.get('/admin/payments/export', { params }),
   sendFeeReminders: (feeId) => api.post('/admin/fees/reminders', { feeId }),
+  
+  // Class Management
+  getClassOverview: () => api.get('/admin/class/overview'),
+  getStudentAnalytics: (params) => api.get('/admin/class/students', { params }),
+  getAtRiskStudents: () => api.get('/admin/class/at-risk'),
+  getStudentDetails: (id) => api.get(`/admin/class/students/${id}`),
 };
 
 export default api;

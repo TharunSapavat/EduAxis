@@ -7,6 +7,8 @@ import {
   deleteUser,
   getCourses,
   createCourse,
+  updateCourse,
+  deleteCourse,
   getClasses,
   getReports,
   getStats,
@@ -18,7 +20,11 @@ import {
   createPayment,
   getPaymentStats,
   exportPayments,
-  sendFeeReminders
+  sendFeeReminders,
+  getClassOverview,
+  getStudentAnalytics,
+  getAtRiskStudents,
+  getStudentDetails
 } from '../controllers/adminController.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
 
@@ -36,6 +42,8 @@ router.put('/users/:id', updateUser);
 router.delete('/users/:id', deleteUser);
 router.get('/courses', getCourses);
 router.post('/courses', createCourse);
+router.put('/courses/:id', updateCourse);
+router.delete('/courses/:id', deleteCourse);
 router.get('/classes', getClasses);
 router.get('/reports', getReports);
 
@@ -51,5 +59,11 @@ router.post('/payments', createPayment);
 router.get('/payments/stats', getPaymentStats);
 router.get('/payments/export', exportPayments);
 router.post('/fees/reminders', sendFeeReminders);
+
+// Class Management Routes
+router.get('/class/overview', getClassOverview);
+router.get('/class/students', getStudentAnalytics);
+router.get('/class/at-risk', getAtRiskStudents);
+router.get('/class/students/:id', getStudentDetails);
 
 export default router;

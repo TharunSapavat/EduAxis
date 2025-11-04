@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.2.2",
     "@tailwindcss/vite": "^4.1.15",
     "axios": "^1.12.2",
     "lucide-react": "^0.546.0",
@@ -16,6 +17,9 @@
     "react-dom": "^18.3.1",
     "socket.io-client": "^4.8.1",
     "tailwindcss": "^4.1.15"
+    "react-hook-form": "^7.66.0",
+    "tailwindcss": "^4.1.15",
+    "yup": "^1.7.1"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",
