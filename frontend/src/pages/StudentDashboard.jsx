@@ -957,7 +957,17 @@ export default function StudentDashboard() {
       case 'grades':
         return (
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 mb-6">Grades & Performance</h1>
+            <div className="flex items-center justify-between mb-6">
+              <h1 className="text-3xl font-bold text-slate-900">Grades & Performance</h1>
+              <button
+                onClick={fetchGrades}
+                disabled={gradesLoading}
+                className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${gradesLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </button>
+            </div>
             {gradesLoading ? (
               <div className="text-center py-12">
                 <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -978,6 +988,7 @@ export default function StudentDashboard() {
                         <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Assignment</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Marks</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Grade</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Feedback</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Date</th>
                       </tr>
                     </thead>
@@ -1005,6 +1016,15 @@ export default function StudentDashboard() {
                             }`}>
                               {grade.grade}
                             </span>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-slate-600 max-w-xs">
+                            {grade.feedback ? (
+                              <span title={grade.feedback} className="line-clamp-2">
+                                {grade.feedback}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
                             {new Date(grade.date).toLocaleDateString()}
