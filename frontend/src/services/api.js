@@ -76,14 +76,18 @@ export const authAPI = {
 export const studentAPI = {
   getDashboard: (studentId) => api.get(`/student/dashboard?studentId=${studentId}`),
   getCourses: () => api.get('/student/courses'),
-  getGrades: () => api.get('/student/grades'),
-  getAttendance: () => api.get('/student/attendance'),
+  getCourseDetails: (courseId) => api.get(`/student/courses/${courseId}`),
+  getGrades: (studentId) => api.get(`/student/grades?studentId=${studentId}`),
+  getAttendance: (studentId) => api.get(`/student/attendance?studentId=${studentId}`),
   getAssignments: (studentId) => api.get(`/student/assignments?studentId=${studentId}`),
-  getTimetable: () => api.get('/student/timetable'),
+  submitAssignment: (data) => api.post('/student/assignments/submit', data),
+  getSubmissionDetails: (assignmentId) => api.get(`/student/assignments/${assignmentId}/submission`),
+  getTimetable: (day) => api.get('/student/timetable', { params: { day } }),
   getAnnouncements: () => api.get('/student/announcements'),
   getFees: () => api.get('/student/fees'),
   makePayment: (paymentData) => api.post('/student/payment', paymentData),
   downloadReceipt: (paymentId) => api.get(`/student/receipt/${paymentId}`),
+  getLibrary: () => api.get('/student/library'),
 };
 
 // Teacher APIs
