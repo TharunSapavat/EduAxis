@@ -4,7 +4,6 @@ import Assignment from '../models/Assignment.js';
 import User from '../models/User.js';
 import Attendance from '../models/Attendance.js';
 import Course from '../models/Course.js';
-import User from '../models/User.js';
 
 // Get teacher dashboard data
 export const getDashboard = async (req, res) => {
