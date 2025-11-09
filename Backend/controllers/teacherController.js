@@ -4,6 +4,7 @@ import Assignment from '../models/Assignment.js';
 import User from '../models/User.js';
 import Attendance from '../models/Attendance.js';
 import Course from '../models/Course.js';
+import Announcement from '../models/Announcement.js';
 
 // Get teacher dashboard data
 export const getDashboard = async (req, res) => {
@@ -328,24 +329,161 @@ export const createAssignment = async (req, res) => {
 // Post announcement
 export const postAnnouncement = async (req, res) => {
   try {
-    const { title, content, targetAudience, priority } = req.body;
-    const teacherId = req.body.teacherId || '2';
+    const teacherId = req.user?._id;
+    const { title, content, targetAudience, priority, courseId } = req.body;
     
-    const announcement = db.addAnnouncement({
+    if (!title || !content) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Title and content are required' 
+      });
+    }
+
+    if (!courseId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Course is required' 
+      });
+    }
+
+    // Find the course to get the grade
+    const course = await Course.findById(courseId);
+    
+    if (!course) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Course not found' 
+      });
+    }
+
+    // Verify teacher owns this course
+    if (String(course.teacherId) !== String(teacherId)) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Not allowed to post announcement for this course' 
+      });
+    }
+
+    // Create announcement in database
+    const announcement = await Announcement.create({
       title,
       content,
       createdBy: teacherId,
       createdByRole: 'teacher',
-      targetAudience: targetAudience || 'all',
-      priority: priority || 'normal'
+      targetAudience: targetAudience || 'students',
+      priority: priority || 'normal',
+      courseId,
+      grade: String(course.grade),
+      isActive: true
     });
+
+    // Populate creator details and course
+    await announcement.populate('createdBy', 'name email');
+    await announcement.populate('courseId', 'name code grade');
+
+    // Emit realtime socket event for students of this grade
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        io.emit('announcementCreated', {
+          announcement: {
+            _id: announcement._id,
+            title: announcement.title,
+            content: announcement.content,
+            priority: announcement.priority,
+            targetAudience: announcement.targetAudience,
+            createdBy: announcement.createdBy,
+            courseId: announcement.courseId,
+            grade: announcement.grade,
+            createdAt: announcement.createdAt
+          },
+          grade: announcement.grade
+        });
+      }
+    } catch (e) {
+      console.warn('Socket emit (announcementCreated) failed:', e.message);
+    }
+    
+    res.status(201).json({
+      success: true,
+      message: 'Announcement posted successfully',
+      announcement
+    });
+  } catch (error) {
+    console.error('Post announcement error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
+};
+
+// Get teacher's announcements
+export const getAnnouncements = async (req, res) => {
+  try {
+    const teacherId = req.user?._id;
+    
+    const announcements = await Announcement.find({ 
+      createdBy: teacherId,
+      isActive: true 
+    })
+      .populate('courseId', 'name code grade')
+      .sort({ createdAt: -1 })
+      .limit(20);
     
     res.json({
       success: true,
-      message: 'Announcement posted successfully',
-      data: announcement
+      announcements
     });
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    console.error('Get announcements error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
+};
+
+// Delete announcement
+export const deleteAnnouncement = async (req, res) => {
+  try {
+    const teacherId = req.user?._id;
+    const { id } = req.params;
+    
+    // Find announcement
+    const announcement = await Announcement.findById(id);
+    
+    if (!announcement) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Announcement not found' 
+      });
+    }
+    
+    // Verify teacher owns this announcement
+    if (String(announcement.createdBy) !== String(teacherId)) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Not authorized to delete this announcement' 
+      });
+    }
+    
+    // Soft delete by setting isActive to false
+    announcement.isActive = false;
+    await announcement.save();
+    
+    res.json({
+      success: true,
+      message: 'Announcement deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete announcement error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: error.message 
+    });
   }
 };

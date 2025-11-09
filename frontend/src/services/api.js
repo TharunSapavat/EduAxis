@@ -105,7 +105,9 @@ export const teacherAPI = {
       : {};
     return api.post('/teacher/assignments', formData, config);
   },
+  getAnnouncements: () => api.get('/teacher/announcements'),
   postAnnouncement: (data) => api.post('/teacher/announcements', data),
+  deleteAnnouncement: (id) => api.delete(`/teacher/announcements/${id}`),
 };
 
 // Admin APIs

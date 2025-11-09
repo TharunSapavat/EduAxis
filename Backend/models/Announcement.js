@@ -28,6 +28,13 @@ const announcementSchema = new mongoose.Schema({
     enum: ['all', 'students', 'teachers', 'specific'],
     default: 'all'
   },
+  courseId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Course'
+  },
+  grade: {
+    type: String
+  },
   priority: {
     type: String,
     enum: ['low', 'normal', 'high', 'urgent'],

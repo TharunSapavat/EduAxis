@@ -323,18 +323,32 @@ export const getTimetable = async (req, res) => {
 // Get announcements
 export const getAnnouncements = async (req, res) => {
   try {
+    const student = req.user; // Loaded by auth middleware
+    
     const announcements = await Announcement.find({
       isActive: true,
       $or: [
         { targetAudience: 'all' },
         { targetAudience: 'students' }
       ],
-      $or: [
-        { expiresAt: null },
-        { expiresAt: { $gt: new Date() } }
+      $and: [
+        {
+          $or: [
+            { grade: { $exists: false } }, // No grade specified (legacy or all grades)
+            { grade: null },
+            { grade: String(student.grade) } // Matches student's grade
+          ]
+        },
+        {
+          $or: [
+            { expiresAt: null },
+            { expiresAt: { $gt: new Date() } }
+          ]
+        }
       ]
     })
     .populate('createdBy', 'name')
+    .populate('courseId', 'name code')
     .sort({ priority: -1, createdAt: -1 })
     .limit(20);
     

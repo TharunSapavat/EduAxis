@@ -7,7 +7,9 @@ import {
   submitGrades,
   getAssignments,
   createAssignment,
-  postAnnouncement
+  postAnnouncement,
+  getAnnouncements,
+  deleteAnnouncement
 } from '../controllers/teacherController.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
 import { uploadAssignmentFiles } from '../config/multer.js';
@@ -26,6 +28,8 @@ router.post('/grades', submitGrades);
 router.get('/assignments', getAssignments);
 // Update to handle file uploads - allow up to 5 attachment files
 router.post('/assignments', uploadAssignmentFiles.array('attachments', 5), createAssignment);
+router.get('/announcements', getAnnouncements);
 router.post('/announcements', postAnnouncement);
+router.delete('/announcements/:id', deleteAnnouncement);
 
 export default router;
