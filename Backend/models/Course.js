@@ -56,7 +56,7 @@ const courseSchema = new mongoose.Schema({
 
 // Index for faster queries
 courseSchema.index({ teacherId: 1 });
-courseSchema.index({ code: 1 });
+// Note: code field already has unique: true which creates an index automatically
 
 const Course = mongoose.model('Course', courseSchema);
 

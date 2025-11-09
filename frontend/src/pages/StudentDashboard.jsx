@@ -172,6 +172,24 @@ export default function StudentDashboard() {
     };
   }, [activeModule, user]);
 
+  // Realtime: Listen for announcement creation events (teacher posts) and refresh if viewing announcements
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket || !user) return;
+    const handler = (payload) => {
+      // Only react if announcement is for student's grade
+      if (!payload || String(payload.grade) !== String(user.grade)) return;
+      // Refresh announcements if on that module
+      if (activeModule === 'announcements') {
+        fetchAnnouncements();
+      }
+    };
+    socket.on('announcementCreated', handler);
+    return () => {
+      socket.off('announcementCreated', handler);
+    };
+  }, [activeModule, user]);
+
   const fetchFeeData = async () => {
     try {
       setFeesLoading(true);
@@ -1332,14 +1350,17 @@ export default function StudentDashboard() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
                           <h3 className="text-lg font-bold text-slate-900">{announcement.title}</h3>
-                          {announcement.priority === 'high' && (
-                            <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-medium rounded-full">
-                              Important
-                            </span>
-                          )}
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                            announcement.priority === 'urgent' ? 'bg-red-100 text-red-700' :
+                            announcement.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                            announcement.priority === 'low' ? 'bg-slate-100 text-slate-600' :
+                            'bg-blue-100 text-blue-700'
+                          }`}>
+                            {announcement.priority?.toUpperCase() || 'NORMAL'}
+                          </span>
                         </div>
                         <p className="text-sm text-slate-600">
-                          By {announcement.createdBy?.name || 'Admin'} • {new Date(announcement.createdAt).toLocaleDateString()}
+                          By {announcement.createdBy?.name || 'Teacher'} • {new Date(announcement.createdAt).toLocaleDateString()}
                         </p>
                       </div>
                     </div>
@@ -1631,17 +1652,13 @@ export default function StudentDashboard() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Recent Assignments */}
                     <div>
-                      <h4 className="font-semibold text-slate-900 mb-3">Recent Assignments</h4>
+                      <h4 className="font-semibold text-slate-900 mb-3">Most Recent Assignment</h4>
                       {courseDetails.recentAssignments && courseDetails.recentAssignments.length > 0 ? (
-                        <div className="space-y-3">
-                          {courseDetails.recentAssignments.map((a) => (
-                            <div key={a._id} className="p-4 bg-white rounded-lg border border-slate-200 shadow-sm">
-                              <p className="font-medium text-slate-900">{a.title}</p>
-                              <p className="text-sm text-slate-600 mt-1">
-                                Due: {new Date(a.dueDate).toLocaleDateString()} • {a.totalMarks || 100} marks
-                              </p>
-                            </div>
-                          ))}
+                        <div className="p-4 bg-white rounded-lg border border-slate-200 shadow-sm">
+                          <p className="font-medium text-slate-900">{courseDetails.recentAssignments[0].title}</p>
+                          <p className="text-sm text-slate-600 mt-1">
+                            Due: {new Date(courseDetails.recentAssignments[0].dueDate).toLocaleDateString()} • {courseDetails.recentAssignments[0].totalMarks || 100} marks
+                          </p>
                         </div>
                       ) : (
                         <p className="text-sm text-slate-600">No recent assignments</p>
@@ -1650,18 +1667,14 @@ export default function StudentDashboard() {
 
                     {/* Recent Announcements */}
                     <div>
-                      <h4 className="font-semibold text-slate-900 mb-3">Recent Announcements</h4>
+                      <h4 className="font-semibold text-slate-900 mb-3">Most Recent Announcement</h4>
                       {courseDetails.recentAnnouncements && courseDetails.recentAnnouncements.length > 0 ? (
-                        <div className="space-y-3">
-                          {courseDetails.recentAnnouncements.map((ann) => (
-                            <div key={ann._id} className="p-4 bg-white rounded-lg border border-slate-200 shadow-sm">
-                              <p className="font-medium text-slate-900">{ann.title}</p>
-                              <p className="text-sm text-slate-600 mt-1">{new Date(ann.createdAt).toLocaleDateString()}</p>
-                              {ann.content && (
-                                <p className="text-sm text-slate-700 mt-1 line-clamp-3">{ann.content}</p>
-                              )}
-                            </div>
-                          ))}
+                        <div className="p-4 bg-white rounded-lg border border-slate-200 shadow-sm">
+                          <p className="font-medium text-slate-900">{courseDetails.recentAnnouncements[0].title}</p>
+                          <p className="text-sm text-slate-600 mt-1">{new Date(courseDetails.recentAnnouncements[0].createdAt).toLocaleDateString()}</p>
+                          {courseDetails.recentAnnouncements[0].content && (
+                            <p className="text-sm text-slate-700 mt-1 line-clamp-3">{courseDetails.recentAnnouncements[0].content}</p>
+                          )}
                         </div>
                       ) : (
                         <p className="text-sm text-slate-600">No recent announcements</p>
