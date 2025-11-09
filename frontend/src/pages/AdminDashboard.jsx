@@ -8,6 +8,7 @@ import * as yup from 'yup';
 import DashboardHeader from '../components/DashboardHeader';
 import DashboardFooter from '../components/DashboardFooter';
 import ClassManagement from '../components/ClassManagement.jsx';
+import CourseManagement from '../components/adminComp/CourseManagement.jsx';
 
 // User creation validation schema
 const userSchema = yup.object({
@@ -85,46 +86,7 @@ const userSchema = yup.object({
     .notRequired()
 }).required();
 
-// Course validation schema
-const courseSchema = yup.object({
-  name: yup
-    .string()
-    .required('Course name is required')
-    .min(2, 'Course name must be at least 2 characters')
-    .max(100, 'Course name must not exceed 100 characters')
-    .trim(),
-  code: yup
-    .string()
-    .required('Course code is required')
-    .min(3, 'Course code must be at least 3 characters')
-    .max(10, 'Course code must not exceed 10 characters')
-    .matches(/^[A-Z0-9-]+$/, 'Course code must be uppercase letters, numbers, or hyphens')
-    .trim(),
-  description: yup
-    .string()
-    .max(500, 'Description must not exceed 500 characters')
-    .notRequired(),
-  teacher: yup
-    .string()
-    .max(100, 'Teacher name must not exceed 100 characters')
-    .notRequired(),
-  credits: yup
-    .number()
-    .required('Credits are required')
-    .min(1, 'Credits must be at least 1')
-    .max(6, 'Credits cannot exceed 6')
-    .integer('Credits must be a whole number'),
-  grade: yup
-    .number()
-    .required('Grade is required')
-    .min(1, 'Grade must be at least 1')
-    .max(12, 'Grade cannot exceed 12')
-    .integer('Grade must be a whole number'),
-  status: yup
-    .string()
-    .oneOf(['active', 'inactive', 'archived'], 'Invalid status')
-    .required('Status is required')
-}).required();
+
 
 // Fee form validation schema
 const feeSchema = yup.object({
@@ -228,6 +190,7 @@ export default function AdminDashboard() {
   const [paymentsLoading, setPaymentsLoading] = useState(false);
   const [paymentStats, setPaymentStats] = useState({ total: 0, completed: 0, totalAmount: 0 });
 
+  // Fee form with React Hook Form (restored)
   // Course Management States
   const [courses, setCourses] = useState([]);
   const [filteredCourses, setFilteredCourses] = useState([]);
@@ -281,8 +244,8 @@ export default function AdminDashboard() {
     }
   });
 
-  const feeAppliesTo = watchFee('appliesTo');
-  const feeGrades = watchFee('grades');
+
+
 
   // Course form with React Hook Form
   const {
@@ -388,12 +351,6 @@ export default function AdminDashboard() {
     }
   }, [activeModule]);
 
-  // Fetch courses when courses module is active
-  useEffect(() => {
-    if (activeModule === 'courses') {
-      fetchCourses();
-    }
-  }, [activeModule]);
 
   // Filter payments
   useEffect(() => {
@@ -572,22 +529,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Course Management Functions
-  const fetchCourses = async () => {
-    setCoursesLoading(true);
-    setCoursesError('');
-    try {
-      const res = await adminAPI.getCourses();
-      const coursesData = res.data?.courses || [];
-      setCourses(coursesData);
-      setFilteredCourses(coursesData);
-    } catch (err) {
-      console.error('Failed to fetch courses:', err);
-      setCoursesError(err.response?.data?.message || 'Failed to fetch courses');
-    } finally {
-      setCoursesLoading(false);
-    }
-  };
 
   const handleCreateCourse = async (data) => {
     try {
@@ -1655,6 +1596,7 @@ export default function AdminDashboard() {
         );
 
       case 'courses':
+        return <CourseManagement users={users} />;
         return (
           <div>
             {/* Header with Stats */}
