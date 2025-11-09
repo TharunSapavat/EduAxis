@@ -180,15 +180,13 @@ export const getCourses = async (req, res) => {
 // Create new course
 export const createCourse = async (req, res) => {
   try {
-    const { name, code, description, teacher, credits, grade } = req.body;
+    const { name, code, description, teacher, teacherId: providedTeacherId, credits, grade } = req.body;
 
-    // Find teacher by name if provided
-    let teacherId = null;
-    if (teacher && teacher !== 'TBD' && teacher.trim() !== '') {
+    // Prefer explicit teacherId if provided, otherwise resolve by name
+    let teacherId = providedTeacherId || null;
+    if (!teacherId && teacher && teacher !== 'TBD' && teacher.trim() !== '') {
       const teacherUser = await User.findOne({ name: teacher, role: 'teacher' });
-      if (teacherUser) {
-        teacherId = teacherUser._id;
-      }
+      if (teacherUser) teacherId = teacherUser._id;
     }
 
     const newCourse = await Course.create({
@@ -224,8 +222,10 @@ export const updateCourse = async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
 
-    // Find teacher by name if teacher field is being updated
-    if (updates.teacher && updates.teacher !== 'TBD' && updates.teacher.trim() !== '') {
+    // If teacherId provided explicitly, keep it. Otherwise, if teacher name provided, resolve to teacherId
+    if (updates.teacherId) {
+      // keep provided teacherId
+    } else if (updates.teacher && updates.teacher !== 'TBD' && updates.teacher.trim() !== '') {
       const teacherUser = await User.findOne({ name: updates.teacher, role: 'teacher' });
       if (teacherUser) {
         updates.teacherId = teacherUser._id;
