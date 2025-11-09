@@ -7,6 +7,7 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import DashboardHeader from '../components/DashboardHeader';
 import DashboardFooter from '../components/DashboardFooter';
+import ClassManagement from '../components/ClassManagement.jsx';
 
 // User creation validation schema
 const userSchema = yup.object({
@@ -2078,6 +2079,9 @@ export default function AdminDashboard() {
             )}
           </div>
         );
+
+      case 'classes':
+        return <ClassManagement />;
 
       default:
         return (

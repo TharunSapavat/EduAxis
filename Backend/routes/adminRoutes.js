@@ -20,7 +20,11 @@ import {
   createPayment,
   getPaymentStats,
   exportPayments,
-  sendFeeReminders
+  sendFeeReminders,
+  getClassOverview,
+  getStudentAnalytics,
+  getAtRiskStudents,
+  getStudentDetails
 } from '../controllers/adminController.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
 
@@ -55,5 +59,11 @@ router.post('/payments', createPayment);
 router.get('/payments/stats', getPaymentStats);
 router.get('/payments/export', exportPayments);
 router.post('/fees/reminders', sendFeeReminders);
+
+// Class Management Routes
+router.get('/class/overview', getClassOverview);
+router.get('/class/students', getStudentAnalytics);
+router.get('/class/at-risk', getAtRiskStudents);
+router.get('/class/students/:id', getStudentDetails);
 
 export default router;
