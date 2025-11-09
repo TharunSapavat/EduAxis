@@ -47,6 +47,8 @@ export default function StudentDashboard() {
     endDate: '',
     reason: ''
   });
+  const [leaveCurrentPage, setLeaveCurrentPage] = useState(1);
+  const leaveRequestsPerPage = 5;
 
   // Course Details Modal States
   const [showCourseModal, setShowCourseModal] = useState(false);
@@ -145,6 +147,7 @@ export default function StudentDashboard() {
         break;
       case 'leave':
         fetchLeaveRequests();
+        setLeaveCurrentPage(1); // Reset to first page when opening leave module
         break;
       default:
         break;
@@ -1546,32 +1549,84 @@ export default function StudentDashboard() {
                 <p className="text-slate-500 text-sm mt-2">Click "Apply for Leave" to submit your first request</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-4">
-                {leaveRequests.map((req) => (
-                  <div key={req._id} className="bg-white rounded-xl shadow-md p-6 border border-slate-100">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h3 className="text-lg font-bold text-slate-900 capitalize">{req.type} Leave</h3>
-                        <p className="text-sm text-slate-600 mt-1">
-                          {new Date(req.startDate).toLocaleDateString()} – {new Date(req.endDate).toLocaleDateString()} ({req.days} day{req.days > 1 ? 's' : ''})
-                        </p>
+              <>
+                <div className="grid grid-cols-1 gap-4">
+                  {leaveRequests
+                    .slice((leaveCurrentPage - 1) * leaveRequestsPerPage, leaveCurrentPage * leaveRequestsPerPage)
+                    .map((req) => (
+                    <div key={req._id} className="bg-white rounded-xl shadow-md p-6 border border-slate-100">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <h3 className="text-lg font-bold text-slate-900 capitalize">{req.type} Leave</h3>
+                          <p className="text-sm text-slate-600 mt-1">
+                            {new Date(req.startDate).toLocaleDateString()} – {new Date(req.endDate).toLocaleDateString()} ({req.days} day{req.days > 1 ? 's' : ''})
+                          </p>
+                        </div>
+                        <span className={`px-3 py-1 text-xs font-bold rounded-full ${
+                          req.status === 'approved' ? 'bg-green-100 text-green-700' :
+                          req.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                          'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {req.status.toUpperCase()}
+                        </span>
                       </div>
-                      <span className={`px-3 py-1 text-xs font-bold rounded-full ${
-                        req.status === 'approved' ? 'bg-green-100 text-green-700' :
-                        req.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                        'bg-yellow-100 text-yellow-700'
-                      }`}>
-                        {req.status.toUpperCase()}
-                      </span>
+                      <p className="text-sm text-slate-700 mb-2"><span className="font-medium">Reason:</span> {req.reason}</p>
+                      {req.reviewRemarks && (
+                        <p className="text-sm text-slate-600 mt-2 p-3 bg-slate-50 rounded"><span className="font-medium">Admin Remarks:</span> {req.reviewRemarks}</p>
+                      )}
+                      <p className="text-xs text-slate-500 mt-3">Submitted: {new Date(req.createdAt).toLocaleString()}</p>
                     </div>
-                    <p className="text-sm text-slate-700 mb-2"><span className="font-medium">Reason:</span> {req.reason}</p>
-                    {req.reviewRemarks && (
-                      <p className="text-sm text-slate-600 mt-2 p-3 bg-slate-50 rounded"><span className="font-medium">Admin Remarks:</span> {req.reviewRemarks}</p>
-                    )}
-                    <p className="text-xs text-slate-500 mt-3">Submitted: {new Date(req.createdAt).toLocaleString()}</p>
+                  ))}
+                </div>
+
+                {/* Pagination Controls */}
+                {leaveRequests.length > leaveRequestsPerPage && (
+                  <div className="mt-6 flex items-center justify-between bg-white rounded-lg shadow-md p-4 border border-slate-100">
+                    <div className="text-sm text-slate-600">
+                      Showing {((leaveCurrentPage - 1) * leaveRequestsPerPage) + 1} to {Math.min(leaveCurrentPage * leaveRequestsPerPage, leaveRequests.length)} of {leaveRequests.length} requests
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setLeaveCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={leaveCurrentPage === 1}
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                          leaveCurrentPage === 1
+                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                            : 'bg-blue-600 text-white hover:bg-blue-700'
+                        }`}
+                      >
+                        Previous
+                      </button>
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: Math.ceil(leaveRequests.length / leaveRequestsPerPage) }, (_, i) => i + 1).map(page => (
+                          <button
+                            key={page}
+                            onClick={() => setLeaveCurrentPage(page)}
+                            className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+                              leaveCurrentPage === page
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        onClick={() => setLeaveCurrentPage(prev => Math.min(prev + 1, Math.ceil(leaveRequests.length / leaveRequestsPerPage)))}
+                        disabled={leaveCurrentPage === Math.ceil(leaveRequests.length / leaveRequestsPerPage)}
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                          leaveCurrentPage === Math.ceil(leaveRequests.length / leaveRequestsPerPage)
+                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                            : 'bg-blue-600 text-white hover:bg-blue-700'
+                        }`}
+                      >
+                        Next
+                      </button>
+                    </div>
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             )}
 
             {/* Leave Form Modal */}

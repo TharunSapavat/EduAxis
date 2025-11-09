@@ -244,6 +244,8 @@ export default function AdminDashboard() {
   const [leaveRequests, setLeaveRequests] = useState([]);
   const [leaveRequestsLoading, setLeaveRequestsLoading] = useState(false);
   const [leaveStatusFilter, setLeaveStatusFilter] = useState('pending');
+  const [leaveCurrentPage, setLeaveCurrentPage] = useState(1);
+  const leaveRequestsPerPage = 5;
   const [notification, setNotification] = useState(null);
 
   const showNotification = (message, type = 'success') => {
@@ -360,6 +362,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (activeModule === 'leave') {
       fetchLeaveRequests();
+      setLeaveCurrentPage(1); // Reset to first page when filter changes
     }
   }, [activeModule, leaveStatusFilter]);
 
@@ -2181,71 +2184,123 @@ export default function AdminDashboard() {
                 <p className="text-slate-600 text-lg">No leave requests found</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-4">
-                {leaveRequests.map((req) => (
-                  <div key={req._id} className="bg-white rounded-xl shadow-md p-6 border border-slate-100">
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h3 className="text-lg font-bold text-slate-900">{req.requesterId?.name || 'Unknown'}</h3>
-                        <p className="text-sm text-slate-600">
-                          {req.requesterId?.email} • Grade {req.requesterId?.grade}{req.requesterId?.section ? ` - ${req.requesterId?.section}` : ''}
-                        </p>
+              <>
+                <div className="grid grid-cols-1 gap-4">
+                  {leaveRequests
+                    .slice((leaveCurrentPage - 1) * leaveRequestsPerPage, leaveCurrentPage * leaveRequestsPerPage)
+                    .map((req) => (
+                    <div key={req._id} className="bg-white rounded-xl shadow-md p-6 border border-slate-100">
+                      <div className="flex items-start justify-between mb-4">
+                        <div>
+                          <h3 className="text-lg font-bold text-slate-900">{req.requesterId?.name || 'Unknown'}</h3>
+                          <p className="text-sm text-slate-600">
+                            {req.requesterId?.email} • Grade {req.requesterId?.grade}{req.requesterId?.section ? ` - ${req.requesterId?.section}` : ''}
+                          </p>
+                        </div>
+                        <span className={`px-3 py-1 text-xs font-bold rounded-full ${
+                          req.status === 'approved' ? 'bg-green-100 text-green-700' :
+                          req.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                          'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {req.status.toUpperCase()}
+                        </span>
                       </div>
-                      <span className={`px-3 py-1 text-xs font-bold rounded-full ${
-                        req.status === 'approved' ? 'bg-green-100 text-green-700' :
-                        req.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                        'bg-yellow-100 text-yellow-700'
-                      }`}>
-                        {req.status.toUpperCase()}
-                      </span>
+                      <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
+                        <div>
+                          <span className="font-medium text-slate-700">Type:</span> <span className="capitalize">{req.type}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-slate-700">Duration:</span> {req.days} day{req.days > 1 ? 's' : ''}
+                        </div>
+                        <div className="col-span-2">
+                          <span className="font-medium text-slate-700">Period:</span> {new Date(req.startDate).toLocaleDateString()} to {new Date(req.endDate).toLocaleDateString()}
+                        </div>
+                      </div>
+                      <div className="mb-4 p-3 bg-slate-50 rounded">
+                        <p className="text-sm font-medium text-slate-700 mb-1">Reason:</p>
+                        <p className="text-sm text-slate-700">{req.reason}</p>
+                      </div>
+                      {req.reviewRemarks && (
+                        <div className="mb-4 p-3 bg-blue-50 rounded border border-blue-200">
+                          <p className="text-sm font-medium text-slate-700 mb-1">Admin Remarks:</p>
+                          <p className="text-sm text-slate-700">{req.reviewRemarks}</p>
+                        </div>
+                      )}
+                      <div className="text-xs text-slate-500 mb-3">Submitted: {new Date(req.createdAt).toLocaleString()}</div>
+                      {req.status === 'pending' && (
+                        <div className="flex gap-3">
+                          <button
+                            onClick={() => {
+                              const remarks = prompt('Enter remarks (optional):');
+                              handleLeaveDecision(req._id, 'approve', remarks || '');
+                            }}
+                            className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => {
+                              const remarks = prompt('Enter remarks (optional):');
+                              handleLeaveDecision(req._id, 'reject', remarks || '');
+                            }}
+                            className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
-                      <div>
-                        <span className="font-medium text-slate-700">Type:</span> <span className="capitalize">{req.type}</span>
-                      </div>
-                      <div>
-                        <span className="font-medium text-slate-700">Duration:</span> {req.days} day{req.days > 1 ? 's' : ''}
-                      </div>
-                      <div className="col-span-2">
-                        <span className="font-medium text-slate-700">Period:</span> {new Date(req.startDate).toLocaleDateString()} to {new Date(req.endDate).toLocaleDateString()}
-                      </div>
+                  ))}
+                </div>
+
+                {/* Pagination Controls */}
+                {leaveRequests.length > leaveRequestsPerPage && (
+                  <div className="mt-6 flex items-center justify-between bg-white rounded-lg shadow-md p-4 border border-slate-100">
+                    <div className="text-sm text-slate-600">
+                      Showing {((leaveCurrentPage - 1) * leaveRequestsPerPage) + 1} to {Math.min(leaveCurrentPage * leaveRequestsPerPage, leaveRequests.length)} of {leaveRequests.length} requests
                     </div>
-                    <div className="mb-4 p-3 bg-slate-50 rounded">
-                      <p className="text-sm font-medium text-slate-700 mb-1">Reason:</p>
-                      <p className="text-sm text-slate-700">{req.reason}</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setLeaveCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={leaveCurrentPage === 1}
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                          leaveCurrentPage === 1
+                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                            : 'bg-purple-600 text-white hover:bg-purple-700'
+                        }`}
+                      >
+                        Previous
+                      </button>
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: Math.ceil(leaveRequests.length / leaveRequestsPerPage) }, (_, i) => i + 1).map(page => (
+                          <button
+                            key={page}
+                            onClick={() => setLeaveCurrentPage(page)}
+                            className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+                              leaveCurrentPage === page
+                                ? 'bg-purple-600 text-white'
+                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        onClick={() => setLeaveCurrentPage(prev => Math.min(prev + 1, Math.ceil(leaveRequests.length / leaveRequestsPerPage)))}
+                        disabled={leaveCurrentPage === Math.ceil(leaveRequests.length / leaveRequestsPerPage)}
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                          leaveCurrentPage === Math.ceil(leaveRequests.length / leaveRequestsPerPage)
+                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                            : 'bg-purple-600 text-white hover:bg-purple-700'
+                        }`}
+                      >
+                        Next
+                      </button>
                     </div>
-                    {req.reviewRemarks && (
-                      <div className="mb-4 p-3 bg-blue-50 rounded border border-blue-200">
-                        <p className="text-sm font-medium text-slate-700 mb-1">Admin Remarks:</p>
-                        <p className="text-sm text-slate-700">{req.reviewRemarks}</p>
-                      </div>
-                    )}
-                    <div className="text-xs text-slate-500 mb-3">Submitted: {new Date(req.createdAt).toLocaleString()}</div>
-                    {req.status === 'pending' && (
-                      <div className="flex gap-3">
-                        <button
-                          onClick={() => {
-                            const remarks = prompt('Enter remarks (optional):');
-                            handleLeaveDecision(req._id, 'approve', remarks || '');
-                          }}
-                          className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
-                        >
-                          Approve
-                        </button>
-                        <button
-                          onClick={() => {
-                            const remarks = prompt('Enter remarks (optional):');
-                            handleLeaveDecision(req._id, 'reject', remarks || '');
-                          }}
-                          className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    )}
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             )}
           </div>
         );
