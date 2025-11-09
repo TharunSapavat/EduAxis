@@ -76,25 +76,41 @@ export const authAPI = {
 export const studentAPI = {
   getDashboard: (studentId) => api.get(`/student/dashboard?studentId=${studentId}`),
   getCourses: () => api.get('/student/courses'),
-  getGrades: () => api.get('/student/grades'),
-  getAttendance: () => api.get('/student/attendance'),
+  getCourseDetails: (courseId) => api.get(`/student/courses/${courseId}`),
+  getGrades: (studentId) => api.get(`/student/grades?studentId=${studentId}`),
+  getAttendance: (studentId) => api.get(`/student/attendance?studentId=${studentId}`),
   getAssignments: (studentId) => api.get(`/student/assignments?studentId=${studentId}`),
-  getTimetable: () => api.get('/student/timetable'),
+  submitAssignment: (data) => api.post('/student/assignments/submit', data),
+  getSubmissionDetails: (assignmentId) => api.get(`/student/assignments/${assignmentId}/submission`),
+  getTimetable: (day) => api.get('/student/timetable', { params: { day } }),
   getAnnouncements: () => api.get('/student/announcements'),
   getFees: () => api.get('/student/fees'),
   makePayment: (paymentData) => api.post('/student/payment', paymentData),
   downloadReceipt: (paymentId) => api.get(`/student/receipt/${paymentId}`),
+  getLibrary: () => api.get('/student/library'),
+  // Leave Requests
+  createLeaveRequest: (data) => api.post('/student/leave-requests', data),
+  getLeaveRequests: () => api.get('/student/leave-requests'),
 };
 
 // Teacher APIs
 export const teacherAPI = {
   getDashboard: (teacherId) => api.get(`/teacher/dashboard?teacherId=${teacherId}`),
   getCourses: (teacherId) => api.get(`/teacher/courses?teacherId=${teacherId}`),
-  getStudents: () => api.get('/teacher/students'),
+  getStudents: (params) => api.get('/teacher/students', { params }),
   markAttendance: (data) => api.post('/teacher/attendance', data),
   submitGrades: (data) => api.post('/teacher/grades', data),
   getAssignments: () => api.get('/teacher/assignments'),
+  createAssignment: (formData) => {
+    // Handle both FormData (with files) and regular JSON
+    const config = formData instanceof FormData 
+      ? { headers: { 'Content-Type': 'multipart/form-data' } }
+      : {};
+    return api.post('/teacher/assignments', formData, config);
+  },
+  getAnnouncements: () => api.get('/teacher/announcements'),
   postAnnouncement: (data) => api.post('/teacher/announcements', data),
+  deleteAnnouncement: (id) => api.delete(`/teacher/announcements/${id}`),
 };
 
 // Admin APIs
@@ -124,12 +140,14 @@ export const adminAPI = {
   getPaymentStats: () => api.get('/admin/payments/stats'),
   exportPayments: (params) => api.get('/admin/payments/export', { params }),
   sendFeeReminders: (feeId) => api.post('/admin/fees/reminders', { feeId }),
-  
   // Class Management
   getClassOverview: () => api.get('/admin/class/overview'),
   getStudentAnalytics: (params) => api.get('/admin/class/students', { params }),
   getAtRiskStudents: () => api.get('/admin/class/at-risk'),
   getStudentDetails: (id) => api.get(`/admin/class/students/${id}`),
+  // Leave Requests
+  getLeaveRequests: (params) => api.get('/admin/leave-requests', { params }),
+  decideLeaveRequest: (id, action, remarks) => api.patch(`/admin/leave-requests/${id}`, { action, remarks }),
 };
 
 export default api;

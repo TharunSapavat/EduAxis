@@ -31,6 +31,10 @@ const assignmentSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  courseId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Course'
+  },
   dueDate: {
     type: Date,
     required: [true, 'Due date is required']
@@ -41,8 +45,12 @@ const assignmentSchema = new mongoose.Schema({
     min: 1
   },
   attachments: [{
-    name: String,
-    url: String
+    name: String,          // Original filename
+    filename: String,      // Stored filename on server
+    path: String,          // URL path to access file
+    size: Number,          // File size in bytes
+    mimetype: String,      // MIME type
+    url: String            // For backward compatibility with URL-based attachments
   }],
   status: {
     type: String,
