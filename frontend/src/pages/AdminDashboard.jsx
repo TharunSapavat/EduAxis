@@ -278,6 +278,7 @@ export default function AdminDashboard() {
       code: '',
       description: '',
       teacher: '',
+      teacherId: '',
       credits: 3,
       grade: 1,
       status: 'active'
@@ -534,7 +535,14 @@ export default function AdminDashboard() {
   const handleCreateCourse = async (data) => {
     try {
       setCoursesLoading(true);
-      const response = await adminAPI.createCourse(data);
+      // Attach teacher name when teacherId is provided
+      const payload = { ...data };
+      if (data.teacherId) {
+        const teacher = users.find(u => u.id === data.teacherId);
+        payload.teacher = teacher ? teacher.name : '';
+      }
+
+      const response = await adminAPI.createCourse(payload);
       
       if (response.data.success) {
         setShowCourseForm(false);
@@ -554,7 +562,13 @@ export default function AdminDashboard() {
   const handleUpdateCourse = async (data) => {
     try {
       setCoursesLoading(true);
-      const response = await adminAPI.updateCourse(selectedCourse._id, data);
+      const payload = { ...data };
+      if (data.teacherId) {
+        const teacher = users.find(u => u.id === data.teacherId);
+        payload.teacher = teacher ? teacher.name : '';
+      }
+
+      const response = await adminAPI.updateCourse(selectedCourse._id, payload);
       
       if (response.data.success) {
         setShowCourseForm(false);
@@ -601,7 +615,8 @@ export default function AdminDashboard() {
     setCourseValue('name', course.name);
     setCourseValue('code', course.code);
     setCourseValue('description', course.description || '');
-    setCourseValue('teacher', course.teacher || '');
+  setCourseValue('teacher', course.teacher || '');
+  setCourseValue('teacherId', course.teacherId || '');
     setCourseValue('credits', course.credits);
     setCourseValue('grade', course.grade);
     setCourseValue('status', course.status);
@@ -1864,7 +1879,7 @@ export default function AdminDashboard() {
                           Assign Teacher
                         </label>
                         <select
-                          {...registerCourse('teacher')}
+                          {...registerCourse('teacherId')}
                           className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all bg-white ${
                             courseErrors.teacher ? 'border-red-500' : 'border-slate-300'
                           }`}
@@ -1873,7 +1888,7 @@ export default function AdminDashboard() {
                           {users
                             .filter(u => u.role === 'teacher')
                             .map(teacher => (
-                              <option key={teacher.id} value={teacher.name}>
+                              <option key={teacher.id} value={teacher.id}>
                                 {teacher.name} - {teacher.email}
                               </option>
                             ))}

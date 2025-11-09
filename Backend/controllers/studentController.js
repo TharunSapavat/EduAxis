@@ -39,8 +39,11 @@ export const getDashboard = async (req, res) => {
       status: 'pending'
     });
 
-    // Get total courses (TODO: implement student-course enrollment)
-    const totalCourses = await Course.countDocuments({ status: 'active' });
+    // Get total courses matching student's grade (enrolled courses)
+    const totalCourses = await Course.countDocuments({ 
+      status: 'active',
+      grade: Number(student.grade)
+    });
 
     // Get attendance stats
     const attendanceRecords = await Attendance.find({ studentId: student._id });
@@ -72,20 +75,25 @@ export const getDashboard = async (req, res) => {
 // Get student courses
 export const getCourses = async (req, res) => {
   try {
-    // TODO: Filter courses by student enrollment
-    const courses = await Course.find({ status: 'active' }).populate('teacherId', 'name email');
-    
-    res.json({ 
-      success: true,
-      courses 
-    });
+    // Determine student from auth or query
+    const studentId = req.query.studentId || req.user?._id;
+    if (!studentId) {
+      return res.status(400).json({ success: false, message: 'Student ID is required' });
+    }
+
+    const student = await User.findById(studentId);
+    if (!student || student.role !== 'student') {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    // Filter courses by matching grade and active status
+    const courses = await Course.find({ status: 'active', grade: Number(student.grade) })
+      .populate('teacherId', 'name email');
+
+    res.json({ success: true, courses });
   } catch (error) {
     console.error('Get courses error:', error);
-    res.status(500).json({ 
-      success: false,
-      message: 'Server error', 
-      error: error.message 
-    });
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
 

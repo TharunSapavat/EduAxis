@@ -12,7 +12,13 @@ export const getDashboard = async (req, res) => {
     
     // Find courses assigned to this teacher
     const teacherCourses = await Course.find({ teacherId });
-    const totalStudents = teacherCourses.reduce((sum, course) => sum + (course.students || 0), 0);
+    
+    // Calculate total students across all teacher's courses
+    const uniqueGrades = [...new Set(teacherCourses.map(c => c.grade))];
+    const totalStudents = await User.countDocuments({
+      role: 'student',
+      grade: { $in: uniqueGrades }
+    });
     
     res.json({
       stats: {
@@ -35,9 +41,24 @@ export const getCourses = async (req, res) => {
     // Find all courses assigned to this teacher
     const courses = await Course.find({ teacherId }).sort({ grade: 1, name: 1 });
     
+    // Calculate actual student count for each course based on grade
+    const coursesWithStudentCount = await Promise.all(
+      courses.map(async (course) => {
+        const studentCount = await User.countDocuments({
+          role: 'student',
+          grade: course.grade
+        });
+        
+        return {
+          ...course.toObject(),
+          students: studentCount
+        };
+      })
+    );
+    
     res.json({ 
       success: true,
-      courses 
+      courses: coursesWithStudentCount
     });
   } catch (error) {
     res.status(500).json({ 

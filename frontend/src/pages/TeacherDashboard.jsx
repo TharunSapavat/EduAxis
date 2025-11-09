@@ -1,6 +1,7 @@
 import { BookOpen, Users, Calendar, FileText, BarChart3, ClipboardList, Bell, Upload, MessageSquare, Home, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { teacherAPI } from '../services/api';
 import DashboardHeader from '../components/DashboardHeader';
 import DashboardFooter from '../components/DashboardFooter';
 
@@ -8,6 +9,10 @@ export default function TeacherDashboard() {
   const { user } = useAuth();
   const [activeModule, setActiveModule] = useState('home');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [teacherStats, setTeacherStats] = useState({ totalCourses: 0, totalStudents: 0, pendingGrading: 0, classesToday: 0 });
+  const [teacherCourses, setTeacherCourses] = useState([]);
+  const [coursesLoading, setCoursesLoading] = useState(false);
+  const [statsLoading, setStatsLoading] = useState(false);
 
   const modules = [
     { id: 'home', icon: Home, title: 'Dashboard', description: 'Overview and statistics' },
@@ -21,6 +26,45 @@ export default function TeacherDashboard() {
     { id: 'messages', icon: MessageSquare, title: 'Messages', description: 'Communicate with students' },
   ];
 
+  // Load teacher dashboard stats
+  useEffect(() => {
+    const loadStats = async () => {
+      setStatsLoading(true);
+      try {
+        const res = await teacherAPI.getDashboard(user?.id);
+        setTeacherStats(res.data.stats || { totalCourses: 0, totalStudents: 0, pendingGrading: 0, classesToday: 0 });
+      } catch (err) {
+        console.error('Failed to load teacher stats', err);
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+    loadStats();
+  }, [user]);
+
+  // Load teacher courses when viewing Home or Courses
+  useEffect(() => {
+    if (!user) return;
+    const shouldFetch = activeModule === 'home' || activeModule === 'courses';
+    if (!shouldFetch) return;
+
+    const loadCourses = async () => {
+      setCoursesLoading(true);
+      try {
+        const res = await teacherAPI.getCourses(user?.id);
+        setTeacherCourses(res.data.courses || []);
+      } catch (err) {
+        console.error('Failed to load teacher courses', err);
+        setTeacherCourses([]);
+      } finally {
+        setCoursesLoading(false);
+      }
+    };
+
+    loadCourses();
+  }, [user, activeModule]);
+
+  // Render main content
   const renderMainContent = () => {
     switch (activeModule) {
       case 'home':
@@ -40,7 +84,7 @@ export default function TeacherDashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-slate-600 text-sm font-medium">My Courses</p>
-                    <p className="text-3xl font-bold text-slate-900 mt-1">6</p>
+                    <p className="text-3xl font-bold text-slate-900 mt-1">{statsLoading ? '—' : teacherStats.totalCourses}</p>
                   </div>
                   <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
                     <BookOpen className="w-6 h-6 text-green-600" />
@@ -52,7 +96,7 @@ export default function TeacherDashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-slate-600 text-sm font-medium">Total Students</p>
-                    <p className="text-3xl font-bold text-blue-600 mt-1">180</p>
+                    <p className="text-3xl font-bold text-blue-600 mt-1">{statsLoading ? '—' : teacherStats.totalStudents}</p>
                   </div>
                   <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                     <Users className="w-6 h-6 text-blue-600" />
@@ -64,7 +108,7 @@ export default function TeacherDashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-slate-600 text-sm font-medium">Pending Grading</p>
-                    <p className="text-3xl font-bold text-orange-600 mt-1">23</p>
+                    <p className="text-3xl font-bold text-orange-600 mt-1">{statsLoading ? '—' : teacherStats.pendingGrading}</p>
                   </div>
                   <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
                     <FileText className="w-6 h-6 text-orange-600" />
@@ -76,7 +120,7 @@ export default function TeacherDashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-slate-600 text-sm font-medium">Classes Today</p>
-                    <p className="text-3xl font-bold text-purple-600 mt-1">4</p>
+                    <p className="text-3xl font-bold text-purple-600 mt-1">{statsLoading ? '—' : teacherStats.classesToday}</p>
                   </div>
                   <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
                     <Calendar className="w-6 h-6 text-purple-600" />
@@ -121,46 +165,46 @@ export default function TeacherDashboard() {
             </div>
           </div>
         );
-      
+
       case 'courses':
         return (
           <div>
             <h1 className="text-3xl font-bold text-slate-900 mb-6">My Courses</h1>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {[1, 2, 3, 4, 5, 6].map((course) => (
-                <div key={course} className="bg-white rounded-xl shadow-md p-6 border border-slate-100">
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h3 className="text-xl font-bold text-slate-900">Course {course}</h3>
-                      <p className="text-sm text-slate-600">Class 10-A • 30 Students</p>
+            {coursesLoading ? (
+              <div className="p-6 bg-white rounded-xl shadow-md border border-slate-100 text-slate-600">Loading courses...</div>
+            ) : teacherCourses.length === 0 ? (
+              <div className="p-6 bg-white rounded-xl shadow-md border border-slate-100 text-slate-600">No courses assigned yet.</div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {teacherCourses.map((course) => (
+                  <div key={course._id} className="bg-white rounded-xl shadow-md p-6 border border-slate-100">
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <h3 className="text-xl font-bold text-slate-900">{course.name} <span className="text-slate-500 text-sm">({course.code})</span></h3>
+                        <p className="text-sm text-slate-600">Grade {course.grade} • {course.students || 0} Students</p>
+                      </div>
+                      <span className={`px-3 py-1 text-xs font-medium rounded-full ${course.status === 'active' ? 'bg-green-100 text-green-700' : course.status === 'inactive' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700'}`}>
+                        {course.status?.toUpperCase()}
+                      </span>
                     </div>
-                    <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
-                      Active
-                    </span>
-                  </div>
-                  <div className="space-y-2 mb-4">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-600">Completion</span>
-                      <span className="font-medium text-slate-900">65%</span>
+                    {course.description && (
+                      <p className="text-sm text-slate-700 mb-4 line-clamp-2">{course.description}</p>
+                    )}
+                    <div className="flex gap-2">
+                      <button className="flex-1 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm font-medium">
+                        Manage
+                      </button>
+                      <button className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors text-sm font-medium">
+                        Details
+                      </button>
                     </div>
-                    <div className="w-full bg-slate-200 rounded-full h-2">
-                      <div className="bg-green-600 h-2 rounded-full" style={{ width: '65%' }}></div>
-                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button className="flex-1 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm font-medium">
-                      Manage
-                    </button>
-                    <button className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors text-sm font-medium">
-                      Details
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         );
-      
+
       case 'attendance':
         return (
           <div>
@@ -169,9 +213,15 @@ export default function TeacherDashboard() {
               <div className="mb-6">
                 <label className="block text-sm font-medium text-slate-700 mb-2">Select Course</label>
                 <select className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none">
-                  <option>Mathematics - Class 10-A</option>
-                  <option>Physics - Class 10-B</option>
-                  <option>Chemistry - Class 11-A</option>
+                  {coursesLoading ? (
+                    <option>Loading courses...</option>
+                  ) : teacherCourses.length > 0 ? (
+                    teacherCourses.map(c => (
+                      <option key={c._id} value={c._id}>{c.name} • Grade {c.grade}</option>
+                    ))
+                  ) : (
+                    <option>No courses assigned</option>
+                  )}
                 </select>
               </div>
               <div className="space-y-3">
@@ -198,7 +248,7 @@ export default function TeacherDashboard() {
             </div>
           </div>
         );
-      
+
       default:
         return (
           <div className="bg-white rounded-xl shadow-md p-12 text-center border border-slate-100">
