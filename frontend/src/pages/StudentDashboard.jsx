@@ -154,6 +154,24 @@ export default function StudentDashboard() {
     };
   }, [activeModule, user]);
 
+  // Realtime: Listen for assignment creation events (teacher emits) and refresh if viewing assignments
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket || !user) return;
+    const handler = (payload) => {
+      // Only react if assignment targets the student's grade
+      if (!payload || String(payload.grade) !== String(user.grade)) return;
+      // Refresh list if on assignments module; else skip to avoid unnecessary requests
+      if (activeModule === 'assignments') {
+        fetchAssignments();
+      }
+    };
+    socket.on('assignmentCreated', handler);
+    return () => {
+      socket.off('assignmentCreated', handler);
+    };
+  }, [activeModule, user]);
+
   const fetchFeeData = async () => {
     try {
       setFeesLoading(true);
@@ -644,6 +662,36 @@ export default function StudentDashboard() {
                           )}
                           {assignment.teacherId?.name && (
                             <p className="text-xs text-slate-500 mt-2">By: {assignment.teacherId.name}</p>
+                          )}
+                          {assignment.attachments?.length > 0 && (
+                            <div className="mt-3 bg-slate-50 p-3 rounded-lg">
+                              <p className="text-xs font-semibold text-slate-700 mb-2">📎 Attachments:</p>
+                              <ul className="space-y-1">
+                                {assignment.attachments.map((att, idx) => {
+                                  // Support both file uploads (with path) and URL-based attachments
+                                  const fileUrl = att.path 
+                                    ? `http://localhost:5000${att.path}` 
+                                    : att.url;
+                                  const fileName = att.name || `Attachment ${idx + 1}`;
+                                  const fileSize = att.size ? ` (${(att.size / 1024).toFixed(1)} KB)` : '';
+                                  
+                                  return (
+                                    <li key={idx}>
+                                      <a
+                                        href={fileUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        download
+                                        className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 text-sm hover:underline"
+                                      >
+                                        <FileText className="w-4 h-4" />
+                                        <span>{fileName}{fileSize}</span>
+                                      </a>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            </div>
                           )}
                         </div>
                         <span className={`px-3 py-1 text-xs font-medium rounded-full whitespace-nowrap ml-4 ${
