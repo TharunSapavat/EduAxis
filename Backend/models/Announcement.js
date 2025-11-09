@@ -49,7 +49,6 @@ announcementSchema.index({ isActive: 1 });
 announcementSchema.index({ priority: 1 });
 announcementSchema.index({ createdAt: -1 });
 
-// Virtual to check if expired
 announcementSchema.virtual('isExpired').get(function() {
   if (!this.expiresAt) return false;
   return this.expiresAt < new Date();

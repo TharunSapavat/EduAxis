@@ -4,7 +4,6 @@ import Assignment from '../models/Assignment.js';
 import User from '../models/User.js';
 import Attendance from '../models/Attendance.js';
 import Course from '../models/Course.js';
-import User from '../models/User.js';
 
 // Get teacher dashboard data
 export const getDashboard = async (req, res) => {
@@ -13,7 +12,13 @@ export const getDashboard = async (req, res) => {
     
     // Find courses assigned to this teacher
     const teacherCourses = await Course.find({ teacherId });
-    const totalStudents = teacherCourses.reduce((sum, course) => sum + (course.students || 0), 0);
+    
+    // Calculate total students across all teacher's courses
+    const uniqueGrades = [...new Set(teacherCourses.map(c => c.grade))];
+    const totalStudents = await User.countDocuments({
+      role: 'student',
+      grade: { $in: uniqueGrades }
+    });
     
     res.json({
       stats: {
@@ -36,9 +41,24 @@ export const getCourses = async (req, res) => {
     // Find all courses assigned to this teacher
     const courses = await Course.find({ teacherId }).sort({ grade: 1, name: 1 });
     
+    // Calculate actual student count for each course based on grade
+    const coursesWithStudentCount = await Promise.all(
+      courses.map(async (course) => {
+        const studentCount = await User.countDocuments({
+          role: 'student',
+          grade: course.grade
+        });
+        
+        return {
+          ...course.toObject(),
+          students: studentCount
+        };
+      })
+    );
+    
     res.json({ 
       success: true,
-      courses 
+      courses: coursesWithStudentCount
     });
   } catch (error) {
     res.status(500).json({ 
@@ -51,13 +71,44 @@ export const getCourses = async (req, res) => {
 
 // Get students list
 export const getStudents = async (req, res) => {
-  res.json({
-    students: [
-      { id: 1, name: 'John Doe', studentId: 'STU001', class: '10A', attendance: 95 },
-      { id: 2, name: 'Jane Smith', studentId: 'STU002', class: '10A', attendance: 92 },
-      { id: 3, name: 'Bob Johnson', studentId: 'STU003', class: '10B', attendance: 88 }
-    ]
-  });
+  try {
+    const { courseId, grade } = req.query;
+    
+    let query = { role: 'student' };
+    
+    // If courseId is provided, find the course and filter by its grade
+    if (courseId) {
+      const course = await Course.findById(courseId);
+      if (!course) {
+        return res.status(404).json({ 
+          success: false, 
+          message: 'Course not found' 
+        });
+      }
+      query.grade = course.grade;
+    } 
+    // If grade is provided directly, filter by grade
+    else if (grade) {
+      query.grade = Number(grade);
+    }
+    
+    // Fetch students with optional filtering
+    const students = await User.find(query)
+      .select('name email studentId grade')
+      .sort({ name: 1 });
+    
+    res.json({
+      success: true,
+      students
+    });
+  } catch (error) {
+    console.error('Get students error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
 };
 
 // Mark attendance
@@ -179,14 +230,99 @@ export const submitGrades = async (req, res) => {
   }
 };
 
-// Get assignments
+// Get assignments (real data)
 export const getAssignments = async (req, res) => {
-  res.json({
-    assignments: [
-      { id: 1, title: 'Math Assignment 1', course: 'Mathematics 101', submissions: 40, total: 45 },
-      { id: 2, title: 'Calculus Problem Set', course: 'Calculus', submissions: 28, total: 35 }
-    ]
-  });
+  try {
+    const teacherId = req.user?._id || req.user?.id;
+    const assignments = await Assignment.find({ teacherId })
+      .populate('courseId', 'name code grade')
+      .sort({ createdAt: -1 });
+    res.json({ success: true, assignments });
+  } catch (error) {
+    console.error('Get assignments error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// Create assignment
+export const createAssignment = async (req, res) => {
+  try {
+    const teacherId = req.user?._id;
+    // Data comes from multipart form, so fields are in req.body and files in req.files
+    const { title, description, courseId, dueDate, totalMarks } = req.body;
+    
+    if (!title || !courseId || !dueDate) {
+      return res.status(400).json({ success: false, message: 'Title, courseId and dueDate are required' });
+    }
+    
+    const course = await Course.findById(courseId);
+    if (!course) {
+      return res.status(404).json({ success: false, message: 'Course not found' });
+    }
+    
+    if (String(course.teacherId) !== String(teacherId)) {
+      return res.status(403).json({ success: false, message: 'Not allowed to create assignment for this course' });
+    }
+    
+    // Process uploaded files
+    const attachments = [];
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        attachments.push({
+          name: file.originalname,
+          filename: file.filename, // stored filename on server
+          path: `/uploads/assignments/${file.filename}`,
+          size: file.size,
+          mimetype: file.mimetype
+        });
+      }
+    }
+
+    const assignment = await Assignment.create({
+      title,
+      description: description || '',
+      subject: course.name,
+      grade: String(course.grade),
+      section: 'All',
+      teacherId,
+      courseId,
+      dueDate: new Date(dueDate),
+      totalMarks: totalMarks ? Number(totalMarks) : 100,
+      attachments,
+      status: 'active'
+    });
+    
+    await assignment.populate('courseId', 'name code grade');
+    
+    // Emit realtime socket event so students (by grade) can refresh assignments list
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        io.emit('assignmentCreated', {
+          assignment: {
+            _id: assignment._id,
+            title: assignment.title,
+            description: assignment.description,
+            dueDate: assignment.dueDate,
+            totalMarks: assignment.totalMarks,
+            courseId: assignment.courseId, // populated doc
+            attachments: assignment.attachments,
+            status: assignment.status,
+            grade: assignment.grade
+          },
+          grade: assignment.grade,
+          courseId: String(assignment.courseId?._id || assignment.courseId),
+        });
+      }
+    } catch (e) {
+      console.warn('Socket emit (assignmentCreated) failed:', e.message);
+    }
+    
+    res.status(201).json({ success: true, message: 'Assignment created', assignment });
+  } catch (error) {
+    console.error('Create assignment error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
 };
 
 // Post announcement
