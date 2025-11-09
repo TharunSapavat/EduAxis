@@ -5,6 +5,7 @@ import Payment from '../models/Payment.js';
 import Attendance from '../models/Attendance.js';
 import Grade from '../models/Grade.js';
 import Remark from '../models/Remark.js';
+import LeaveRequest from '../models/LeaveRequest.js';
 
 // Get admin dashboard data
 export const getDashboard = async (req, res) => {
@@ -162,6 +163,59 @@ export const deleteUser = async (req, res) => {
       message: 'User deleted successfully',
       id
     });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// Get leave requests (admin)
+export const getLeaveRequests = async (req, res) => {
+  try {
+    const { status = 'pending' } = req.query;
+    const filter = {};
+    if (status !== 'all') filter.status = status;
+    const requests = await LeaveRequest.find(filter)
+      .populate('requesterId', 'name email role grade section')
+      .sort({ createdAt: -1 });
+    res.json({ success: true, leaveRequests: requests });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// Decide a leave request (approve/reject)
+export const decideLeaveRequest = async (req, res) => {
+  try {
+    const admin = req.user;
+    const { id } = req.params;
+    const { action, remarks } = req.body;
+
+    if (!['approve', 'reject'].includes(action)) {
+      return res.status(400).json({ success: false, message: 'Invalid action' });
+    }
+
+    const lr = await LeaveRequest.findById(id);
+    if (!lr) return res.status(404).json({ success: false, message: 'Leave request not found' });
+
+    lr.status = action === 'approve' ? 'approved' : 'rejected';
+    lr.reviewedBy = admin._id;
+    lr.reviewedAt = new Date();
+    lr.reviewRemarks = remarks || '';
+    await lr.save();
+
+    // Emit updates
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('leaveRequestUpdated', {
+        id: lr._id,
+        status: lr.status,
+        reviewedBy: { id: String(admin._id), name: admin.name },
+        reviewedAt: lr.reviewedAt,
+        reviewRemarks: lr.reviewRemarks
+      });
+    }
+
+    res.json({ success: true, message: `Leave ${lr.status}`, leaveRequest: lr });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }

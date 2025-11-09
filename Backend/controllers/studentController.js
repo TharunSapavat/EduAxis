@@ -7,6 +7,7 @@ import Fee from '../models/Fee.js';
 import Payment from '../models/Payment.js';
 import Submission from '../models/Submission.js';
 import Timetable from '../models/Timetable.js';
+import LeaveRequest from '../models/LeaveRequest.js';
 
 // Get student dashboard data
 export const getDashboard = async (req, res) => {
@@ -317,6 +318,59 @@ export const getTimetable = async (req, res) => {
       message: 'Server error', 
       error: error.message 
     });
+  }
+};
+
+// Create a leave request (student)
+export const createLeaveRequest = async (req, res) => {
+  try {
+    const student = req.user;
+    const { startDate, endDate, reason, type } = req.body;
+
+    if (!startDate || !endDate || !reason) {
+      return res.status(400).json({ success: false, message: 'startDate, endDate and reason are required' });
+    }
+
+    const lr = await LeaveRequest.create({
+      requesterId: student._id,
+      requesterRole: 'student',
+      startDate: new Date(startDate),
+      endDate: new Date(endDate),
+      reason,
+      type: type || 'other'
+    });
+
+    // Notify admins via socket
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('leaveRequestCreated', {
+        id: lr._id,
+        requester: { id: String(student._id), name: student.name, role: 'student' },
+        startDate: lr.startDate,
+        endDate: lr.endDate,
+        days: lr.days,
+        type: lr.type,
+        status: lr.status
+      });
+    }
+
+    res.json({ success: true, message: 'Leave request submitted', leaveRequest: lr });
+  } catch (error) {
+    console.error('Create leave request error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// Get own leave requests (student)
+export const getMyLeaveRequests = async (req, res) => {
+  try {
+    const studentId = req.user._id;
+    const items = await LeaveRequest.find({ requesterId: studentId, requesterRole: 'student' })
+      .sort({ createdAt: -1 });
+    res.json({ success: true, leaveRequests: items });
+  } catch (error) {
+    console.error('Get my leave requests error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
 

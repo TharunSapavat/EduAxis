@@ -88,6 +88,9 @@ export const studentAPI = {
   makePayment: (paymentData) => api.post('/student/payment', paymentData),
   downloadReceipt: (paymentId) => api.get(`/student/receipt/${paymentId}`),
   getLibrary: () => api.get('/student/library'),
+  // Leave Requests
+  createLeaveRequest: (data) => api.post('/student/leave-requests', data),
+  getLeaveRequests: () => api.get('/student/leave-requests'),
 };
 
 // Teacher APIs
@@ -137,12 +140,14 @@ export const adminAPI = {
   getPaymentStats: () => api.get('/admin/payments/stats'),
   exportPayments: (params) => api.get('/admin/payments/export', { params }),
   sendFeeReminders: (feeId) => api.post('/admin/fees/reminders', { feeId }),
-  
   // Class Management
   getClassOverview: () => api.get('/admin/class/overview'),
   getStudentAnalytics: (params) => api.get('/admin/class/students', { params }),
   getAtRiskStudents: () => api.get('/admin/class/at-risk'),
   getStudentDetails: (id) => api.get(`/admin/class/students/${id}`),
+  // Leave Requests
+  getLeaveRequests: (params) => api.get('/admin/leave-requests', { params }),
+  decideLeaveRequest: (id, action, remarks) => api.patch(`/admin/leave-requests/${id}`, { action, remarks }),
 };
 
 export default api;
