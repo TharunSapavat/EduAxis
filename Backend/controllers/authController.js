@@ -178,7 +178,6 @@ export const login = async (req, res) => {
 
 // Logout user
 export const logout = async (req, res) => {
-  // Clear the cookie with same options used when setting it
   res.clearCookie('authToken', {
     httpOnly: true,
     sameSite: 'lax'
