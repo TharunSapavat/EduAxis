@@ -492,6 +492,24 @@ export default function StudentDashboard() {
   // Submit leave request
   const handleLeaveSubmit = async (e) => {
     e.preventDefault();
+    // Frontend validation for dates
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const start = new Date(leaveFormData.startDate);
+    const end = new Date(leaveFormData.endDate);
+
+    if (!leaveFormData.startDate || !leaveFormData.endDate) {
+      showNotification('Please select both start and end dates', 'error');
+      return;
+    }
+    if (start < today) {
+      showNotification('Start date cannot be in the past', 'error');
+      return;
+    }
+    if (end < start) {
+      showNotification('End date cannot be before start date', 'error');
+      return;
+    }
     try {
       const response = await studentAPI.createLeaveRequest(leaveFormData);
       if (response.data.success) {
@@ -1663,6 +1681,7 @@ export default function StudentDashboard() {
                           value={leaveFormData.startDate}
                           onChange={(e) => setLeaveFormData({...leaveFormData, startDate: e.target.value})}
                           className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          min={new Date().toISOString().split('T')[0]}
                           required
                         />
                       </div>
@@ -1673,6 +1692,7 @@ export default function StudentDashboard() {
                           value={leaveFormData.endDate}
                           onChange={(e) => setLeaveFormData({...leaveFormData, endDate: e.target.value})}
                           className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          min={leaveFormData.startDate || new Date().toISOString().split('T')[0]}
                           required
                         />
                       </div>

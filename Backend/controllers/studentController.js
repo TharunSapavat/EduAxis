@@ -331,6 +331,22 @@ export const createLeaveRequest = async (req, res) => {
       return res.status(400).json({ success: false, message: 'startDate, endDate and reason are required' });
     }
 
+    // Server-side validation for date logic
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    if (isNaN(start) || isNaN(end)) {
+      return res.status(400).json({ success: false, message: 'Invalid date format' });
+    }
+    if (start < today) {
+      return res.status(400).json({ success: false, message: 'Start date cannot be in the past' });
+    }
+    if (end < start) {
+      return res.status(400).json({ success: false, message: 'End date cannot be before start date' });
+    }
+
     const lr = await LeaveRequest.create({
       requesterId: student._id,
       requesterRole: 'student',

@@ -2230,19 +2230,13 @@ export default function AdminDashboard() {
                       {req.status === 'pending' && (
                         <div className="flex gap-3">
                           <button
-                            onClick={() => {
-                              const remarks = prompt('Enter remarks (optional):');
-                              handleLeaveDecision(req._id, 'approve', remarks || '');
-                            }}
+                            onClick={() => handleLeaveDecision(req._id, 'approve', '')}
                             className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
                           >
                             Approve
                           </button>
                           <button
-                            onClick={() => {
-                              const remarks = prompt('Enter remarks (optional):');
-                              handleLeaveDecision(req._id, 'reject', remarks || '');
-                            }}
+                            onClick={() => handleLeaveDecision(req._id, 'reject', '')}
                             className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
                           >
                             Reject
