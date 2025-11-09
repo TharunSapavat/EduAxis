@@ -240,6 +240,26 @@ export default function AdminDashboard() {
   const [coursesError, setCoursesError] = useState('');
   const [isEditMode, setIsEditMode] = useState(false);
 
+  // Leave Request States
+  const [leaveRequests, setLeaveRequests] = useState([]);
+  const [leaveRequestsLoading, setLeaveRequestsLoading] = useState(false);
+  const [leaveStatusFilter, setLeaveStatusFilter] = useState('pending');
+  const [leaveCurrentPage, setLeaveCurrentPage] = useState(1);
+  const leaveRequestsPerPage = 5;
+  const [notification, setNotification] = useState(null);
+
+  const showNotification = (message, type = 'success') => {
+    setNotification({ message, type });
+  };
+
+  // Auto-hide notification after 5 seconds
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
+
   // Fee form with React Hook Form
   const {
     register: registerFee,
@@ -278,6 +298,7 @@ export default function AdminDashboard() {
       code: '',
       description: '',
       teacher: '',
+      teacherId: '',
       credits: 3,
       grade: 1,
       status: 'active'
@@ -321,6 +342,43 @@ export default function AdminDashboard() {
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  // Fetch leave requests
+  const fetchLeaveRequests = async () => {
+    setLeaveRequestsLoading(true);
+    try {
+      const res = await adminAPI.getLeaveRequests({ status: leaveStatusFilter });
+      if (res.data.success) {
+        setLeaveRequests(res.data.leaveRequests || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch leave requests:', err);
+      showNotification('Failed to load leave requests', 'error');
+    } finally {
+      setLeaveRequestsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeModule === 'leave') {
+      fetchLeaveRequests();
+      setLeaveCurrentPage(1); // Reset to first page when filter changes
+    }
+  }, [activeModule, leaveStatusFilter]);
+
+  // Handle leave decision
+  const handleLeaveDecision = async (id, action, remarks) => {
+    try {
+      const res = await adminAPI.decideLeaveRequest(id, action, remarks);
+      if (res.data.success) {
+        showNotification(`Leave ${action}d successfully`, 'success');
+        fetchLeaveRequests();
+      }
+    } catch (err) {
+      console.error('Failed to decide leave request:', err);
+      showNotification(err.response?.data?.message || 'Failed to process request', 'error');
+    }
+  };
 
   // Fetch fees and payments when fees module is active
   useEffect(() => {
@@ -534,7 +592,14 @@ export default function AdminDashboard() {
   const handleCreateCourse = async (data) => {
     try {
       setCoursesLoading(true);
-      const response = await adminAPI.createCourse(data);
+      // Attach teacher name when teacherId is provided
+      const payload = { ...data };
+      if (data.teacherId) {
+        const teacher = users.find(u => u.id === data.teacherId);
+        payload.teacher = teacher ? teacher.name : '';
+      }
+
+      const response = await adminAPI.createCourse(payload);
       
       if (response.data.success) {
         setShowCourseForm(false);
@@ -554,7 +619,13 @@ export default function AdminDashboard() {
   const handleUpdateCourse = async (data) => {
     try {
       setCoursesLoading(true);
-      const response = await adminAPI.updateCourse(selectedCourse._id, data);
+      const payload = { ...data };
+      if (data.teacherId) {
+        const teacher = users.find(u => u.id === data.teacherId);
+        payload.teacher = teacher ? teacher.name : '';
+      }
+
+      const response = await adminAPI.updateCourse(selectedCourse._id, payload);
       
       if (response.data.success) {
         setShowCourseForm(false);
@@ -601,7 +672,8 @@ export default function AdminDashboard() {
     setCourseValue('name', course.name);
     setCourseValue('code', course.code);
     setCourseValue('description', course.description || '');
-    setCourseValue('teacher', course.teacher || '');
+  setCourseValue('teacher', course.teacher || '');
+  setCourseValue('teacherId', course.teacherId || '');
     setCourseValue('credits', course.credits);
     setCourseValue('grade', course.grade);
     setCourseValue('status', course.status);
@@ -642,7 +714,7 @@ export default function AdminDashboard() {
     { id: 'attendance', icon: ClipboardList, title: 'Attendance', description: 'View all attendance data' },
     { id: 'fees', icon: DollarSign, title: 'Fee Management', description: 'Manage fee structure & payments' },
     { id: 'classes', icon: GraduationCap, title: 'Class Management', description: 'Manage classes and sections' },
-    { id: 'requests', icon: Mail, title: 'Manage Requests', description: 'View and respond to user requests' },
+    { id: 'leave', icon: Mail, title: 'Leave Requests', description: 'Review leave applications' },
     { id: 'security', icon: Shield, title: 'Security & Roles', description: 'Manage permissions' },
     { id: 'settings', icon: Settings, title: 'System Settings', description: 'Configure system preferences' },
   ];
@@ -653,7 +725,7 @@ export default function AdminDashboard() {
         return (
           <div>
             {/* Welcome Banner */}
-            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-8 mb-8 text-white shadow-lg">
+            <div className="bg-linear-to-r from-purple-600 to-indigo-600 rounded-2xl p-8 mb-8 text-white shadow-lg">
               <h1 className="text-3xl font-bold mb-2">Admin Dashboard</h1>
               <p className="text-purple-100">Complete control over your school management system.</p>
             </div>
@@ -1864,7 +1936,7 @@ export default function AdminDashboard() {
                           Assign Teacher
                         </label>
                         <select
-                          {...registerCourse('teacher')}
+                          {...registerCourse('teacherId')}
                           className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all bg-white ${
                             courseErrors.teacher ? 'border-red-500' : 'border-slate-300'
                           }`}
@@ -1873,7 +1945,7 @@ export default function AdminDashboard() {
                           {users
                             .filter(u => u.role === 'teacher')
                             .map(teacher => (
-                              <option key={teacher.id} value={teacher.name}>
+                              <option key={teacher.id} value={teacher.id}>
                                 {teacher.name} - {teacher.email}
                               </option>
                             ))}
@@ -2083,6 +2155,150 @@ export default function AdminDashboard() {
       case 'classes':
         return <ClassManagement />;
 
+      case 'leave':
+        return (
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 mb-6">Leave Requests</h1>
+            <div className="mb-6 flex items-center gap-4">
+              <label className="text-sm font-medium text-slate-700">Filter:</label>
+              <select
+                value={leaveStatusFilter}
+                onChange={(e) => setLeaveStatusFilter(e.target.value)}
+                className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">All</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </div>
+
+            {leaveRequestsLoading ? (
+              <div className="text-center py-12">
+                <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                <p className="text-slate-600 mt-4">Loading leave requests...</p>
+              </div>
+            ) : leaveRequests.length === 0 ? (
+              <div className="bg-white rounded-xl shadow-md p-12 text-center border border-slate-100">
+                <Mail className="w-16 h-16 text-slate-400 mx-auto mb-4" />
+                <p className="text-slate-600 text-lg">No leave requests found</p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 gap-4">
+                  {leaveRequests
+                    .slice((leaveCurrentPage - 1) * leaveRequestsPerPage, leaveCurrentPage * leaveRequestsPerPage)
+                    .map((req) => (
+                    <div key={req._id} className="bg-white rounded-xl shadow-md p-6 border border-slate-100">
+                      <div className="flex items-start justify-between mb-4">
+                        <div>
+                          <h3 className="text-lg font-bold text-slate-900">{req.requesterId?.name || 'Unknown'}</h3>
+                          <p className="text-sm text-slate-600">
+                            {req.requesterId?.email} • Grade {req.requesterId?.grade}{req.requesterId?.section ? ` - ${req.requesterId?.section}` : ''}
+                          </p>
+                        </div>
+                        <span className={`px-3 py-1 text-xs font-bold rounded-full ${
+                          req.status === 'approved' ? 'bg-green-100 text-green-700' :
+                          req.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                          'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {req.status.toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
+                        <div>
+                          <span className="font-medium text-slate-700">Type:</span> <span className="capitalize">{req.type}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-slate-700">Duration:</span> {req.days} day{req.days > 1 ? 's' : ''}
+                        </div>
+                        <div className="col-span-2">
+                          <span className="font-medium text-slate-700">Period:</span> {new Date(req.startDate).toLocaleDateString()} to {new Date(req.endDate).toLocaleDateString()}
+                        </div>
+                      </div>
+                      <div className="mb-4 p-3 bg-slate-50 rounded">
+                        <p className="text-sm font-medium text-slate-700 mb-1">Reason:</p>
+                        <p className="text-sm text-slate-700">{req.reason}</p>
+                      </div>
+                      {req.reviewRemarks && (
+                        <div className="mb-4 p-3 bg-blue-50 rounded border border-blue-200">
+                          <p className="text-sm font-medium text-slate-700 mb-1">Admin Remarks:</p>
+                          <p className="text-sm text-slate-700">{req.reviewRemarks}</p>
+                        </div>
+                      )}
+                      <div className="text-xs text-slate-500 mb-3">Submitted: {new Date(req.createdAt).toLocaleString()}</div>
+                      {req.status === 'pending' && (
+                        <div className="flex gap-3">
+                          <button
+                            onClick={() => handleLeaveDecision(req._id, 'approve', '')}
+                            className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => handleLeaveDecision(req._id, 'reject', '')}
+                            className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Pagination Controls */}
+                {leaveRequests.length > leaveRequestsPerPage && (
+                  <div className="mt-6 flex items-center justify-between bg-white rounded-lg shadow-md p-4 border border-slate-100">
+                    <div className="text-sm text-slate-600">
+                      Showing {((leaveCurrentPage - 1) * leaveRequestsPerPage) + 1} to {Math.min(leaveCurrentPage * leaveRequestsPerPage, leaveRequests.length)} of {leaveRequests.length} requests
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setLeaveCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={leaveCurrentPage === 1}
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                          leaveCurrentPage === 1
+                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                            : 'bg-purple-600 text-white hover:bg-purple-700'
+                        }`}
+                      >
+                        Previous
+                      </button>
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: Math.ceil(leaveRequests.length / leaveRequestsPerPage) }, (_, i) => i + 1).map(page => (
+                          <button
+                            key={page}
+                            onClick={() => setLeaveCurrentPage(page)}
+                            className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+                              leaveCurrentPage === page
+                                ? 'bg-purple-600 text-white'
+                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        onClick={() => setLeaveCurrentPage(prev => Math.min(prev + 1, Math.ceil(leaveRequests.length / leaveRequestsPerPage)))}
+                        disabled={leaveCurrentPage === Math.ceil(leaveRequests.length / leaveRequestsPerPage)}
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                          leaveCurrentPage === Math.ceil(leaveRequests.length / leaveRequestsPerPage)
+                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                            : 'bg-purple-600 text-white hover:bg-purple-700'
+                        }`}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        );
+
       default:
         return (
           <div className="bg-white rounded-xl shadow-md p-6">
@@ -2102,9 +2318,18 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50 to-slate-100">
       {/* Header */}
       <DashboardHeader title="Admin Portal" userRole="admin" />
+
+      {/* Notification Toast */}
+      {notification && (
+        <div className={`fixed top-20 right-6 z-50 px-6 py-3 rounded-lg shadow-lg ${
+          notification.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+        } text-white`}>
+          {notification.message}
+        </div>
+      )}
 
       <div className="flex">
         {/* Sidebar */}

@@ -7,6 +7,7 @@ import Fee from '../models/Fee.js';
 import Payment from '../models/Payment.js';
 import Submission from '../models/Submission.js';
 import Timetable from '../models/Timetable.js';
+import LeaveRequest from '../models/LeaveRequest.js';
 
 // Get student dashboard data
 export const getDashboard = async (req, res) => {
@@ -39,8 +40,11 @@ export const getDashboard = async (req, res) => {
       status: 'pending'
     });
 
-    // Get total courses (TODO: implement student-course enrollment)
-    const totalCourses = await Course.countDocuments({ status: 'active' });
+    // Get total courses matching student's grade (enrolled courses)
+    const totalCourses = await Course.countDocuments({ 
+      status: 'active',
+      grade: Number(student.grade)
+    });
 
     // Get attendance stats
     const attendanceRecords = await Attendance.find({ studentId: student._id });
@@ -72,20 +76,25 @@ export const getDashboard = async (req, res) => {
 // Get student courses
 export const getCourses = async (req, res) => {
   try {
-    // TODO: Filter courses by student enrollment
-    const courses = await Course.find({ status: 'active' }).populate('teacherId', 'name email');
-    
-    res.json({ 
-      success: true,
-      courses 
-    });
+    // Determine student from auth or query
+    const studentId = req.query.studentId || req.user?._id;
+    if (!studentId) {
+      return res.status(400).json({ success: false, message: 'Student ID is required' });
+    }
+
+    const student = await User.findById(studentId);
+    if (!student || student.role !== 'student') {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    // Filter courses by matching grade and active status
+    const courses = await Course.find({ status: 'active', grade: Number(student.grade) })
+      .populate('teacherId', 'name email');
+
+    res.json({ success: true, courses });
   } catch (error) {
     console.error('Get courses error:', error);
-    res.status(500).json({ 
-      success: false,
-      message: 'Server error', 
-      error: error.message 
-    });
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
 
@@ -204,7 +213,7 @@ export const getAttendance = async (req, res) => {
 // Get student assignments
 export const getAssignments = async (req, res) => {
   try {
-    const studentId = req.query.studentId;
+    const studentId = req.query.studentId || req.user?._id;
 
     if (!studentId) {
       return res.status(400).json({ 
@@ -213,10 +222,20 @@ export const getAssignments = async (req, res) => {
       });
     }
 
-    const assignments = await Assignment.find({ studentId })
+    // Load student to determine grade
+    const student = await User.findById(studentId);
+    if (!student || student.role !== 'student') {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    // Assignments targeted to student's grade (and active)
+    const assignments = await Assignment.find({ 
+        grade: String(student.grade),
+        status: 'active'
+      })
       .populate('courseId', 'name code')
       .populate('teacherId', 'name')
-      .sort({ dueDate: -1 });
+      .sort({ dueDate: -1, createdAt: -1 });
     
     res.json({ 
       success: true,
@@ -302,21 +321,104 @@ export const getTimetable = async (req, res) => {
   }
 };
 
+// Create a leave request (student)
+export const createLeaveRequest = async (req, res) => {
+  try {
+    const student = req.user;
+    const { startDate, endDate, reason, type } = req.body;
+
+    if (!startDate || !endDate || !reason) {
+      return res.status(400).json({ success: false, message: 'startDate, endDate and reason are required' });
+    }
+
+    // Server-side validation for date logic
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    if (isNaN(start) || isNaN(end)) {
+      return res.status(400).json({ success: false, message: 'Invalid date format' });
+    }
+    if (start < today) {
+      return res.status(400).json({ success: false, message: 'Start date cannot be in the past' });
+    }
+    if (end < start) {
+      return res.status(400).json({ success: false, message: 'End date cannot be before start date' });
+    }
+
+    const lr = await LeaveRequest.create({
+      requesterId: student._id,
+      requesterRole: 'student',
+      startDate: new Date(startDate),
+      endDate: new Date(endDate),
+      reason,
+      type: type || 'other'
+    });
+
+    // Notify admins via socket
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('leaveRequestCreated', {
+        id: lr._id,
+        requester: { id: String(student._id), name: student.name, role: 'student' },
+        startDate: lr.startDate,
+        endDate: lr.endDate,
+        days: lr.days,
+        type: lr.type,
+        status: lr.status
+      });
+    }
+
+    res.json({ success: true, message: 'Leave request submitted', leaveRequest: lr });
+  } catch (error) {
+    console.error('Create leave request error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// Get own leave requests (student)
+export const getMyLeaveRequests = async (req, res) => {
+  try {
+    const studentId = req.user._id;
+    const items = await LeaveRequest.find({ requesterId: studentId, requesterRole: 'student' })
+      .sort({ createdAt: -1 });
+    res.json({ success: true, leaveRequests: items });
+  } catch (error) {
+    console.error('Get my leave requests error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
 // Get announcements
 export const getAnnouncements = async (req, res) => {
   try {
+    const student = req.user; // Loaded by auth middleware
+    
     const announcements = await Announcement.find({
       isActive: true,
       $or: [
         { targetAudience: 'all' },
         { targetAudience: 'students' }
       ],
-      $or: [
-        { expiresAt: null },
-        { expiresAt: { $gt: new Date() } }
+      $and: [
+        {
+          $or: [
+            { grade: { $exists: false } }, // No grade specified (legacy or all grades)
+            { grade: null },
+            { grade: String(student.grade) } // Matches student's grade
+          ]
+        },
+        {
+          $or: [
+            { expiresAt: null },
+            { expiresAt: { $gt: new Date() } }
+          ]
+        }
       ]
     })
     .populate('createdBy', 'name')
+    .populate('courseId', 'name code')
     .sort({ priority: -1, createdAt: -1 })
     .limit(20);
     

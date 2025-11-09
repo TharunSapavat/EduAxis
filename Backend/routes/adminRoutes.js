@@ -24,7 +24,9 @@ import {
   getClassOverview,
   getStudentAnalytics,
   getAtRiskStudents,
-  getStudentDetails
+  getStudentDetails,
+  getLeaveRequests,
+  decideLeaveRequest
 } from '../controllers/adminController.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
 
@@ -65,5 +67,9 @@ router.get('/class/overview', getClassOverview);
 router.get('/class/students', getStudentAnalytics);
 router.get('/class/at-risk', getAtRiskStudents);
 router.get('/class/students/:id', getStudentDetails);
+
+// Leave Request Management
+router.get('/leave-requests', getLeaveRequests);
+router.patch('/leave-requests/:id', decideLeaveRequest);
 
 export default router;

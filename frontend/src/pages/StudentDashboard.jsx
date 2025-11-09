@@ -37,6 +37,19 @@ export default function StudentDashboard() {
   const socketRef = useRef(null);
   const [socketConnected, setSocketConnected] = useState(false);
 
+  // Leave Request States
+  const [leaveRequests, setLeaveRequests] = useState([]);
+  const [leaveRequestsLoading, setLeaveRequestsLoading] = useState(false);
+  const [showLeaveForm, setShowLeaveForm] = useState(false);
+  const [leaveFormData, setLeaveFormData] = useState({
+    type: 'casual',
+    startDate: '',
+    endDate: '',
+    reason: ''
+  });
+  const [leaveCurrentPage, setLeaveCurrentPage] = useState(1);
+  const leaveRequestsPerPage = 5;
+
   // Course Details Modal States
   const [showCourseModal, setShowCourseModal] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState(null);
@@ -132,6 +145,10 @@ export default function StudentDashboard() {
       case 'library':
         fetchLibrary();
         break;
+      case 'leave':
+        fetchLeaveRequests();
+        setLeaveCurrentPage(1); // Reset to first page when opening leave module
+        break;
       default:
         break;
     }
@@ -151,6 +168,42 @@ export default function StudentDashboard() {
     socket.on('attendanceUpdated', handler);
     return () => {
       socket.off('attendanceUpdated', handler);
+    };
+  }, [activeModule, user]);
+
+  // Realtime: Listen for assignment creation events (teacher emits) and refresh if viewing assignments
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket || !user) return;
+    const handler = (payload) => {
+      // Only react if assignment targets the student's grade
+      if (!payload || String(payload.grade) !== String(user.grade)) return;
+      // Refresh list if on assignments module; else skip to avoid unnecessary requests
+      if (activeModule === 'assignments') {
+        fetchAssignments();
+      }
+    };
+    socket.on('assignmentCreated', handler);
+    return () => {
+      socket.off('assignmentCreated', handler);
+    };
+  }, [activeModule, user]);
+
+  // Realtime: Listen for announcement creation events (teacher posts) and refresh if viewing announcements
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket || !user) return;
+    const handler = (payload) => {
+      // Only react if announcement is for student's grade
+      if (!payload || String(payload.grade) !== String(user.grade)) return;
+      // Refresh announcements if on that module
+      if (activeModule === 'announcements') {
+        fetchAnnouncements();
+      }
+    };
+    socket.on('announcementCreated', handler);
+    return () => {
+      socket.off('announcementCreated', handler);
     };
   }, [activeModule, user]);
 
@@ -420,6 +473,57 @@ export default function StudentDashboard() {
     }
   };
 
+  // Fetch Leave Requests
+  const fetchLeaveRequests = async () => {
+    try {
+      setLeaveRequestsLoading(true);
+      const response = await studentAPI.getLeaveRequests();
+      if (response.data.success) {
+        setLeaveRequests(response.data.leaveRequests || []);
+      }
+    } catch (error) {
+      console.error('Error fetching leave requests:', error);
+      showNotification('Failed to load leave requests', 'error');
+    } finally {
+      setLeaveRequestsLoading(false);
+    }
+  };
+
+  // Submit leave request
+  const handleLeaveSubmit = async (e) => {
+    e.preventDefault();
+    // Frontend validation for dates
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const start = new Date(leaveFormData.startDate);
+    const end = new Date(leaveFormData.endDate);
+
+    if (!leaveFormData.startDate || !leaveFormData.endDate) {
+      showNotification('Please select both start and end dates', 'error');
+      return;
+    }
+    if (start < today) {
+      showNotification('Start date cannot be in the past', 'error');
+      return;
+    }
+    if (end < start) {
+      showNotification('End date cannot be before start date', 'error');
+      return;
+    }
+    try {
+      const response = await studentAPI.createLeaveRequest(leaveFormData);
+      if (response.data.success) {
+        showNotification('Leave request submitted successfully', 'success');
+        setShowLeaveForm(false);
+        setLeaveFormData({ type: 'casual', startDate: '', endDate: '', reason: '' });
+        fetchLeaveRequests();
+      }
+    } catch (error) {
+      console.error('Error submitting leave request:', error);
+      showNotification(error.response?.data?.message || 'Failed to submit leave request', 'error');
+    }
+  };
+
   const modules = [
     { id: 'home', icon: Home, title: 'Dashboard', description: 'Overview and statistics' },
     { id: 'courses', icon: BookOpen, title: 'My Courses', description: 'View enrolled courses' },
@@ -430,6 +534,7 @@ export default function StudentDashboard() {
     { id: 'announcements', icon: Bell, title: 'Announcements', description: 'Stay updated' },
     { id: 'library', icon: Library, title: 'Library', description: 'Access resources' },
     { id: 'fees', icon: DollarSign, title: 'Fees', description: 'View and pay fees' },
+    { id: 'leave', icon: Calendar, title: 'Leave Requests', description: 'Apply & track leave' },
   ];
 
   const renderMainContent = () => {
@@ -644,6 +749,36 @@ export default function StudentDashboard() {
                           )}
                           {assignment.teacherId?.name && (
                             <p className="text-xs text-slate-500 mt-2">By: {assignment.teacherId.name}</p>
+                          )}
+                          {assignment.attachments?.length > 0 && (
+                            <div className="mt-3 bg-slate-50 p-3 rounded-lg">
+                              <p className="text-xs font-semibold text-slate-700 mb-2">📎 Attachments:</p>
+                              <ul className="space-y-1">
+                                {assignment.attachments.map((att, idx) => {
+                                  // Support both file uploads (with path) and URL-based attachments
+                                  const fileUrl = att.path 
+                                    ? `http://localhost:5000${att.path}` 
+                                    : att.url;
+                                  const fileName = att.name || `Attachment ${idx + 1}`;
+                                  const fileSize = att.size ? ` (${(att.size / 1024).toFixed(1)} KB)` : '';
+                                  
+                                  return (
+                                    <li key={idx}>
+                                      <a
+                                        href={fileUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        download
+                                        className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 text-sm hover:underline"
+                                      >
+                                        <FileText className="w-4 h-4" />
+                                        <span>{fileName}{fileSize}</span>
+                                      </a>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            </div>
                           )}
                         </div>
                         <span className={`px-3 py-1 text-xs font-medium rounded-full whitespace-nowrap ml-4 ${
@@ -1284,14 +1419,17 @@ export default function StudentDashboard() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
                           <h3 className="text-lg font-bold text-slate-900">{announcement.title}</h3>
-                          {announcement.priority === 'high' && (
-                            <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-medium rounded-full">
-                              Important
-                            </span>
-                          )}
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                            announcement.priority === 'urgent' ? 'bg-red-100 text-red-700' :
+                            announcement.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                            announcement.priority === 'low' ? 'bg-slate-100 text-slate-600' :
+                            'bg-blue-100 text-blue-700'
+                          }`}>
+                            {announcement.priority?.toUpperCase() || 'NORMAL'}
+                          </span>
                         </div>
                         <p className="text-sm text-slate-600">
-                          By {announcement.createdBy?.name || 'Admin'} • {new Date(announcement.createdAt).toLocaleDateString()}
+                          By {announcement.createdBy?.name || 'Teacher'} • {new Date(announcement.createdAt).toLocaleDateString()}
                         </p>
                       </div>
                     </div>
@@ -1402,7 +1540,196 @@ export default function StudentDashboard() {
             )}
           </div>
         );
-      
+
+      case 'leave':
+        return (
+          <div>
+            <div className="flex items-center justify-between mb-6">
+              <h1 className="text-3xl font-bold text-slate-900">Leave Requests</h1>
+              <button
+                onClick={() => setShowLeaveForm(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              >
+                <Calendar className="w-4 h-4" />
+                Apply for Leave
+              </button>
+            </div>
+
+            {leaveRequestsLoading ? (
+              <div className="text-center py-12">
+                <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                <p className="text-slate-600 mt-4">Loading leave requests...</p>
+              </div>
+            ) : leaveRequests.length === 0 ? (
+              <div className="bg-white rounded-xl shadow-md p-12 text-center border border-slate-100">
+                <Calendar className="w-16 h-16 text-slate-400 mx-auto mb-4" />
+                <p className="text-slate-600 text-lg">No leave requests yet</p>
+                <p className="text-slate-500 text-sm mt-2">Click "Apply for Leave" to submit your first request</p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 gap-4">
+                  {leaveRequests
+                    .slice((leaveCurrentPage - 1) * leaveRequestsPerPage, leaveCurrentPage * leaveRequestsPerPage)
+                    .map((req) => (
+                    <div key={req._id} className="bg-white rounded-xl shadow-md p-6 border border-slate-100">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <h3 className="text-lg font-bold text-slate-900 capitalize">{req.type} Leave</h3>
+                          <p className="text-sm text-slate-600 mt-1">
+                            {new Date(req.startDate).toLocaleDateString()} – {new Date(req.endDate).toLocaleDateString()} ({req.days} day{req.days > 1 ? 's' : ''})
+                          </p>
+                        </div>
+                        <span className={`px-3 py-1 text-xs font-bold rounded-full ${
+                          req.status === 'approved' ? 'bg-green-100 text-green-700' :
+                          req.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                          'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {req.status.toUpperCase()}
+                        </span>
+                      </div>
+                      <p className="text-sm text-slate-700 mb-2"><span className="font-medium">Reason:</span> {req.reason}</p>
+                      {req.reviewRemarks && (
+                        <p className="text-sm text-slate-600 mt-2 p-3 bg-slate-50 rounded"><span className="font-medium">Admin Remarks:</span> {req.reviewRemarks}</p>
+                      )}
+                      <p className="text-xs text-slate-500 mt-3">Submitted: {new Date(req.createdAt).toLocaleString()}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Pagination Controls */}
+                {leaveRequests.length > leaveRequestsPerPage && (
+                  <div className="mt-6 flex items-center justify-between bg-white rounded-lg shadow-md p-4 border border-slate-100">
+                    <div className="text-sm text-slate-600">
+                      Showing {((leaveCurrentPage - 1) * leaveRequestsPerPage) + 1} to {Math.min(leaveCurrentPage * leaveRequestsPerPage, leaveRequests.length)} of {leaveRequests.length} requests
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setLeaveCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={leaveCurrentPage === 1}
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                          leaveCurrentPage === 1
+                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                            : 'bg-blue-600 text-white hover:bg-blue-700'
+                        }`}
+                      >
+                        Previous
+                      </button>
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: Math.ceil(leaveRequests.length / leaveRequestsPerPage) }, (_, i) => i + 1).map(page => (
+                          <button
+                            key={page}
+                            onClick={() => setLeaveCurrentPage(page)}
+                            className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+                              leaveCurrentPage === page
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        onClick={() => setLeaveCurrentPage(prev => Math.min(prev + 1, Math.ceil(leaveRequests.length / leaveRequestsPerPage)))}
+                        disabled={leaveCurrentPage === Math.ceil(leaveRequests.length / leaveRequestsPerPage)}
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                          leaveCurrentPage === Math.ceil(leaveRequests.length / leaveRequestsPerPage)
+                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                            : 'bg-blue-600 text-white hover:bg-blue-700'
+                        }`}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Leave Form Modal */}
+            {showLeaveForm && (
+              <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
+                  <div className="p-6 border-b border-slate-200 flex items-center justify-between">
+                    <h2 className="text-2xl font-bold text-slate-900">Apply for Leave</h2>
+                    <button onClick={() => setShowLeaveForm(false)} className="text-slate-400 hover:text-slate-600">
+                      <X className="w-6 h-6" />
+                    </button>
+                  </div>
+                  <form onSubmit={handleLeaveSubmit} className="p-6">
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Leave Type</label>
+                        <select
+                          value={leaveFormData.type}
+                          onChange={(e) => setLeaveFormData({...leaveFormData, type: e.target.value})}
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          required
+                        >
+                          <option value="casual">Casual</option>
+                          <option value="sick">Sick</option>
+                          <option value="personal">Personal</option>
+                          <option value="emergency">Emergency</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Start Date</label>
+                        <input
+                          type="date"
+                          value={leaveFormData.startDate}
+                          onChange={(e) => setLeaveFormData({...leaveFormData, startDate: e.target.value})}
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          min={new Date().toISOString().split('T')[0]}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">End Date</label>
+                        <input
+                          type="date"
+                          value={leaveFormData.endDate}
+                          onChange={(e) => setLeaveFormData({...leaveFormData, endDate: e.target.value})}
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          min={leaveFormData.startDate || new Date().toISOString().split('T')[0]}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Reason</label>
+                        <textarea
+                          value={leaveFormData.reason}
+                          onChange={(e) => setLeaveFormData({...leaveFormData, reason: e.target.value})}
+                          rows="4"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          placeholder="Explain why you need leave..."
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-3 mt-6">
+                      <button
+                        type="button"
+                        onClick={() => setShowLeaveForm(false)}
+                        className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                      >
+                        Submit Request
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+
       default:
         return (
           <div className="bg-white rounded-xl shadow-md p-12 text-center border border-slate-100">
@@ -1583,17 +1910,13 @@ export default function StudentDashboard() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Recent Assignments */}
                     <div>
-                      <h4 className="font-semibold text-slate-900 mb-3">Recent Assignments</h4>
+                      <h4 className="font-semibold text-slate-900 mb-3">Most Recent Assignment</h4>
                       {courseDetails.recentAssignments && courseDetails.recentAssignments.length > 0 ? (
-                        <div className="space-y-3">
-                          {courseDetails.recentAssignments.map((a) => (
-                            <div key={a._id} className="p-4 bg-white rounded-lg border border-slate-200 shadow-sm">
-                              <p className="font-medium text-slate-900">{a.title}</p>
-                              <p className="text-sm text-slate-600 mt-1">
-                                Due: {new Date(a.dueDate).toLocaleDateString()} • {a.totalMarks || 100} marks
-                              </p>
-                            </div>
-                          ))}
+                        <div className="p-4 bg-white rounded-lg border border-slate-200 shadow-sm">
+                          <p className="font-medium text-slate-900">{courseDetails.recentAssignments[0].title}</p>
+                          <p className="text-sm text-slate-600 mt-1">
+                            Due: {new Date(courseDetails.recentAssignments[0].dueDate).toLocaleDateString()} • {courseDetails.recentAssignments[0].totalMarks || 100} marks
+                          </p>
                         </div>
                       ) : (
                         <p className="text-sm text-slate-600">No recent assignments</p>
@@ -1602,18 +1925,14 @@ export default function StudentDashboard() {
 
                     {/* Recent Announcements */}
                     <div>
-                      <h4 className="font-semibold text-slate-900 mb-3">Recent Announcements</h4>
+                      <h4 className="font-semibold text-slate-900 mb-3">Most Recent Announcement</h4>
                       {courseDetails.recentAnnouncements && courseDetails.recentAnnouncements.length > 0 ? (
-                        <div className="space-y-3">
-                          {courseDetails.recentAnnouncements.map((ann) => (
-                            <div key={ann._id} className="p-4 bg-white rounded-lg border border-slate-200 shadow-sm">
-                              <p className="font-medium text-slate-900">{ann.title}</p>
-                              <p className="text-sm text-slate-600 mt-1">{new Date(ann.createdAt).toLocaleDateString()}</p>
-                              {ann.content && (
-                                <p className="text-sm text-slate-700 mt-1 line-clamp-3">{ann.content}</p>
-                              )}
-                            </div>
-                          ))}
+                        <div className="p-4 bg-white rounded-lg border border-slate-200 shadow-sm">
+                          <p className="font-medium text-slate-900">{courseDetails.recentAnnouncements[0].title}</p>
+                          <p className="text-sm text-slate-600 mt-1">{new Date(courseDetails.recentAnnouncements[0].createdAt).toLocaleDateString()}</p>
+                          {courseDetails.recentAnnouncements[0].content && (
+                            <p className="text-sm text-slate-700 mt-1 line-clamp-3">{courseDetails.recentAnnouncements[0].content}</p>
+                          )}
                         </div>
                       ) : (
                         <p className="text-sm text-slate-600">No recent announcements</p>
