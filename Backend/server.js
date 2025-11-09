@@ -3,6 +3,9 @@ import http from 'http';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 import connectDB from './config/database.js';
 import authRoutes from './routes/authRoutes.js';
 import studentRoutes from './routes/studentRoutes.js';
@@ -11,6 +14,9 @@ import adminRoutes from './routes/adminRoutes.js';
 import { Server as SocketIOServer } from 'socket.io';
 
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const app = express();
 const server = http.createServer(app);
@@ -27,6 +33,9 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(cookieParser()); // Parse cookies
+
+// Serve static files from uploads directory
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Socket.IO setup
 const io = new SocketIOServer(server, {

@@ -212,7 +212,7 @@ export const getAttendance = async (req, res) => {
 // Get student assignments
 export const getAssignments = async (req, res) => {
   try {
-    const studentId = req.query.studentId;
+    const studentId = req.query.studentId || req.user?._id;
 
     if (!studentId) {
       return res.status(400).json({ 
@@ -221,10 +221,20 @@ export const getAssignments = async (req, res) => {
       });
     }
 
-    const assignments = await Assignment.find({ studentId })
+    // Load student to determine grade
+    const student = await User.findById(studentId);
+    if (!student || student.role !== 'student') {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    // Assignments targeted to student's grade (and active)
+    const assignments = await Assignment.find({ 
+        grade: String(student.grade),
+        status: 'active'
+      })
       .populate('courseId', 'name code')
       .populate('teacherId', 'name')
-      .sort({ dueDate: -1 });
+      .sort({ dueDate: -1, createdAt: -1 });
     
     res.json({ 
       success: true,
