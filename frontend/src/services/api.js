@@ -94,10 +94,17 @@ export const studentAPI = {
 export const teacherAPI = {
   getDashboard: (teacherId) => api.get(`/teacher/dashboard?teacherId=${teacherId}`),
   getCourses: (teacherId) => api.get(`/teacher/courses?teacherId=${teacherId}`),
-  getStudents: () => api.get('/teacher/students'),
+  getStudents: (params) => api.get('/teacher/students', { params }),
   markAttendance: (data) => api.post('/teacher/attendance', data),
   submitGrades: (data) => api.post('/teacher/grades', data),
   getAssignments: () => api.get('/teacher/assignments'),
+  createAssignment: (formData) => {
+    // Handle both FormData (with files) and regular JSON
+    const config = formData instanceof FormData 
+      ? { headers: { 'Content-Type': 'multipart/form-data' } }
+      : {};
+    return api.post('/teacher/assignments', formData, config);
+  },
   postAnnouncement: (data) => api.post('/teacher/announcements', data),
 };
 
