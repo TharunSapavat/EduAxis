@@ -240,6 +240,24 @@ export default function AdminDashboard() {
   const [coursesError, setCoursesError] = useState('');
   const [isEditMode, setIsEditMode] = useState(false);
 
+  // Leave Request States
+  const [leaveRequests, setLeaveRequests] = useState([]);
+  const [leaveRequestsLoading, setLeaveRequestsLoading] = useState(false);
+  const [leaveStatusFilter, setLeaveStatusFilter] = useState('pending');
+  const [notification, setNotification] = useState(null);
+
+  const showNotification = (message, type = 'success') => {
+    setNotification({ message, type });
+  };
+
+  // Auto-hide notification after 5 seconds
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
+
   // Fee form with React Hook Form
   const {
     register: registerFee,
@@ -322,6 +340,42 @@ export default function AdminDashboard() {
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  // Fetch leave requests
+  const fetchLeaveRequests = async () => {
+    setLeaveRequestsLoading(true);
+    try {
+      const res = await adminAPI.getLeaveRequests({ status: leaveStatusFilter });
+      if (res.data.success) {
+        setLeaveRequests(res.data.leaveRequests || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch leave requests:', err);
+      showNotification('Failed to load leave requests', 'error');
+    } finally {
+      setLeaveRequestsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeModule === 'leave') {
+      fetchLeaveRequests();
+    }
+  }, [activeModule, leaveStatusFilter]);
+
+  // Handle leave decision
+  const handleLeaveDecision = async (id, action, remarks) => {
+    try {
+      const res = await adminAPI.decideLeaveRequest(id, action, remarks);
+      if (res.data.success) {
+        showNotification(`Leave ${action}d successfully`, 'success');
+        fetchLeaveRequests();
+      }
+    } catch (err) {
+      console.error('Failed to decide leave request:', err);
+      showNotification(err.response?.data?.message || 'Failed to process request', 'error');
+    }
+  };
 
   // Fetch fees and payments when fees module is active
   useEffect(() => {
@@ -657,7 +711,7 @@ export default function AdminDashboard() {
     { id: 'attendance', icon: ClipboardList, title: 'Attendance', description: 'View all attendance data' },
     { id: 'fees', icon: DollarSign, title: 'Fee Management', description: 'Manage fee structure & payments' },
     { id: 'classes', icon: GraduationCap, title: 'Class Management', description: 'Manage classes and sections' },
-    { id: 'requests', icon: Mail, title: 'Manage Requests', description: 'View and respond to user requests' },
+    { id: 'leave', icon: Mail, title: 'Leave Requests', description: 'Review leave applications' },
     { id: 'security', icon: Shield, title: 'Security & Roles', description: 'Manage permissions' },
     { id: 'settings', icon: Settings, title: 'System Settings', description: 'Configure system preferences' },
   ];
@@ -668,7 +722,7 @@ export default function AdminDashboard() {
         return (
           <div>
             {/* Welcome Banner */}
-            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-8 mb-8 text-white shadow-lg">
+            <div className="bg-linear-to-r from-purple-600 to-indigo-600 rounded-2xl p-8 mb-8 text-white shadow-lg">
               <h1 className="text-3xl font-bold mb-2">Admin Dashboard</h1>
               <p className="text-purple-100">Complete control over your school management system.</p>
             </div>
@@ -2098,6 +2152,104 @@ export default function AdminDashboard() {
       case 'classes':
         return <ClassManagement />;
 
+      case 'leave':
+        return (
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 mb-6">Leave Requests</h1>
+            <div className="mb-6 flex items-center gap-4">
+              <label className="text-sm font-medium text-slate-700">Filter:</label>
+              <select
+                value={leaveStatusFilter}
+                onChange={(e) => setLeaveStatusFilter(e.target.value)}
+                className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">All</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </div>
+
+            {leaveRequestsLoading ? (
+              <div className="text-center py-12">
+                <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                <p className="text-slate-600 mt-4">Loading leave requests...</p>
+              </div>
+            ) : leaveRequests.length === 0 ? (
+              <div className="bg-white rounded-xl shadow-md p-12 text-center border border-slate-100">
+                <Mail className="w-16 h-16 text-slate-400 mx-auto mb-4" />
+                <p className="text-slate-600 text-lg">No leave requests found</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4">
+                {leaveRequests.map((req) => (
+                  <div key={req._id} className="bg-white rounded-xl shadow-md p-6 border border-slate-100">
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <h3 className="text-lg font-bold text-slate-900">{req.requesterId?.name || 'Unknown'}</h3>
+                        <p className="text-sm text-slate-600">
+                          {req.requesterId?.email} • Grade {req.requesterId?.grade}{req.requesterId?.section ? ` - ${req.requesterId?.section}` : ''}
+                        </p>
+                      </div>
+                      <span className={`px-3 py-1 text-xs font-bold rounded-full ${
+                        req.status === 'approved' ? 'bg-green-100 text-green-700' :
+                        req.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                        'bg-yellow-100 text-yellow-700'
+                      }`}>
+                        {req.status.toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
+                      <div>
+                        <span className="font-medium text-slate-700">Type:</span> <span className="capitalize">{req.type}</span>
+                      </div>
+                      <div>
+                        <span className="font-medium text-slate-700">Duration:</span> {req.days} day{req.days > 1 ? 's' : ''}
+                      </div>
+                      <div className="col-span-2">
+                        <span className="font-medium text-slate-700">Period:</span> {new Date(req.startDate).toLocaleDateString()} to {new Date(req.endDate).toLocaleDateString()}
+                      </div>
+                    </div>
+                    <div className="mb-4 p-3 bg-slate-50 rounded">
+                      <p className="text-sm font-medium text-slate-700 mb-1">Reason:</p>
+                      <p className="text-sm text-slate-700">{req.reason}</p>
+                    </div>
+                    {req.reviewRemarks && (
+                      <div className="mb-4 p-3 bg-blue-50 rounded border border-blue-200">
+                        <p className="text-sm font-medium text-slate-700 mb-1">Admin Remarks:</p>
+                        <p className="text-sm text-slate-700">{req.reviewRemarks}</p>
+                      </div>
+                    )}
+                    <div className="text-xs text-slate-500 mb-3">Submitted: {new Date(req.createdAt).toLocaleString()}</div>
+                    {req.status === 'pending' && (
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => {
+                            const remarks = prompt('Enter remarks (optional):');
+                            handleLeaveDecision(req._id, 'approve', remarks || '');
+                          }}
+                          className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => {
+                            const remarks = prompt('Enter remarks (optional):');
+                            handleLeaveDecision(req._id, 'reject', remarks || '');
+                          }}
+                          className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+
       default:
         return (
           <div className="bg-white rounded-xl shadow-md p-6">
@@ -2117,9 +2269,18 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50 to-slate-100">
       {/* Header */}
       <DashboardHeader title="Admin Portal" userRole="admin" />
+
+      {/* Notification Toast */}
+      {notification && (
+        <div className={`fixed top-20 right-6 z-50 px-6 py-3 rounded-lg shadow-lg ${
+          notification.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+        } text-white`}>
+          {notification.message}
+        </div>
+      )}
 
       <div className="flex">
         {/* Sidebar */}

@@ -13,7 +13,9 @@ import {
   getFees,
   makePayment,
   downloadReceipt,
-  getLibraryResources
+  getLibraryResources,
+  createLeaveRequest,
+  getMyLeaveRequests
 } from '../controllers/studentController.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
 
@@ -54,5 +56,9 @@ router.get('/receipt/:paymentId', downloadReceipt);
 
 // Library
 router.get('/library', getLibraryResources);
+
+// Leave Requests
+router.post('/leave-requests', createLeaveRequest);
+router.get('/leave-requests', getMyLeaveRequests);
 
 export default router;

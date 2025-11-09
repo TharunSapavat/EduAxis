@@ -155,7 +155,7 @@ export default function TeacherDashboard() {
         return (
           <div>
             {/* Welcome Section */}
-            <div className="bg-gradient-to-r from-green-600 to-green-700 rounded-2xl p-8 mb-6 text-white">
+            <div className="bg-linear-to-r from-green-600 to-green-700 rounded-2xl p-8 mb-6 text-white">
               <h1 className="text-3xl font-bold mb-2">
                 Welcome, {user?.name || 'Teacher'}!
               </h1>
@@ -421,7 +421,7 @@ export default function TeacherDashboard() {
             ) : (
               <div className="bg-white rounded-xl shadow-md border border-slate-100 overflow-hidden">
                 {/* Stats Header */}
-                <div className="bg-gradient-to-r from-green-600 to-green-700 p-6 text-white">
+                <div className="bg-linear-to-r from-green-600 to-green-700 p-6 text-white">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
                       <Users className="w-6 h-6" />
@@ -549,7 +549,7 @@ export default function TeacherDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50 to-slate-100">
       {/* Header */}
       <DashboardHeader title="Teacher Portal" userRole="teacher" />
 
