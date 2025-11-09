@@ -177,7 +177,6 @@ export const getCourses = async (req, res) => {
   }
 };
 
-// Create new course
 export const createCourse = async (req, res) => {
   try {
     const { name, code, description, teacher, credits, grade } = req.body;
