@@ -715,8 +715,7 @@ export default function AdminDashboard() {
     { id: 'fees', icon: DollarSign, title: 'Fee Management', description: 'Manage fee structure & payments' },
     { id: 'classes', icon: GraduationCap, title: 'Class Management', description: 'Manage classes and sections' },
     { id: 'leave', icon: Mail, title: 'Leave Requests', description: 'Review leave applications' },
-    { id: 'security', icon: Shield, title: 'Security & Roles', description: 'Manage permissions' },
-    { id: 'settings', icon: Settings, title: 'System Settings', description: 'Configure system preferences' },
+     
   ];
 
   const renderMainContent = () => {
