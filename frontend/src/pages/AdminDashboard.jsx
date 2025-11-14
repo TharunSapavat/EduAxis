@@ -757,7 +757,7 @@ export default function AdminDashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-slate-600 text-sm">Active Courses</p>
-                    <p className="text-3xl font-bold text-orange-600 mt-1">42</p>
+                    <p className="text-3xl font-bold text-orange-600 mt-1">{courses.filter(c => c.status === 'active').length}</p>
                   </div>
                   <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
                     <BookOpen className="w-6 h-6 text-orange-600" />
@@ -768,7 +768,7 @@ export default function AdminDashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-slate-600 text-sm">Total Revenue</p>
-                    <p className="text-3xl font-bold text-purple-600 mt-1">₹485K</p>
+                    <p className="text-3xl font-bold text-purple-600 mt-1">₹{paymentStats.totalAmount ? (paymentStats.totalAmount / 1000).toFixed(1) + 'K' : '0'}</p>
                   </div>
                   <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
                     <DollarSign className="w-6 h-6 text-purple-600" />
@@ -780,7 +780,7 @@ export default function AdminDashboard() {
             {/* Quick Actions */}
             <div className="bg-white rounded-xl shadow-md p-6">
               <h2 className="text-xl font-semibold text-slate-900 mb-4">Quick Actions</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <button
                   onClick={() => setActiveModule('users')}
                   className="flex items-center space-x-3 p-4 rounded-lg border border-slate-200 hover:border-purple-400 hover:bg-purple-50 transition-all group"
@@ -795,13 +795,7 @@ export default function AdminDashboard() {
                   <BookOpen className="w-5 h-5 text-purple-600" />
                   <span className="text-slate-700 group-hover:text-purple-900 font-medium">Create Course</span>
                 </button>
-                <button
-                  onClick={() => setActiveModule('reports')}
-                  className="flex items-center space-x-3 p-4 rounded-lg border border-slate-200 hover:border-purple-400 hover:bg-purple-50 transition-all group"
-                >
-                  <BarChart3 className="w-5 h-5 text-purple-600" />
-                  <span className="text-slate-700 group-hover:text-purple-900 font-medium">View Reports</span>
-                </button>
+               
               </div>
             </div>
           </div>
