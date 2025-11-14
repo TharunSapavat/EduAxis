@@ -260,6 +260,12 @@ export default function AdminDashboard() {
     }
   }, [notification]);
 
+  // Fetch dashboard data on initial load
+  useEffect(() => {
+    fetchCourses();
+    fetchPayments();
+  }, []);
+
   // Fee form with React Hook Form
   const {
     register: registerFee,
