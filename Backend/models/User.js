@@ -112,6 +112,8 @@ userSchema.methods.generateAuthToken = function() {
 userSchema.methods.toJSON = function() {
   const user = this.toObject();
   delete user.password;
+  // Add id as string version of _id for frontend compatibility
+  user.id = user._id.toString();
   return user;
 };
 
