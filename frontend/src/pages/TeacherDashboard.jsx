@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from 'react';
 import { teacherAPI } from '../services/api';
 import DashboardHeader from '../components/DashboardHeader';
 import DashboardFooter from '../components/DashboardFooter';
+import TeacherInbox from '../components/TeacherInbox';
+import io from 'socket.io-client';
 
 export default function TeacherDashboard() {
   const { user } = useAuth();
@@ -13,6 +15,7 @@ export default function TeacherDashboard() {
   const [teacherCourses, setTeacherCourses] = useState([]);
   const [coursesLoading, setCoursesLoading] = useState(false);
   const [statsLoading, setStatsLoading] = useState(false);
+  const socketRef = useRef(null);
   
   // Course Management Modal
   const [showCourseManageModal, setShowCourseManageModal] = useState(false);
@@ -40,6 +43,44 @@ export default function TeacherDashboard() {
     { id: 'timetable', icon: Calendar, title: 'My Timetable', description: 'View schedule' },
     { id: 'messages', icon: MessageSquare, title: 'Messages', description: 'Communicate with students' },
   ];
+
+  // Socket.io setup
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const socket = io(import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000', {
+      withCredentials: true,
+      transports: ['websocket', 'polling']
+    });
+
+    socket.on('connect', () => {
+      console.log('Teacher socket connected');
+      socket.emit('join', { userId: user.id });
+    });
+
+    socket.on('message:received', (payload) => {
+      console.log('New message received', payload);
+      // Show notification
+      if (Notification.permission === 'granted') {
+        new Notification('New Message', {
+          body: `${payload.sender.name}: ${payload.text.substring(0, 50)}...`
+        });
+      }
+    });
+
+    socketRef.current = socket;
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [user]);
+
+  // Request notification permission
+  useEffect(() => {
+    if (Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
 
   // Load teacher dashboard stats
   useEffect(() => {
@@ -520,6 +561,17 @@ export default function TeacherDashboard() {
                 <TeacherAnnouncementsList />
               </div>
             </div>
+          </div>
+        );
+
+      case 'messages':
+        return (
+          <div>
+            <div className="mb-6">
+              <h1 className="text-3xl font-bold text-slate-900 mb-2">Messages</h1>
+              <p className="text-slate-600">View and respond to student messages</p>
+            </div>
+            <TeacherInbox user={user} socket={socketRef.current} />
           </div>
         );
 

@@ -1,9 +1,10 @@
-import { BookOpen, Users, Calendar, FileText, BarChart3, ClipboardList, Bell, Library, DollarSign, Home, X, RefreshCw } from 'lucide-react';
+import { BookOpen, Users, Calendar, FileText, BarChart3, ClipboardList, Bell, Library, DollarSign, Home, X, RefreshCw, MessageSquare } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { studentAPI } from '../services/api';
 import { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 import DashboardHeader from '../components/DashboardHeader';
+import StudentInbox from '../components/StudentInbox';
 import DashboardFooter from '../components/DashboardFooter';
 
 export default function StudentDashboard() {
@@ -103,6 +104,12 @@ export default function StudentDashboard() {
       socketRef.current = socket;
       socket.on('connect', () => setSocketConnected(true));
       socket.on('disconnect', () => setSocketConnected(false));
+      // Join room after socket connects if user present
+      socket.on('connect', () => {
+        if (user) {
+          try { socket.emit('join', { userId: user._id || user.id || user.studentId }); } catch (err) { console.error(err); }
+        }
+      });
     }
     return () => {
       if (socketRef.current) {
@@ -175,6 +182,13 @@ export default function StudentDashboard() {
   useEffect(() => {
     const socket = socketRef.current;
     if (!socket || !user) return;
+    // Incoming private messages
+    const msgHandler = (payload) => {
+      const sender = payload?.sender?.name || payload?.sender?.email || 'Someone';
+      const text = payload?.text || '';
+      showNotification(`${sender}: ${text}`, 'success');
+    };
+    socket.on('message:received', msgHandler);
     const handler = (payload) => {
       // Only react if assignment targets the student's grade
       if (!payload || String(payload.grade) !== String(user.grade)) return;
@@ -186,6 +200,7 @@ export default function StudentDashboard() {
     socket.on('assignmentCreated', handler);
     return () => {
       socket.off('assignmentCreated', handler);
+      socket.off('message:received', msgHandler);
     };
   }, [activeModule, user]);
 
@@ -532,6 +547,7 @@ export default function StudentDashboard() {
     { id: 'assignments', icon: FileText, title: 'Assignments', description: 'Submit and track assignments' },
     { id: 'timetable', icon: Calendar, title: 'Timetable', description: 'View class schedule' },
     { id: 'announcements', icon: Bell, title: 'Announcements', description: 'Stay updated' },
+    { id: 'messages', icon: MessageSquare, title: 'Messages', description: 'Chat with teachers' },
     { id: 'library', icon: Library, title: 'Library', description: 'Access resources' },
     { id: 'fees', icon: DollarSign, title: 'Fees', description: 'View and pay fees' },
     { id: 'leave', icon: Calendar, title: 'Leave Requests', description: 'Apply & track leave' },
@@ -653,6 +669,13 @@ export default function StudentDashboard() {
                 >
                   <Bell className="w-8 h-8 text-orange-600 mx-auto mb-2" />
                   <p className="text-sm font-medium text-slate-900">Announcements</p>
+                </button>
+                <button
+                  onClick={() => setActiveModule('messages')}
+                  className="p-4 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors text-center"
+                >
+                  <MessageSquare className="w-8 h-8 text-indigo-600 mx-auto mb-2" />
+                  <p className="text-sm font-medium text-slate-900">Messages</p>
                 </button>
               </div>
             </div>
@@ -1438,6 +1461,17 @@ export default function StudentDashboard() {
                 ))}
               </div>
             )}
+          </div>
+        );
+
+      case 'messages':
+        return (
+          <div>
+            <div className="mb-6">
+              <h1 className="text-3xl font-bold text-slate-900 mb-2">Messages</h1>
+              <p className="text-slate-600">Chat with your teachers</p>
+            </div>
+            <StudentInbox user={user} socket={socketRef.current} />
           </div>
         );
 
