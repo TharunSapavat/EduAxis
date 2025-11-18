@@ -1,6 +1,7 @@
 import { X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { teacherAPI } from '../services/api';
 import DashboardHeader from '../components/DashboardHeader';
 import DashboardFooter from '../components/DashboardFooter';
@@ -26,7 +27,8 @@ import { TEACHER_MODULES } from '../config/teacherModules';
 
 export default function TeacherDashboard() {
   const { user } = useAuth();
-  const [activeModule, setActiveModule] = useState('home');
+  const location = useLocation();
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [teacherStats, setTeacherStats] = useState({ totalCourses: 0, totalStudents: 0, pendingGrading: 0, classesToday: 0 });
   const [teacherCourses, setTeacherCourses] = useState([]);
@@ -127,7 +129,7 @@ export default function TeacherDashboard() {
   // Load teacher courses when viewing Home, Courses, Attendance, Grading or Announcements
   useEffect(() => {
     if (!user || user.role !== 'teacher') return;
-    const shouldFetch = ['home','courses','attendance','grading','announcements'].includes(activeModule);
+    const shouldFetch = ['/teacher/home','/teacher/courses','/teacher/attendance','/teacher/grading','/teacher/announcements'].includes(location.pathname) || location.pathname === '/teacher';
     if (!shouldFetch) return;
 
     const loadCourses = async () => {
@@ -144,19 +146,19 @@ export default function TeacherDashboard() {
     };
 
     loadCourses();
-  }, [user, activeModule]);
+  }, [user, location.pathname]);
 
   // When switching to Attendance, default select first course
   useEffect(() => {
-    if (activeModule !== 'attendance') return;
+    if (location.pathname !== '/teacher/attendance') return;
     if (!attendanceCourseId && teacherCourses.length > 0) {
       setAttendanceCourseId(teacherCourses[0]._id);
     }
-  }, [activeModule, teacherCourses, attendanceCourseId]);
+  }, [location.pathname, teacherCourses, attendanceCourseId]);
 
   // Load students for selected course in Attendance
   useEffect(() => {
-    if (activeModule !== 'attendance' || !attendanceCourseId) return;
+    if (location.pathname !== '/teacher/attendance' || !attendanceCourseId) return;
     const load = async () => {
       setAttendanceLoading(true);
       try {
@@ -170,7 +172,7 @@ export default function TeacherDashboard() {
       }
     };
     load();
-  }, [activeModule, attendanceCourseId]);
+  }, [location.pathname, attendanceCourseId]);
 
   // Fetch students for a course
   const fetchStudentsForCourse = useCallback(async (course) => {
@@ -200,28 +202,28 @@ export default function TeacherDashboard() {
   const handleViewStudentList = useCallback((course) => {
     setShowCourseManageModal(false);
     fetchStudentsForCourse(course);
-    setActiveModule('students');
-  }, [fetchStudentsForCourse]);
+    navigate('/teacher/students');
+  }, [fetchStudentsForCourse, navigate]);
 
   // Render main content
   const renderMainContent = () => {
-    switch (activeModule) {
-      case 'home':
+    switch (location.pathname) {
+      case '/teacher':
+      case '/teacher/home':
         return <TeacherHome 
           user={user}
           teacherStats={teacherStats}
           statsLoading={statsLoading}
-          setActiveModule={setActiveModule}
         />;
 
-      case 'courses':
+      case '/teacher/courses':
         return <TeacherCourses 
           teacherCourses={teacherCourses}
           coursesLoading={coursesLoading}
           handleManageCourse={handleManageCourse}
         />;
 
-      case 'attendance':
+      case '/teacher/attendance':
         return <TeacherAttendance 
           teacherCourses={teacherCourses}
           coursesLoading={coursesLoading}
@@ -233,7 +235,7 @@ export default function TeacherDashboard() {
           markAttendanceStatus={markAttendanceStatus}
         />;
 
-      case 'grading':
+      case '/teacher/grading':
         return (
           <div>
             <h1 className="text-3xl font-bold text-slate-900 mb-6">Assignments</h1>
@@ -255,17 +257,16 @@ export default function TeacherDashboard() {
           </div>
         );
 
-      case 'students':
+      case '/teacher/students':
         return <TeacherStudents 
           students={students}
           studentsLoading={studentsLoading}
           courseForStudentView={courseForStudentView}
           setCourseForStudentView={setCourseForStudentView}
           setStudents={setStudents}
-          setActiveModule={setActiveModule}
         />;
 
-      case 'announcements':
+      case '/teacher/announcements':
         return (
           <div>
             <h1 className="text-3xl font-bold text-slate-900 mb-6">Post Announcement</h1>
@@ -285,7 +286,7 @@ export default function TeacherDashboard() {
           </div>
         );
 
-      case 'messages':
+      case '/teacher/messages':
         return (
           <div>
             <div className="mb-6">
@@ -300,18 +301,18 @@ export default function TeacherDashboard() {
         return (
           <div className="bg-white rounded-xl shadow-md p-12 text-center border border-slate-100">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              {TEACHER_MODULES.find(m => m.id === activeModule)?.icon && 
-                React.createElement(TEACHER_MODULES.find(m => m.id === activeModule).icon, {
+              {TEACHER_MODULES.find(m => location.pathname.includes(m.id))?.icon && 
+                React.createElement(TEACHER_MODULES.find(m => location.pathname.includes(m.id)).icon, {
                   className: "w-8 h-8 text-green-600"
                 })
               }
             </div>
             <h2 className="text-2xl font-bold text-slate-900 mb-2">
-              {TEACHER_MODULES.find(m => m.id === activeModule)?.title}
+              {TEACHER_MODULES.find(m => location.pathname.includes(m.id))?.title}
             </h2>
             <p className="text-slate-600 mb-6">This feature is coming soon!</p>
             <button 
-              onClick={() => setActiveModule('home')}
+              onClick={() => navigate('/teacher/home')}
               className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium"
             >
               Back to Dashboard
@@ -367,9 +368,9 @@ export default function TeacherDashboard() {
             {TEACHER_MODULES.map((module) => (
               <button
                 key={module.id}
-                onClick={() => setActiveModule(module.id)}
+                onClick={() => navigate(`/teacher/${module.id}`)}
                 className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
-                  activeModule === module.id
+                  location.pathname === `/teacher/${module.id}` || (module.id === 'home' && location.pathname === '/teacher')
                     ? 'bg-green-600 text-white shadow-md'
                     : 'text-slate-700 hover:bg-slate-100'
                 }`}
@@ -400,7 +401,7 @@ export default function TeacherDashboard() {
               )}
             </button>
             <p className="text-sm text-slate-600">
-              {TEACHER_MODULES.find(m => m.id === activeModule)?.title || 'Dashboard'}
+              {TEACHER_MODULES.find(m => location.pathname === `/teacher/${m.id}` || (m.id === 'home' && location.pathname === '/teacher'))?.title || 'Dashboard'}
             </p>
           </div>
 
@@ -419,7 +420,6 @@ export default function TeacherDashboard() {
         show={showCourseManageModal}
         selectedCourse={selectedCourse}
         onClose={() => setShowCourseManageModal(false)}
-        onSetActiveModule={setActiveModule}
         onViewStudentList={handleViewStudentList}
       />
     </div>

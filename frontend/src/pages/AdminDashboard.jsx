@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Users, BookOpen, Calendar, FileText, BarChart3, Settings, Shield, Database, DollarSign, Library, GraduationCap, ClipboardList, Home, X, Search, Filter, Eye, Mail, Phone, MapPin, Trash2, UserPlus, Lock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { adminAPI } from '../services/api';
@@ -178,7 +179,8 @@ const feeSchema = yup.object({
 
 export default function AdminDashboard() {
   const { user } = useAuth();
-  const [activeModule, setActiveModule] = useState('home');
+  const location = useLocation();
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   
   // User Management States
@@ -366,11 +368,11 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    if (activeModule === 'leave') {
+    if (location.pathname === '/admin/leave') {
       fetchLeaveRequests();
       setLeaveCurrentPage(1); // Reset to first page when filter changes
     }
-  }, [activeModule, leaveStatusFilter]);
+  }, [location.pathname, leaveStatusFilter]);
 
   // Handle leave decision
   const handleLeaveDecision = async (id, action, remarks) => {
@@ -388,18 +390,18 @@ export default function AdminDashboard() {
 
   // Fetch fees and payments when fees module is active
   useEffect(() => {
-    if (activeModule === 'fees') {
+    if (location.pathname === '/admin/fees') {
       fetchFees();
       fetchPayments();
     }
-  }, [activeModule]);
+  }, [location.pathname]);
 
   // Fetch courses when courses module is active
   useEffect(() => {
-    if (activeModule === 'courses') {
+    if (location.pathname === '/admin/courses') {
       fetchCourses();
     }
-  }, [activeModule]);
+  }, [location.pathname]);
 
   // Filter payments
   useEffect(() => {
@@ -725,8 +727,9 @@ export default function AdminDashboard() {
   ];
 
   const renderMainContent = () => {
-    switch (activeModule) {
-      case 'home':
+    switch (location.pathname) {
+      case '/admin':
+      case '/admin/home':
         return (
           <div>
             {/* Welcome Banner */}
@@ -788,14 +791,14 @@ export default function AdminDashboard() {
               <h2 className="text-xl font-semibold text-slate-900 mb-4">Quick Actions</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <button
-                  onClick={() => setActiveModule('users')}
+                  onClick={() => navigate('/admin/users')}
                   className="flex items-center space-x-3 p-4 rounded-lg border border-slate-200 hover:border-purple-400 hover:bg-purple-50 transition-all group"
                 >
                   <Users className="w-5 h-5 text-purple-600" />
                   <span className="text-slate-700 group-hover:text-purple-900 font-medium">Add New User</span>
                 </button>
                 <button
-                  onClick={() => setActiveModule('courses')}
+                  onClick={() => navigate('/admin/courses')}
                   className="flex items-center space-x-3 p-4 rounded-lg border border-slate-200 hover:border-purple-400 hover:bg-purple-50 transition-all group"
                 >
                   <BookOpen className="w-5 h-5 text-purple-600" />
@@ -807,7 +810,7 @@ export default function AdminDashboard() {
           </div>
         );
 
-      case 'users':
+      case '/admin/users':
         return (
           <div>
             {/* Header with Stats */}
@@ -1297,7 +1300,7 @@ export default function AdminDashboard() {
           </div>
         );
 
-      case 'fees':
+      case '/admin/fees':
         return (
           <div>
             {/* Fee Management Header */}
@@ -1653,7 +1656,7 @@ export default function AdminDashboard() {
           </div>
         );
 
-      case 'courses':
+      case '/admin/courses':
         return (
           <div>
             {/* Header with Stats */}
@@ -2151,10 +2154,10 @@ export default function AdminDashboard() {
           </div>
         );
 
-      case 'classes':
+      case '/admin/classes':
         return <ClassManagement />;
 
-      case 'leave':
+      case '/admin/leave':
         return (
           <div>
             <h1 className="text-3xl font-bold text-slate-900 mb-6">Leave Requests</h1>
@@ -2302,10 +2305,10 @@ export default function AdminDashboard() {
         return (
           <div className="bg-white rounded-xl shadow-md p-6">
             <h2 className="text-2xl font-bold text-slate-900 mb-4">
-              {modules.find(m => m.id === activeModule)?.title}
+              {modules.find(m => location.pathname.includes(m.id))?.title}
             </h2>
             <p className="text-slate-600">
-              {modules.find(m => m.id === activeModule)?.description}
+              {modules.find(m => location.pathname.includes(m.id))?.description}
             </p>
             <div className="mt-6 p-8 bg-slate-50 rounded-lg text-center">
               <Settings className="w-16 h-16 text-purple-400 mx-auto mb-4" />
@@ -2337,9 +2340,9 @@ export default function AdminDashboard() {
             {modules.map((module) => (
               <button
                 key={module.id}
-                onClick={() => setActiveModule(module.id)}
+                onClick={() => navigate(`/admin/${module.id}`)}
                 className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
-                  activeModule === module.id
+                  location.pathname === `/admin/${module.id}` || (module.id === 'home' && location.pathname === '/admin')
                     ? 'bg-purple-600 text-white shadow-md'
                     : 'text-slate-700 hover:bg-slate-100'
                 }`}
@@ -2370,7 +2373,7 @@ export default function AdminDashboard() {
               )}
             </button>
             <p className="text-sm text-slate-600">
-              {modules.find(m => m.id === activeModule)?.title || 'Dashboard'}
+              {modules.find(m => location.pathname === `/admin/${m.id}` || (m.id === 'home' && location.pathname === '/admin'))?.title || 'Dashboard'}
             </p>
           </div>
 

@@ -1,7 +1,10 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { BookOpen, Users, FileText, Calendar, ClipboardList, BarChart3, Bell, Upload } from 'lucide-react';
 
-const TeacherHome = ({ user, teacherStats, statsLoading, setActiveModule }) => {
+const TeacherHome = ({ user, teacherStats, statsLoading }) => {
+  const navigate = useNavigate();
+  
   return (
     <div>
       {/* Welcome Section */}
@@ -68,28 +71,28 @@ const TeacherHome = ({ user, teacherStats, statsLoading, setActiveModule }) => {
         <h2 className="text-xl font-bold text-slate-900 mb-4">Quick Actions</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <button
-            onClick={() => setActiveModule('attendance')}
+            onClick={() => navigate('/teacher/attendance')}
             className="p-4 bg-green-50 hover:bg-green-100 rounded-lg transition-colors text-center"
           >
             <ClipboardList className="w-8 h-8 text-green-600 mx-auto mb-2" />
             <p className="text-sm font-medium text-slate-900">Mark Attendance</p>
           </button>
           <button
-            onClick={() => setActiveModule('grading')}
+            onClick={() => navigate('/teacher/grading')}
             className="p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors text-center"
           >
             <BarChart3 className="w-8 h-8 text-blue-600 mx-auto mb-2" />
             <p className="text-sm font-medium text-slate-900">Grade Work</p>
           </button>
           <button
-            onClick={() => setActiveModule('announcements')}
+            onClick={() => navigate('/teacher/announcements')}
             className="p-4 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors text-center"
           >
             <Bell className="w-8 h-8 text-purple-600 mx-auto mb-2" />
             <p className="text-sm font-medium text-slate-900">Post Announcement</p>
           </button>
           <button
-            onClick={() => setActiveModule('materials')}
+            onClick={() => navigate('/teacher/materials')}
             className="p-4 bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors text-center"
           >
             <Upload className="w-8 h-8 text-orange-600 mx-auto mb-2" />

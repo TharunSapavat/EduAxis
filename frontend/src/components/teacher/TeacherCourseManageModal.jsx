@@ -1,7 +1,10 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { X, Users, BookOpen, FileText, Upload, ClipboardList, Bell } from 'lucide-react';
 
-export default function TeacherCourseManageModal({ show, selectedCourse, onClose, onSetActiveModule, onViewStudentList }) {
+export default function TeacherCourseManageModal({ show, selectedCourse, onClose, onViewStudentList }) {
+  const navigate = useNavigate();
+  
   if (!show || !selectedCourse) return null;
 
   return (
@@ -58,7 +61,7 @@ export default function TeacherCourseManageModal({ show, selectedCourse, onClose
             <h3 className="font-bold text-slate-900 mb-3">Course Management</h3>
             {/* Upload Assignment */}
             <button
-              onClick={() => { onClose(); onSetActiveModule('grading'); }}
+              onClick={() => { onClose(); navigate('/teacher/grading'); }}
               className="w-full flex items-center gap-4 p-4 bg-white border-2 border-slate-200 hover:border-green-500 hover:bg-green-50 rounded-lg transition-all group"
             >
               <div className="w-12 h-12 bg-green-100 group-hover:bg-green-200 rounded-lg flex items-center justify-center">
@@ -71,7 +74,7 @@ export default function TeacherCourseManageModal({ show, selectedCourse, onClose
             </button>
             {/* Upload Study Materials */}
             <button
-              onClick={() => { onClose(); onSetActiveModule('materials'); }}
+              onClick={() => { onClose(); navigate('/teacher/materials'); }}
               className="w-full flex items-center gap-4 p-4 bg-white border-2 border-slate-200 hover:border-blue-500 hover:bg-blue-50 rounded-lg transition-all group"
             >
               <div className="w-12 h-12 bg-blue-100 group-hover:bg-blue-200 rounded-lg flex items-center justify-center">
@@ -84,7 +87,7 @@ export default function TeacherCourseManageModal({ show, selectedCourse, onClose
             </button>
             {/* Mark Attendance */}
             <button
-              onClick={() => { onClose(); onSetActiveModule('attendance'); }}
+              onClick={() => { onClose(); navigate('/teacher/attendance'); }}
               className="w-full flex items-center gap-4 p-4 bg-white border-2 border-slate-200 hover:border-purple-500 hover:bg-purple-50 rounded-lg transition-all group"
             >
               <div className="w-12 h-12 bg-purple-100 group-hover:bg-purple-200 rounded-lg flex items-center justify-center">
@@ -97,7 +100,7 @@ export default function TeacherCourseManageModal({ show, selectedCourse, onClose
             </button>
             {/* Post Announcement */}
             <button
-              onClick={() => { onClose(); onSetActiveModule('announcements'); }}
+              onClick={() => { onClose(); navigate('/teacher/announcements'); }}
               className="w-full flex items-center gap-4 p-4 bg-white border-2 border-slate-200 hover:border-orange-500 hover:bg-orange-50 rounded-lg transition-all group"
             >
               <div className="w-12 h-12 bg-orange-100 group-hover:bg-orange-200 rounded-lg flex items-center justify-center">

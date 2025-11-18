@@ -1,6 +1,9 @@
 import { BookOpen, ClipboardList, BarChart3, FileText, Calendar, Bell, MessageSquare } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
-export default function StudentHome({ user, stats, loading, error, fetchDashboardData, setActiveModule }) {
+export default function StudentHome({ user, stats, loading, error, fetchDashboardData }) {
+  const navigate = useNavigate();
+  
   return (
     <div>
       {/* Welcome Section */}
@@ -88,35 +91,35 @@ export default function StudentHome({ user, stats, loading, error, fetchDashboar
         <h2 className="text-xl font-bold text-slate-900 mb-4">Quick Actions</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <button
-            onClick={() => setActiveModule('assignments')}
+            onClick={() => navigate('/student/assignments')}
             className="p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors text-center"
           >
             <FileText className="w-8 h-8 text-blue-600 mx-auto mb-2" />
             <p className="text-sm font-medium text-slate-900">Assignments</p>
           </button>
           <button
-            onClick={() => setActiveModule('timetable')}
+            onClick={() => navigate('/student/timetable')}
             className="p-4 bg-green-50 hover:bg-green-100 rounded-lg transition-colors text-center"
           >
             <Calendar className="w-8 h-8 text-green-600 mx-auto mb-2" />
             <p className="text-sm font-medium text-slate-900">Timetable</p>
           </button>
           <button
-            onClick={() => setActiveModule('grades')}
+            onClick={() => navigate('/student/grades')}
             className="p-4 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors text-center"
           >
             <BarChart3 className="w-8 h-8 text-purple-600 mx-auto mb-2" />
             <p className="text-sm font-medium text-slate-900">Grades</p>
           </button>
           <button
-            onClick={() => setActiveModule('announcements')}
+            onClick={() => navigate('/student/announcements')}
             className="p-4 bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors text-center"
           >
             <Bell className="w-8 h-8 text-orange-600 mx-auto mb-2" />
             <p className="text-sm font-medium text-slate-900">Announcements</p>
           </button>
           <button
-            onClick={() => setActiveModule('messages')}
+            onClick={() => navigate('/student/messages')}
             className="p-4 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors text-center"
           >
             <MessageSquare className="w-8 h-8 text-indigo-600 mx-auto mb-2" />

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Users } from 'lucide-react';
 
 const TeacherStudents = ({ 
@@ -6,9 +7,9 @@ const TeacherStudents = ({
   studentsLoading, 
   courseForStudentView, 
   setCourseForStudentView, 
-  setStudents, 
-  setActiveModule 
+  setStudents 
 }) => {
+  const navigate = useNavigate();
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -47,7 +48,7 @@ const TeacherStudents = ({
               : 'Select a course from "My Courses" to view enrolled students.'}
           </p>
           <button
-            onClick={() => setActiveModule('courses')}
+            onClick={() => navigate('/teacher/courses')}
             className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium"
           >
             View My Courses

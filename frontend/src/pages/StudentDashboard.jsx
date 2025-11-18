@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { X } from 'lucide-react';
 
@@ -31,6 +32,8 @@ import { STUDENT_MODULES } from '../config/studentModules';
 
 export default function StudentDashboard() {
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalCourses: 0,
     attendance: 0,
@@ -39,7 +42,6 @@ export default function StudentDashboard() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeModule, setActiveModule] = useState('home');///////
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Module-specific states
@@ -131,50 +133,50 @@ export default function StudentDashboard() {
   }, []);
 
   useEffect(() => {
-    if (user && activeModule === 'fees') {
+    if (user && location.pathname === '/student/fees') {
       fetchFeeData();
     }
-  }, [user, activeModule]);
+  }, [user, location.pathname]);
 
   // Fetch data when switching modules
   useEffect(() => {
     if (!user) return;
 
-    switch (activeModule) {
-      case 'courses':
+    switch (location.pathname) {
+      case '/student/courses':
         fetchCourses();
         break;
-      case 'grades':
+      case '/student/grades':
         fetchGrades();
         break;
-      case 'attendance':
+      case '/student/attendance':
         fetchAttendance();
         break;
-      case 'assignments':
+      case '/student/assignments':
         fetchAssignments();
         break;
-      case 'timetable':
+      case '/student/timetable':
         fetchTimetable();
         break;
-      case 'announcements':
+      case '/student/announcements':
         fetchAnnouncements();
         break;
-      case 'library':
+      case '/student/library':
         fetchLibrary();
         break;
-      case 'leave':
+      case '/student/leave':
         fetchLeaveRequests();
         setLeaveCurrentPage(1); // Reset to first page when opening leave module
         break;
       default:
         break;
     }
-  }, [user, activeModule]);
+  }, [user, location.pathname]);
 
   // Realtime: Listen for attendance updates and refresh when relevant
   useEffect(() => {
     const socket = socketRef.current;
-    if (!socket || activeModule !== 'attendance') return;
+    if (!socket || location.pathname !== '/student/attendance') return;
     const handler = (payload) => {
       const myId = user?._id || user?.id || user?.studentId;
       if (!myId) return;
@@ -186,7 +188,7 @@ export default function StudentDashboard() {
     return () => {
       socket.off('attendanceUpdated', handler);
     };
-  }, [activeModule, user]);
+  }, [location.pathname, user]);
 
   // Realtime: Listen for assignment creation events (teacher emits) and refresh if viewing assignments
   useEffect(() => {
@@ -203,7 +205,7 @@ export default function StudentDashboard() {
       // Only react if assignment targets the student's grade
       if (!payload || String(payload.grade) !== String(user.grade)) return;
       // Refresh list if on assignments module; else skip to avoid unnecessary requests
-      if (activeModule === 'assignments') {
+      if (location.pathname === '/student/assignments') {
         fetchAssignments();
       }
     };
@@ -212,7 +214,7 @@ export default function StudentDashboard() {
       socket.off('assignmentCreated', handler);
       socket.off('message:received', msgHandler);
     };
-  }, [activeModule, user]);
+  }, [location.pathname, user]);
 
   // Realtime: Listen for announcement creation events (teacher posts) and refresh if viewing announcements
   useEffect(() => {
@@ -222,7 +224,7 @@ export default function StudentDashboard() {
       // Only react if announcement is for student's grade
       if (!payload || String(payload.grade) !== String(user.grade)) return;
       // Refresh announcements if on that module
-      if (activeModule === 'announcements') {
+      if (location.pathname === '/student/announcements') {
         fetchAnnouncements();
       }
     };
@@ -230,7 +232,7 @@ export default function StudentDashboard() {
     return () => {
       socket.off('announcementCreated', handler);
     };
-  }, [activeModule, user]);
+  }, [location.pathname, user]);
 
   const fetchFeeData = async () => {
     try {
@@ -552,32 +554,32 @@ export default function StudentDashboard() {
   // Use imported module configuration
 
   const renderMainContent = () => {
-    switch (activeModule) {
-      case 'home':
+    switch (location.pathname) {
+      case '/student':
+      case '/student/home':
         return <StudentHome 
           user={user} 
           stats={stats} 
           loading={loading} 
           error={error} 
           fetchDashboardData={fetchDashboardData}
-          setActiveModule={setActiveModule}
         />;
       
-      case 'courses':
+      case '/student/courses':
         return <StudentCourses 
           courses={courses} 
           coursesLoading={coursesLoading}
           openCourseDetails={openCourseDetails}
         />;
       
-      case 'assignments':
+      case '/student/assignments':
         return <StudentAssignments 
           assignments={assignments}
           assignmentsLoading={assignmentsLoading}
           showNotification={showNotification}
         />;
 
-      case 'fees':
+      case '/student/fees':
         return <StudentFees 
           fees={fees}
           feesLoading={feesLoading}
@@ -593,31 +595,31 @@ export default function StudentDashboard() {
           handleDownloadReceipt={handleDownloadReceipt}
         />;
 
-      case 'grades':
+      case '/student/grades':
         return <StudentGrades 
           grades={grades}
           gradesLoading={gradesLoading}
         />;
 
-      case 'attendance':
+      case '/student/attendance':
         return <StudentAttendance 
           attendance={attendance}
           attendanceLoading={attendanceLoading}
         />;
 
-      case 'timetable':
+      case '/student/timetable':
         return <StudentTimetable 
           timetable={timetable}
           timetableLoading={timetableLoading}
         />;
 
-      case 'announcements':
+      case '/student/announcements':
         return <StudentAnnouncements 
           announcements={announcements}
           announcementsLoading={announcementsLoading}
         />;
 
-      case 'messages':
+      case '/student/messages':
         return (
           <div>
             <div className="mb-6">
@@ -628,13 +630,13 @@ export default function StudentDashboard() {
           </div>
         );
 
-      case 'library':
+      case '/student/library':
         return <StudentLibrary 
           library={library}
           libraryLoading={libraryLoading}
         />;
 
-      case 'leave':
+      case '/student/leave':
         return <StudentLeave 
           leaveRequests={leaveRequests}
           leaveRequestsLoading={leaveRequestsLoading}
@@ -652,18 +654,18 @@ export default function StudentDashboard() {
         return (
           <div className="bg-white rounded-xl shadow-md p-12 text-center border border-slate-100">
             <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              {STUDENT_MODULES.find(m => m.id === activeModule)?.icon && 
-                React.createElement(STUDENT_MODULES.find(m => m.id === activeModule).icon, {
+              {STUDENT_MODULES.find(m => location.pathname.includes(m.id))?.icon && 
+                React.createElement(STUDENT_MODULES.find(m => location.pathname.includes(m.id)).icon, {
                   className: "w-8 h-8 text-blue-600"
                 })
               }
             </div>
             <h2 className="text-2xl font-bold text-slate-900 mb-2">
-              {STUDENT_MODULES.find(m => m.id === activeModule)?.title}
+              {STUDENT_MODULES.find(m => location.pathname.includes(m.id))?.title}
             </h2>
             <p className="text-slate-600 mb-6">This feature is coming soon!</p>
             <button 
-              onClick={() => setActiveModule('home')}
+              onClick={() => navigate('/student/home')}
               className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
             >
               Back to Dashboard
@@ -688,9 +690,9 @@ export default function StudentDashboard() {
             {STUDENT_MODULES.map((module) => (
               <button
                 key={module.id}
-                onClick={() => setActiveModule(module.id)}
+                onClick={() => navigate(`/student/${module.id}`)}
                 className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
-                  activeModule === module.id
+                  location.pathname === `/student/${module.id}` || (module.id === 'home' && location.pathname === '/student')
                     ? 'bg-blue-600 text-white shadow-md'
                     : 'text-slate-700 hover:bg-slate-100'
                 }`}
@@ -721,7 +723,7 @@ export default function StudentDashboard() {
               )}
             </button>
             <p className="text-sm text-slate-600">
-              {STUDENT_MODULES.find(m => m.id === activeModule)?.title || 'Dashboard'}
+              {STUDENT_MODULES.find(m => location.pathname === `/student/${m.id}` || (m.id === 'home' && location.pathname === '/student'))?.title || 'Dashboard'}
             </p>
           </div>
 
