@@ -19,6 +19,7 @@ import {
   getTeachers
 } from '../controllers/studentController.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
+import { uploadSubmissionFiles } from '../config/multer.js';
 
 const router = express.Router();
 
@@ -41,7 +42,8 @@ router.get('/attendance', getAttendance);
 
 // Assignments
 router.get('/assignments', getAssignments);
-router.post('/assignments/submit', submitAssignment);
+// Allow up to 5 files per submission under field name 'files'
+router.post('/assignments/submit', uploadSubmissionFiles.array('files', 5), submitAssignment);
 router.get('/assignments/:assignmentId/submission', getSubmissionDetails);
 
 // Timetable
