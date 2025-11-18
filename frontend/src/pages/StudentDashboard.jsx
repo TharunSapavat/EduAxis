@@ -481,10 +481,10 @@ export default function StudentDashboard() {
   }, [showNotification]);
 
   // Fetch Library
-  const fetchLibrary = useCallback(async () => {
+  const fetchLibrary = useCallback(async (params = {}) => {
     try {
       setLibraryLoading(true);
-      const response = await studentAPI.getLibrary();
+      const response = await studentAPI.getLibrary(params);
       console.log('Library response:', response.data);
       if (response.data.success) {
         setLibrary(response.data.library);
@@ -634,6 +634,7 @@ export default function StudentDashboard() {
         return <StudentLibrary 
           library={library}
           libraryLoading={libraryLoading}
+          onSearch={(params) => fetchLibrary(params)}
         />;
 
       case '/student/leave':

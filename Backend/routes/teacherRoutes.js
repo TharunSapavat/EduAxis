@@ -13,7 +13,7 @@ import {
   getSubmissionsForAssignment
 } from '../controllers/teacherController.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
-import { uploadAssignmentFiles } from '../config/multer.js';
+import { uploadAssignmentFiles, uploadLibraryFiles } from '../config/multer.js';
 
 const router = express.Router();
 
@@ -33,5 +33,9 @@ router.get('/assignments/:assignmentId/submissions', getSubmissionsForAssignment
 router.get('/announcements', getAnnouncements);
 router.post('/announcements', postAnnouncement);
 router.delete('/announcements/:id', deleteAnnouncement);
+// Library resources (teacher)
+import { createLibraryResource, listMyLibraryResources } from '../controllers/teacherController.js';
+router.get('/library', listMyLibraryResources);
+router.post('/library', uploadLibraryFiles.single('file'), createLibraryResource);
 
 export default router;

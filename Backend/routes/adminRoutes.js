@@ -32,6 +32,8 @@ import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
 
 const router = express.Router();
 
+  import { uploadLibraryFiles } from '../config/multer.js';
+  import { adminCreateLibraryResource, adminListLibraryResources, adminDeleteLibraryResource } from '../controllers/adminController.js';
 // Protect all admin routes - require authentication and admin role
 router.use(authMiddleware);
 router.use(roleMiddleware('admin'));
@@ -51,6 +53,11 @@ router.get('/reports', getReports);
 
 // Fee Management Routes
 router.get('/fees', getFees);
+
+  // Library management (admin)
+  router.get('/library', adminListLibraryResources);
+  router.post('/library', uploadLibraryFiles.single('file'), adminCreateLibraryResource);
+  router.delete('/library/:id', adminDeleteLibraryResource);
 router.post('/fees', createFee);
 router.put('/fees/:id', updateFee);
 router.delete('/fees/:id', deleteFee);

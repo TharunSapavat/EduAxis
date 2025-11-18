@@ -9,6 +9,7 @@ import * as yup from 'yup';
 import DashboardHeader from '../components/DashboardHeader';
 import DashboardFooter from '../components/DashboardFooter';
 import ClassManagement from '../components/ClassManagement.jsx';
+import AdminLibraryManagement from '../components/adminComp/AdminLibraryManagement.jsx';
 
 // User creation validation schema
 const userSchema = yup.object({
@@ -722,6 +723,7 @@ export default function AdminDashboard() {
     { id: 'attendance', icon: ClipboardList, title: 'Attendance', description: 'View all attendance data' },
     { id: 'fees', icon: DollarSign, title: 'Fee Management', description: 'Manage fee structure & payments' },
     { id: 'classes', icon: GraduationCap, title: 'Class Management', description: 'Manage classes and sections' },
+    { id: 'library', icon: Library, title: 'Library Management', description: 'Upload and manage library resources' },
     { id: 'leave', icon: Mail, title: 'Leave Requests', description: 'Review leave applications' },
      
   ];
@@ -2156,6 +2158,9 @@ export default function AdminDashboard() {
 
       case '/admin/classes':
         return <ClassManagement />;
+
+      case '/admin/library':
+        return <AdminLibraryManagement showNotification={showNotification} />;
 
       case '/admin/leave':
         return (

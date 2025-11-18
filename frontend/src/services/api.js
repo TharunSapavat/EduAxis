@@ -91,7 +91,7 @@ export const studentAPI = {
   getFees: () => api.get('/student/fees'),
   makePayment: (paymentData) => api.post('/student/payment', paymentData),
   downloadReceipt: (paymentId) => api.get(`/student/receipt/${paymentId}`),
-  getLibrary: () => api.get('/student/library'),
+  getLibrary: (params) => api.get('/student/library', { params }),
   // Messaging
   sendMessage: (data) => api.post('/messages', data),
   // Leave Requests
@@ -145,6 +145,14 @@ export const adminAPI = {
   getPayments: (params) => api.get('/admin/payments', { params }),
   createPayment: (paymentData) => api.post('/admin/payments', paymentData),
   getPaymentStats: () => api.get('/admin/payments/stats'),
+  // Library management
+  getLibraryResources: () => api.get('/admin/library'),
+  createLibraryResource: (data) => {
+    const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
+    const config = isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {};
+    return api.post('/admin/library', data, config);
+  },
+  deleteLibraryResource: (id) => api.delete(`/admin/library/${id}`),
   exportPayments: (params) => api.get('/admin/payments/export', { params }),
   sendFeeReminders: (feeId) => api.post('/admin/fees/reminders', { feeId }),
   // Class Management
