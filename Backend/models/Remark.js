@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-
+// Remarkind the schema for student remarks made by teachers or admins
 const remarkSchema = new mongoose.Schema({
   studentId: {
     type: mongoose.Schema.Types.ObjectId,
