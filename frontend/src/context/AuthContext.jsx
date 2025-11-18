@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../services/api';
 
 const AuthContext = createContext(null);
@@ -12,6 +13,7 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
+  const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -50,6 +52,15 @@ export const AuthProvider = ({ children }) => {
     setIsAuthenticated(true);
     // Cookie is set automatically by backend, we just store user info
     localStorage.setItem('user', JSON.stringify(userData));
+    
+    // Navigate to appropriate dashboard
+    if (userData.role === 'student') {
+      navigate('/student/home');
+    } else if (userData.role === 'teacher') {
+      navigate('/teacher/home');
+    } else if (userData.role === 'admin') {
+      navigate('/admin/home');
+    }
   };
 
   const logout = async () => {
@@ -63,6 +74,8 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setIsAuthenticated(false);
       localStorage.removeItem('user');
+      // Navigate to landing page
+      navigate('/');
     }
   };
 

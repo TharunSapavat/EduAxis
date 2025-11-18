@@ -88,6 +88,8 @@ export const studentAPI = {
   makePayment: (paymentData) => api.post('/student/payment', paymentData),
   downloadReceipt: (paymentId) => api.get(`/student/receipt/${paymentId}`),
   getLibrary: () => api.get('/student/library'),
+  // Messaging
+  sendMessage: (data) => api.post('/messages', data),
   // Leave Requests
   createLeaveRequest: (data) => api.post('/student/leave-requests', data),
   getLeaveRequests: () => api.get('/student/leave-requests'),
