@@ -245,6 +245,42 @@ export const getAssignments = async (req, res) => {
   }
 };
 
+// List student submissions for a specific assignment
+export const getSubmissionsForAssignment = async (req, res) => {
+  try {
+    const teacherId = req.user?._id;
+    const { assignmentId } = req.params;
+
+    if (!assignmentId) {
+      return res.status(400).json({ success: false, message: 'assignmentId is required' });
+    }
+
+    // Verify the assignment belongs to this teacher
+    const assignment = await Assignment.findById(assignmentId).populate('courseId', 'name code grade teacherId');
+    if (!assignment) {
+      return res.status(404).json({ success: false, message: 'Assignment not found' });
+    }
+    if (String(assignment.teacherId) !== String(teacherId)) {
+      return res.status(403).json({ success: false, message: 'Not allowed to view submissions for this assignment' });
+    }
+
+    const submissions = await Submission.find({ assignmentId })
+      .populate('studentId', 'name email studentId grade section')
+      .sort({ submittedAt: -1 });
+
+    res.json({ success: true, submissions, assignment: {
+      _id: assignment._id,
+      title: assignment.title,
+      dueDate: assignment.dueDate,
+      totalMarks: assignment.totalMarks,
+      courseId: assignment.courseId
+    }});
+  } catch (error) {
+    console.error('Get submissions for assignment error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
 // Create assignment
 export const createAssignment = async (req, res) => {
   try {

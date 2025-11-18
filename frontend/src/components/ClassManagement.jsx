@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Users, Search, Filter, AlertTriangle, TrendingUp, TrendingDown, Minus, Eye, Download, ChevronDown, X, GraduationCap, DollarSign, Calendar, Award } from 'lucide-react';
 import { adminAPI } from '../services/api';
+// Removed AtRiskStudentsModal in favor of simple inline list view
 
 export default function ClassManagement() {
   const [loading, setLoading] = useState(true);
@@ -20,9 +21,10 @@ export default function ClassManagement() {
   const [studentDetails, setStudentDetails] = useState(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('performance');
-  
+
   // Show at-risk panel
   const [showAtRisk, setShowAtRisk] = useState(true);
+  const [showAllAtRisk, setShowAllAtRisk] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -165,7 +167,12 @@ export default function ClassManagement() {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-md border border-slate-100">
+        <div
+          className="bg-white p-6 rounded-xl shadow-md border border-slate-100 cursor-pointer hover:shadow-lg transition-shadow"
+          onClick={() => setShowAllAtRisk(true)}
+          role="button"
+          aria-label="View all at-risk students"
+        >
           <div className="flex items-center justify-between">
             <div>
               <p className="text-slate-600 text-sm">At-Risk Students</p>
@@ -221,9 +228,12 @@ export default function ClassManagement() {
                   </div>
                 ))}
                 {atRiskStudents.length > 5 && (
-                  <p className="text-sm text-red-600 text-center pt-2">
+                  <button
+                    onClick={() => setShowAllAtRisk(true)}
+                    className="w-full text-center py-3 text-red-600 font-semibold hover:bg-red-100 rounded-lg transition-colors"
+                  >
                     +{atRiskStudents.length - 5} more students need attention
-                  </p>
+                  </button>
                 )}
               </div>
             </div>
@@ -719,6 +729,53 @@ export default function ClassManagement() {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* All At-Risk Students - Simple Inline List */}
+      {showAllAtRisk && (
+        <div id="at-risk-all" className="bg-white rounded-xl shadow-md border border-slate-100 mt-6">
+          <div className="p-6 flex items-center justify-between border-b border-slate-200">
+            <div>
+              <h3 className="text-xl font-bold text-slate-900">All At-Risk Students</h3>
+              <p className="text-sm text-slate-600">{atRiskStudents.length} student{atRiskStudents.length !== 1 ? 's' : ''} need attention</p>
+            </div>
+            <button
+              onClick={() => setShowAllAtRisk(false)}
+              className="px-4 py-2 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
+            >
+              Hide List
+            </button>
+          </div>
+          <div className="p-6 max-h-[70vh] overflow-y-auto space-y-3">
+            {atRiskStudents.map((student) => (
+              <div key={student.id} className="flex items-center justify-between bg-slate-50 p-4 rounded-lg border border-slate-200">
+                <div className="flex-1">
+                  <p className="font-semibold text-slate-900">{student.name}</p>
+                  <p className="text-sm text-slate-600">Grade {student.grade} • {student.studentId || student.id}</p>
+                  <div className="flex items-center flex-wrap gap-2 mt-2">
+                    {student.reasons?.map((reason, idx) => (
+                      <span key={idx} className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">{reason}</span>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-semibold px-2 py-1 rounded ${student.attendance >= 75 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                    {student.attendance}% Attendance
+                  </span>
+                  <button
+                    onClick={() => handleViewDetails(student)}
+                    className="ml-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium"
+                  >
+                    View Details
+                  </button>
+                </div>
+              </div>
+            ))}
+            {atRiskStudents.length === 0 && (
+              <div className="text-center text-slate-500 py-8">No at-risk students found</div>
+            )}
           </div>
         </div>
       )}

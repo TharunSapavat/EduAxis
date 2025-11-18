@@ -659,7 +659,7 @@ export const getCourseDetails = async (req, res) => {
 export const submitAssignment = async (req, res) => {
   try {
     const studentId = req.user._id;
-    const { assignmentId, content, attachments } = req.body;
+    const { assignmentId, content } = req.body;
 
     if (!assignmentId) {
       return res.status(400).json({ 
@@ -690,25 +690,57 @@ export const submitAssignment = async (req, res) => {
       });
     }
 
-    // Check if submission is late
+    // Enforce due date: block submissions after due date
     const now = new Date();
-    const isLate = now > assignment.dueDate;
+    if (assignment.dueDate && now > assignment.dueDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Submission closed. The due date has passed.'
+      });
+    }
 
-    // Create submission
+    // Build attachments list from uploaded files and optional link fields
+    const attachments = [];
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        attachments.push({
+          name: file.originalname,
+          filename: file.filename,
+          path: `/uploads/submissions/${file.filename}`,
+          size: file.size,
+          mimetype: file.mimetype
+        });
+      }
+    }
+    // Optional single link
+    if (req.body.link) {
+      attachments.push({ url: req.body.link, name: 'Link' });
+    }
+    // Optional links as JSON array
+    if (req.body.links) {
+      try {
+        const parsed = JSON.parse(req.body.links);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((u) => {
+            if (typeof u === 'string') attachments.push({ url: u });
+            else if (u && typeof u === 'object') attachments.push(u);
+          });
+        }
+      } catch (_) {}
+    }
+
     const submission = await Submission.create({
       assignmentId,
       studentId,
       content,
-      attachments: attachments || [],
-      status: isLate ? 'late' : 'submitted',
+      attachments,
+      status: 'submitted',
       submittedAt: now
     });
 
     res.json({
       success: true,
-      message: isLate 
-        ? 'Assignment submitted late. Late submission noted.' 
-        : 'Assignment submitted successfully',
+      message: 'Assignment submitted successfully',
       submission
     });
   } catch (error) {
@@ -826,5 +858,44 @@ export const getLibraryResources = async (req, res) => {
       message: 'Server error', 
       error: error.message 
     });
+  }
+};
+
+// Get teachers for messaging
+export const getTeachers = async (req, res) => {
+  try {
+    const studentId = req.userId;
+    
+    // Find student to get their grade
+    const student = await User.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    // Find teachers who teach courses for this student's grade
+    const courses = await Course.find({ 
+      grade: Number(student.grade),
+      status: 'active'
+    }).populate('teacherId', 'name email');
+
+    // Extract unique teachers
+    const teachersMap = new Map();
+    courses.forEach(course => {
+      if (course.teacherId && course.teacherId._id) {
+        teachersMap.set(course.teacherId._id.toString(), {
+          _id: course.teacherId._id,
+          name: course.teacherId.name,
+          email: course.teacherId.email,
+          subject: course.name
+        });
+      }
+    });
+
+    const teachers = Array.from(teachersMap.values());
+    
+    return res.json({ success: true, data: teachers });
+  } catch (error) {
+    console.error('Get teachers error:', error);
+    return res.status(500).json({ success: false, message: 'Server error' });
   }
 };

@@ -80,7 +80,11 @@ export const studentAPI = {
   getGrades: (studentId) => api.get(`/student/grades?studentId=${studentId}`),
   getAttendance: (studentId) => api.get(`/student/attendance?studentId=${studentId}`),
   getAssignments: (studentId) => api.get(`/student/assignments?studentId=${studentId}`),
-  submitAssignment: (data) => api.post('/student/assignments/submit', data),
+  submitAssignment: (data) => {
+    const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
+    const config = isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {};
+    return api.post('/student/assignments/submit', data, config);
+  },
   getSubmissionDetails: (assignmentId) => api.get(`/student/assignments/${assignmentId}/submission`),
   getTimetable: (day) => api.get('/student/timetable', { params: { day } }),
   getAnnouncements: () => api.get('/student/announcements'),
@@ -88,6 +92,8 @@ export const studentAPI = {
   makePayment: (paymentData) => api.post('/student/payment', paymentData),
   downloadReceipt: (paymentId) => api.get(`/student/receipt/${paymentId}`),
   getLibrary: () => api.get('/student/library'),
+  // Messaging
+  sendMessage: (data) => api.post('/messages', data),
   // Leave Requests
   createLeaveRequest: (data) => api.post('/student/leave-requests', data),
   getLeaveRequests: () => api.get('/student/leave-requests'),
@@ -108,6 +114,7 @@ export const teacherAPI = {
       : {};
     return api.post('/teacher/assignments', formData, config);
   },
+  getSubmissions: (assignmentId) => api.get(`/teacher/assignments/${assignmentId}/submissions`),
   getAnnouncements: () => api.get('/teacher/announcements'),
   postAnnouncement: (data) => api.post('/teacher/announcements', data),
   deleteAnnouncement: (id) => api.delete(`/teacher/announcements/${id}`),
