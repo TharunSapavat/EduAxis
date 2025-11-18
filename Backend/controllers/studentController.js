@@ -787,77 +787,48 @@ export const getSubmissionDetails = async (req, res) => {
   }
 };
 
-// Get library resources
+// Library resources (catalog mode)
 export const getLibraryResources = async (req, res) => {
   try {
-    const studentId = req.user._id;
     const student = req.user;
+    const studentGrade = String(student.grade || 'All');
+    const { search, category, tag } = req.query || {};
 
-    // Get student's grade or default to '10'
-    const studentGrade = student.grade || '10';
+    const LibraryResource = (await import('../models/LibraryResource.js')).default;
 
-    // TODO: Create a proper LibraryResource model
-    // For now, return sample data structure
-    const resources = [
-      {
-        id: '1',
-        title: 'Mathematics Textbook - Grade ' + studentGrade,
-        type: 'Textbook',
-        subject: 'Mathematics',
-        format: 'PDF',
-        availableOnline: true,
-        downloadUrl: '/api/library/download/1',
-        description: 'Official mathematics textbook for your grade'
-      },
-      {
-        id: '2',
-        title: 'Science Lab Manual',
-        type: 'Lab Manual',
-        subject: 'Science',
-        format: 'PDF',
-        availableOnline: true,
-        downloadUrl: '/api/library/download/2',
-        description: 'Comprehensive lab manual with experiments'
-      },
-      {
-        id: '3',
-        title: 'English Literature Collection',
-        type: 'E-Book',
-        subject: 'English',
-        format: 'EPUB',
-        availableOnline: true,
-        downloadUrl: '/api/library/download/3',
-        description: 'Collection of classic literature pieces'
-      }
-    ];
+    const query = { isActive: true, $and: [] };
+    query.$and.push({ $or: [ { grade: 'All' }, { grade: studentGrade } ] });
+    if (category) query.$and.push({ category });
+    if (tag) query.$and.push({ tags: tag });
+    if (search) query.$and.push({ $text: { $search: search } });
+    if (!query.$and.length) delete query.$and;
 
-    // Borrowed books
-    const borrowedBooks = [
-      {
-        id: 'b1',
-        title: 'History of Ancient Civilizations',
-        borrowedDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        status: 'active'
-      }
-    ];
+    const resources = await LibraryResource.find(query)
+      .sort({ createdAt: -1 })
+      .limit(100);
+
+    const availableResources = resources.map(r => ({
+      _id: r._id,
+      title: r.title,
+      author: r.author,
+      category: r.category,
+      available: 1,
+      downloadUrl: r.isExternal ? r.linkUrl : (r.file?.path ? `http://localhost:5000${r.file.path}` : ''),
+      fileType: r.isExternal ? 'link' : (r.file?.mimetype || 'file'),
+      tags: r.tags,
+    }));
 
     res.json({
       success: true,
       library: {
-        availableResources: resources,
-        borrowedBooks,
-        borrowingLimit: 5,
-        currentBorrowed: borrowedBooks.length
+        availableResources,
+        borrowedBooks: [],
+        overdueItems: 0
       }
     });
   } catch (error) {
     console.error('Get library resources error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error', 
-      error: error.message 
-    });
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
 

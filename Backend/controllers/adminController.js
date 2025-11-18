@@ -1,3 +1,4 @@
+// Imports
 import User from '../models/User.js';
 import Course from '../models/Course.js';
 import Fee from '../models/Fee.js';
@@ -6,6 +7,66 @@ import Attendance from '../models/Attendance.js';
 import Grade from '../models/Grade.js';
 import Remark from '../models/Remark.js';
 import LeaveRequest from '../models/LeaveRequest.js';
+import LibraryResource from '../models/LibraryResource.js';
+
+// Library resource admin management
+export const adminCreateLibraryResource = async (req, res) => {
+  try {
+    const adminId = req.user?._id;
+    const { title, description, author, category, tags, grade = 'All', courseId, linkUrl } = req.body;
+    if (!title) return res.status(400).json({ success: false, message: 'Title is required' });
+
+    const resource = new LibraryResource({
+      title,
+      description: description || '',
+      author: author || '',
+      category: category || 'General',
+      tags: tags ? (Array.isArray(tags) ? tags : String(tags).split(',').map(t => t.trim()).filter(Boolean)) : [],
+      grade: String(grade || 'All'),
+      courseId: courseId || undefined,
+      isExternal: !!linkUrl,
+      linkUrl: linkUrl || '',
+      createdBy: adminId,
+      isActive: true
+    });
+
+    if (req.file) {
+      resource.file = {
+        path: `/uploads/library/${req.file.filename}`,
+        filename: req.file.filename,
+        size: req.file.size,
+        mimetype: req.file.mimetype
+      };
+    }
+
+    await resource.save();
+    res.status(201).json({ success: true, message: 'Resource created', resource });
+  } catch (error) {
+    console.error('Admin create library resource error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+export const adminListLibraryResources = async (req, res) => {
+  try {
+    const resources = await LibraryResource.find({}).sort({ createdAt: -1 });
+    res.json({ success: true, resources });
+  } catch (error) {
+    console.error('Admin list library resources error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+export const adminDeleteLibraryResource = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await LibraryResource.findByIdAndDelete(id);
+    res.json({ success: true, message: 'Resource deleted' });
+  } catch (error) {
+    console.error('Admin delete library resource error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
 
 // Get admin dashboard data
 export const getDashboard = async (req, res) => {

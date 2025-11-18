@@ -1,5 +1,6 @@
 import { db } from '../models/database.js';
 import Submission from '../models/Submission.js';
+import LibraryResource from '../models/LibraryResource.js';
 import Assignment from '../models/Assignment.js';
 import User from '../models/User.js';
 import Attendance from '../models/Attendance.js';
@@ -277,6 +278,55 @@ export const getSubmissionsForAssignment = async (req, res) => {
     }});
   } catch (error) {
     console.error('Get submissions for assignment error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// Teacher: Create library resource (auto-publish for their grade/course)
+export const createLibraryResource = async (req, res) => {
+  try {
+    const teacherId = req.user?._id;
+    const { title, description, author, category, tags, grade = 'All', courseId, linkUrl } = req.body;
+    if (!title) return res.status(400).json({ success: false, message: 'Title is required' });
+
+    const resource = new LibraryResource({
+      title,
+      description: description || '',
+      author: author || '',
+      category: category || 'General',
+      tags: tags ? (Array.isArray(tags) ? tags : String(tags).split(',').map(t => t.trim()).filter(Boolean)) : [],
+      grade: String(grade || 'All'),
+      courseId: courseId || undefined,
+      isExternal: !!linkUrl,
+      linkUrl: linkUrl || '',
+      createdBy: teacherId,
+      isActive: true
+    });
+
+    if (req.file) {
+      resource.file = {
+        path: `/uploads/library/${req.file.filename}`,
+        filename: req.file.filename,
+        size: req.file.size,
+        mimetype: req.file.mimetype
+      };
+    }
+
+    await resource.save();
+    res.status(201).json({ success: true, message: 'Resource published', resource });
+  } catch (error) {
+    console.error('Create library resource error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+export const listMyLibraryResources = async (req, res) => {
+  try {
+    const teacherId = req.user?._id;
+    const resources = await LibraryResource.find({ createdBy: teacherId, isActive: true }).sort({ createdAt: -1 });
+    res.json({ success: true, resources });
+  } catch (error) {
+    console.error('List library resources error:', error);
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
