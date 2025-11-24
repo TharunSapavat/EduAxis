@@ -247,6 +247,7 @@ export default function AdminDashboard() {
   const [leaveCurrentPage, setLeaveCurrentPage] = useState(1);
   const leaveRequestsPerPage = 5;
   const [notification, setNotification] = useState(null);
+  const [processingLeaveIds, setProcessingLeaveIds] = useState({});
 
   const showNotification = (message, type = 'success') => {
     setNotification({ message, type });
@@ -369,14 +370,28 @@ export default function AdminDashboard() {
   // Handle leave decision
   const handleLeaveDecision = async (id, action, remarks) => {
     try {
+      setProcessingLeaveIds(prev => ({ ...prev, [id]: true }));
       const res = await adminAPI.decideLeaveRequest(id, action, remarks);
       if (res.data.success) {
         showNotification(`Leave ${action}d successfully`, 'success');
-        fetchLeaveRequests();
+        const updated = res.data.leaveRequest;
+        setLeaveRequests(prev => {
+          if (!updated || !updated._id) return prev;
+          if (leaveStatusFilter !== 'all' && leaveStatusFilter !== updated.status) {
+            return prev.filter(r => r._id !== id);
+          }
+          return prev.map(r => (r._id === id ? { ...r, ...updated } : r));
+        });
       }
     } catch (err) {
       console.error('Failed to decide leave request:', err);
       showNotification(err.response?.data?.message || 'Failed to process request', 'error');
+    } finally {
+      setProcessingLeaveIds(prev => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
     }
   };
 
@@ -2224,15 +2239,25 @@ export default function AdminDashboard() {
                         <div className="flex gap-3">
                           <button
                             onClick={() => handleLeaveDecision(req._id, 'approve', '')}
-                            className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                            disabled={!!processingLeaveIds[req._id]}
+                            className={`flex-1 px-4 py-2 rounded-lg transition-colors font-medium text-white ${
+                              processingLeaveIds[req._id]
+                                ? 'bg-green-400 cursor-not-allowed'
+                                : 'bg-green-600 hover:bg-green-700'
+                            }`}
                           >
-                            Approve
+                            {processingLeaveIds[req._id] ? 'Processing...' : 'Approve'}
                           </button>
                           <button
                             onClick={() => handleLeaveDecision(req._id, 'reject', '')}
-                            className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                            disabled={!!processingLeaveIds[req._id]}
+                            className={`flex-1 px-4 py-2 rounded-lg transition-colors font-medium text-white ${
+                              processingLeaveIds[req._id]
+                                ? 'bg-red-400 cursor-not-allowed'
+                                : 'bg-red-600 hover:bg-red-700'
+                            }`}
                           >
-                            Reject
+                            {processingLeaveIds[req._id] ? 'Processing...' : 'Reject'}
                           </button>
                         </div>
                       )}
