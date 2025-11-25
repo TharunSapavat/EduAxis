@@ -267,9 +267,27 @@ export const getSubmissionsForAssignment = async (req, res) => {
 
     const submissions = await Submission.find({ assignmentId })
       .populate('studentId', 'name email studentId grade section')
+      .populate('gradedBy', 'name')
       .sort({ submittedAt: -1 });
 
-    res.json({ success: true, submissions, assignment: {
+    // Ensure all submissions have the correct structure
+    const formattedSubmissions = submissions.map(sub => ({
+      _id: sub._id,
+      assignmentId: sub.assignmentId,
+      studentId: sub.studentId,
+      content: sub.content || '',
+      comments: sub.comments || '',
+      files: sub.files || [],
+      attachments: sub.attachments || sub.files || [],
+      submittedAt: sub.submittedAt,
+      status: sub.status,
+      marks: sub.marks,
+      feedback: sub.feedback,
+      gradedAt: sub.gradedAt,
+      gradedBy: sub.gradedBy
+    }));
+
+    res.json({ success: true, submissions: formattedSubmissions, assignment: {
       _id: assignment._id,
       title: assignment.title,
       dueDate: assignment.dueDate,
