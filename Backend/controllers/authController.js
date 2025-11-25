@@ -3,13 +3,21 @@ import User from '../models/User.js';
 // Register new user
 export const register = async (req, res) => {
   try {
-    const { name, email, password, role, phone, dateOfBirth } = req.body;
+    const { name, email, password, role, phone, dateOfBirth, grade, section, subject, gradesTeaching } = req.body;
 
     // Validate required fields
     if (!name || !email || !password) {
       return res.status(400).json({ 
         success: false,
         message: 'Name, email, and password are required' 
+      });
+    }
+
+    // Validate password length
+    if (password.length < 6) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Password must be at least 6 characters long' 
       });
     }
 
@@ -22,20 +30,56 @@ export const register = async (req, res) => {
       });
     }
 
-    // Create new user (pre-save hook will generate studentId/teacherId)
-    const newUser = await User.create({
+    // If student, require grade; section is optional (admin can assign later)
+    const effectiveRole = role || 'student';
+
+    if (effectiveRole === 'student') {
+      const validGrades = ['1','2','3','4','5','6','7','8','9','10','11','12'];
+      if (!grade || !validGrades.includes(String(grade))) {
+        return res.status(400).json({ success: false, message: 'Grade is required and must be between 1-12' });
+      }
+      const validSections = ['A','B','C','D'];
+      if (section && !validSections.includes(String(section))) {
+        return res.status(400).json({ success: false, message: 'Section must be A-D when provided' });
+      }
+    }
+
+    // Prepare payload
+    const payload = {
       name,
       email,
-      password, // TODO: Hash this with bcrypt in production
-      role: role || 'student',
+      password,
+      role: effectiveRole,
       phone,
-      dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined
+      dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
+    };
+
+    if (effectiveRole === 'student') {
+      payload.grade = String(grade);
+      if (section) payload.section = String(section);
+    } else if (effectiveRole === 'teacher') {
+      if (subject) payload.subject = subject;
+      if (Array.isArray(gradesTeaching)) payload.gradesTeaching = gradesTeaching.map(String);
+    }
+
+    // Create new user (password will be hashed by pre-save hook)
+    const newUser = await User.create(payload);
+
+    // Generate JWT token
+    const token = newUser.generateAuthToken();
+
+    // Set cookie with the token
+    res.cookie('authToken', token, {
+      httpOnly: true,      // Cookie cannot be accessed by JavaScript (secure)
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      sameSite: 'lax'      // CSRF protection
     });
 
     res.status(201).json({
       success: true,
       message: 'User registered successfully',
-      user: newUser.toJSON()
+      user: newUser.toJSON(),
+      token
     });
   } catch (error) {
     console.error('Register error:', error);
@@ -70,7 +114,7 @@ export const login = async (req, res) => {
       });
     }
 
-    // Find user by email
+    // Find user by email (include password for comparison)
     const user = await User.findOne({ email: email.toLowerCase() });
     
     if (!user) {
@@ -88,8 +132,10 @@ export const login = async (req, res) => {
       });
     }
 
-    // Compare password (TODO: Use bcrypt.compare in production)
-    if (user.password !== password) {
+    // Compare password using bcrypt
+    const isPasswordValid = await user.comparePassword(password);
+    
+    if (!isPasswordValid) {
       return res.status(401).json({ 
         success: false,
         message: 'Invalid email or password' 
@@ -104,10 +150,21 @@ export const login = async (req, res) => {
       });
     }
 
+    // Generate JWT token
+    const token = user.generateAuthToken();
+
+    // Set cookie with the token
+    res.cookie('authToken', token, {
+      httpOnly: true,      // Cookie cannot be accessed by JavaScript (secure)
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      sameSite: 'lax'      // CSRF protection
+    });
+
     res.json({
       success: true,
       message: 'Login successful',
-      user: user.toJSON()
+      user: user.toJSON(),
+      token
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -121,38 +178,31 @@ export const login = async (req, res) => {
 
 // Logout user
 export const logout = async (req, res) => {
-  // In production, invalidate JWT token or clear session
+  res.clearCookie('authToken', {
+    httpOnly: true,
+    sameSite: 'lax'
+  });
+  
   res.json({ 
     success: true, 
     message: 'Logout successful' 
   });
 };
 
-// Get current user
+// Get current user (from JWT token)
 export const getCurrentUser = async (req, res) => {
   try {
-    // TODO: In production, get user ID from JWT token
-    const userId = req.query.userId || req.body.userId;
-    
-    if (!userId) {
-      return res.status(400).json({ 
+    // User is already attached by auth middleware
+    if (!req.user) {
+      return res.status(401).json({ 
         success: false,
-        message: 'User ID is required' 
+        message: 'Not authenticated' 
       });
     }
 
-    const user = await User.findById(userId);
-    
-    if (!user) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'User not found' 
-      });
-    }
-
-    res.json({ 
+    res.json({
       success: true,
-      user: user.toJSON() 
+      user: req.user
     });
   } catch (error) {
     console.error('Get current user error:', error);

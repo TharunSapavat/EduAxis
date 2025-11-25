@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { X, Mail, Lock, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { authAPI } from '../services/api';
 
 export default function Login({ onClose, onSwitchToRegister }) {
   const { login } = useAuth();
+  const dialogRef = useRef(null);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -35,6 +36,8 @@ export default function Login({ onClose, onSwitchToRegister }) {
       const response = await authAPI.login(formData);
       
       if (response.data.success) {
+        // Cookie is set automatically by backend!
+        // Just pass user data
         login(response.data.user);
         onClose();
       } else {
@@ -52,9 +55,25 @@ export default function Login({ onClose, onSwitchToRegister }) {
     }
   };
 
+  // Close on Escape key
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md relative">
+    <div
+      className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm bg-opacity-50 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div
+        ref={dialogRef}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md relative"
+      >
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors"

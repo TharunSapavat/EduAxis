@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { X, Mail, Lock, User, Phone, Calendar } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { authAPI } from '../services/api';
 
 export default function Register({ onClose, onSwitchToLogin }) {
   const { login } = useAuth();
+  const dialogRef = useRef(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -12,7 +13,9 @@ export default function Register({ onClose, onSwitchToLogin }) {
     confirmPassword: '',
     role: 'student',
     phone: '',
-    dateOfBirth: ''
+    dateOfBirth: '',
+    grade: '',
+    section: ''
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -59,10 +62,24 @@ export default function Register({ onClose, onSwitchToLogin }) {
       return;
     }
 
+    // Student-specific validation
+    if (formData.role === 'student') {
+      const validGrades = ['1','2','3','4','5','6','7','8','9','10','11','12'];
+      const validSections = ['A','B','C','D'];
+      if (!formData.grade || !validGrades.includes(formData.grade)) {
+        setError('Please select a valid grade (1-12)');
+        setLoading(false);
+        return;
+      }
+     
+    }
+
     try {
       const response = await authAPI.register(formData);
       
       if (response.data.success) {
+        // Cookie is set automatically by backend!
+        // Just pass user data
         login(response.data.user);
         onClose();
       } else {
@@ -80,9 +97,25 @@ export default function Register({ onClose, onSwitchToLogin }) {
     }
   };
 
+  // Close on Escape key
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md relative max-h-[90vh] overflow-y-scroll scrollbar-hide">
+    <div
+      className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm bg-opacity-50 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div
+        ref={dialogRef}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md relative max-h-[90vh] overflow-y-scroll scrollbar-hide"
+      >
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors z-10"
@@ -194,6 +227,42 @@ export default function Register({ onClose, onSwitchToLogin }) {
                 />
               </div>
             </div>
+
+            {/* Student: Grade & Section */}
+            {formData.role === 'student' && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Grade</label>
+                    <select
+                      required
+                      value={formData.grade}
+                      onChange={(e) => setFormData({ ...formData, grade: e.target.value })}
+                      className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all bg-white"
+                    >
+                      <option value="" disabled>Select grade</option>
+                      {[...Array(12)].map((_, i) => (
+                        <option key={i+1} value={String(i+1)}>{i+1}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Section (optional)</label>
+                    <select
+                      value={formData.section}
+                      onChange={(e) => setFormData({ ...formData, section: e.target.value })}
+                      className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all bg-white"
+                    >
+                      <option value="">I don't know yet</option>
+                      {['A','B','C','D'].map(sec => (
+                        <option key={sec} value={sec}>{sec}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500">If you don't know your section, choose "I don't know yet". Your section can be assigned by the school later.</p>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">

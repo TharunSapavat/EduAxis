@@ -4,9 +4,9 @@ import { useAuth } from '../context/AuthContext';
 export default function DashboardHeader({ title, userRole }) {
   const { user, logout } = useAuth();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (confirm('Are you sure you want to logout?')) {
-      logout();
+      await logout();
     }
   };
 
@@ -47,10 +47,19 @@ export default function DashboardHeader({ title, userRole }) {
             <div className="flex items-center space-x-3 ">
               <div className="text-right">
                 <p className="text-sm font-medium text-slate-900">{user?.name || 'User'}</p>
-                <p className="text-xs text-slate-600">
-                  {user?.studentId || user?.teacherId || 
-                   userRole.charAt(0).toUpperCase() + userRole.slice(1)}
-                </p>
+                <div className="flex items-center justify-end gap-2">
+                  <p className="text-xs text-slate-600">
+                    {user?.studentId || user?.teacherId || 
+                     userRole.charAt(0).toUpperCase() + userRole.slice(1)}
+                  </p>
+                  {userRole === 'student' && (
+                    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                      <span>Grade {user?.grade || '—'}</span>
+                      <span>•</span>
+                      <span>Sec {user?.section || 'Not assigned'}</span>
+                    </span>
+                  )}
+                </div>
               </div>
               <div className={`w-10 h-10 ${styles.bgColor} rounded-full flex items-center justify-center`}>
                 <User className={`w-5 h-5 ${styles.userIconColor}`} />
