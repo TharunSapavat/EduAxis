@@ -32,8 +32,8 @@ import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
 
 const router = express.Router();
 
-  import { uploadLibraryFiles } from '../config/multer.js';
-  import { adminCreateLibraryResource, adminListLibraryResources, adminDeleteLibraryResource } from '../controllers/adminController.js';
+  import { uploadLibraryFiles, uploadTimetableFiles } from '../config/multer.js';
+  import { adminCreateLibraryResource, adminListLibraryResources, adminDeleteLibraryResource, adminListTimetables, adminCreateOrUpdateTimetable, adminUpdateTimetable, adminDeleteTimetable } from '../controllers/adminController.js';
 // Protect all admin routes - require authentication and admin role
 router.use(authMiddleware);
 router.use(roleMiddleware('admin'));
@@ -58,6 +58,12 @@ router.get('/fees', getFees);
   router.get('/library', adminListLibraryResources);
   router.post('/library', uploadLibraryFiles.single('file'), adminCreateLibraryResource);
   router.delete('/library/:id', adminDeleteLibraryResource);
+
+// Timetable management (admin)
+router.get('/timetables', adminListTimetables);
+router.post('/timetables', uploadTimetableFiles.single('file'), adminCreateOrUpdateTimetable);
+router.patch('/timetables/:id', adminUpdateTimetable);
+router.delete('/timetables/:id', adminDeleteTimetable);
 router.post('/fees', createFee);
 router.put('/fees/:id', updateFee);
 router.delete('/fees/:id', deleteFee);

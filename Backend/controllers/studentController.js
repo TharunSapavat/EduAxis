@@ -255,48 +255,44 @@ export const getAssignments = async (req, res) => {
 export const getTimetable = async (req, res) => {
   try {
     const student = req.user; // User is already loaded by auth middleware
-    const { day } = req.query; // Optional: Get timetable for specific day
 
-    // Find active timetable for student's grade and section
-    const timetableDoc = await Timetable.findOne({
+    // Find active timetable for student's grade and section (or grade-wide 'All')
+    const now = new Date();
+    const sectionValue = student.section ? String(student.section) : 'All';
+
+    // Prefer section-specific if available
+    let timetableDoc = await Timetable.findOne({
       grade: student.grade,
-      section: student.section,
+      section: sectionValue,
       isActive: true,
-      effectiveFrom: { $lte: new Date() },
+      effectiveFrom: { $lte: now },
       $or: [
         { effectiveTo: null },
-        { effectiveTo: { $gte: new Date() } }
+        { effectiveTo: { $gte: now } }
       ]
-    })
-    .populate('schedule.courseId', 'name code')
-    .populate('schedule.teacherId', 'name email');
+    });
 
-    if (!timetableDoc) {
-      // Return sample timetable if no timetable found
-      return res.json({ 
-        success: true,
-        timetable: {
-          grade: student.grade,
-          section: student.section,
-          schedule: [
-            { day: 'Monday', startTime: '09:00', endTime: '10:00', subject: 'Mathematics', room: 'A101', type: 'lecture' },
-            { day: 'Monday', startTime: '10:00', endTime: '11:00', subject: 'Physics', room: 'B202', type: 'lecture' },
-            { day: 'Tuesday', startTime: '10:00', endTime: '11:00', subject: 'Chemistry', room: 'C303', type: 'lab' },
-            { day: 'Wednesday', startTime: '09:00', endTime: '10:00', subject: 'English', room: 'A105', type: 'lecture' }
-          ],
-          message: 'Sample timetable - actual timetable not yet configured'
-        }
+    // Fallback to 'All' if no section-specific timetable
+    if (!timetableDoc && sectionValue !== 'All') {
+      timetableDoc = await Timetable.findOne({
+        grade: student.grade,
+        section: 'All',
+        isActive: true,
+        effectiveFrom: { $lte: now },
+        $or: [
+          { effectiveTo: null },
+          { effectiveTo: { $gte: now } }
+        ]
       });
     }
 
-    // If specific day requested, filter schedule
-    let schedule = timetableDoc.schedule;
-    if (day) {
-      schedule = timetableDoc.getDaySchedule(day);
+    if (!timetableDoc) {
+      return res.json({ 
+        success: true,
+        timetable: null,
+        message: 'No timetable uploaded yet for your class'
+      });
     }
-
-    // Get today's schedule
-    const todaySchedule = timetableDoc.getTodaySchedule();
 
     res.json({ 
       success: true,
@@ -305,8 +301,7 @@ export const getTimetable = async (req, res) => {
         section: timetableDoc.section,
         academicYear: timetableDoc.academicYear,
         semester: timetableDoc.semester,
-        schedule: schedule,
-        todaySchedule: todaySchedule,
+        file: timetableDoc.file,
         effectiveFrom: timetableDoc.effectiveFrom,
         effectiveTo: timetableDoc.effectiveTo
       }

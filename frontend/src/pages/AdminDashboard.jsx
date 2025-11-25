@@ -10,6 +10,7 @@ import DashboardHeader from '../components/DashboardHeader';
 import DashboardFooter from '../components/DashboardFooter';
 import ClassManagement from '../components/ClassManagement.jsx';
 import AdminLibraryManagement from '../components/adminComp/AdminLibraryManagement.jsx';
+import AdminTimetableManagement from '../components/adminComp/AdminTimetableManagement.jsx';
 
 // User creation validation schema
 const userSchema = yup.object({
@@ -2173,6 +2174,9 @@ export default function AdminDashboard() {
 
       case '/admin/classes':
         return <ClassManagement />;
+
+      case '/admin/timetable':
+        return <AdminTimetableManagement showNotification={showNotification} />;
 
       case '/admin/library':
         return <AdminLibraryManagement showNotification={showNotification} />;

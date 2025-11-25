@@ -34,8 +34,10 @@ router.get('/announcements', getAnnouncements);
 router.post('/announcements', postAnnouncement);
 router.delete('/announcements/:id', deleteAnnouncement);
 // Library resources (teacher)
-import { createLibraryResource, listMyLibraryResources } from '../controllers/teacherController.js';
+import { createLibraryResource, listMyLibraryResources, getTeacherTimetable } from '../controllers/teacherController.js';
 router.get('/library', listMyLibraryResources);
 router.post('/library', uploadLibraryFiles.single('file'), createLibraryResource);
+// Timetable (teacher)
+router.get('/timetable', getTeacherTimetable);
 
 export default router;
