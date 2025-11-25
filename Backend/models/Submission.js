@@ -15,9 +15,25 @@ const submissionSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  comments: {
+    type: String,
+    trim: true
+  },
+  files: [{
+    name: String,
+    filename: String,
+    path: String,
+    url: String,
+    size: Number,
+    mimetype: String
+  }],
   attachments: [{
     name: String,
-    url: String
+    filename: String,
+    path: String,
+    url: String,
+    size: Number,
+    mimetype: String
   }],
   submittedAt: {
     type: Date,

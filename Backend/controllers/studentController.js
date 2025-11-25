@@ -129,14 +129,20 @@ export const getGrades = async (req, res) => {
       const subjectName = course.name || a.subject || 'N/A';
       const totalMarks = a.totalMarks || 100;
       return {
+        _id: submission._id,
         subject: subjectName,
         assignment: a.title || 'Assignment',
         marks: submission.marks ?? 0,
+        totalMarks: totalMarks,
         total: totalMarks,
         grade: calculateGrade(submission.marks ?? 0, totalMarks),
         date: submission.gradedAt || submission.updatedAt || submission.createdAt,
+        createdAt: submission.gradedAt || submission.updatedAt || submission.createdAt,
         courseCode: course.code || undefined,
         feedback: submission.feedback || undefined,
+        courseId: course,
+        assignmentId: { title: a.title },
+        course: subjectName,
       };
     });
 
@@ -654,7 +660,7 @@ export const getCourseDetails = async (req, res) => {
 export const submitAssignment = async (req, res) => {
   try {
     const studentId = req.user._id;
-    const { assignmentId, content } = req.body;
+    const { assignmentId, content, comments } = req.body; // Added 'comments'
 
     if (!assignmentId) {
       return res.status(400).json({ 
@@ -724,14 +730,22 @@ export const submitAssignment = async (req, res) => {
       } catch (_) {}
     }
 
+    // 5. Create submission
     const submission = await Submission.create({
       assignmentId,
       studentId,
-      content,
-      attachments,
+      content: content || '',
+      comments: comments || '',
+      files: attachments,
+      attachments: attachments, // For backward compatibility
       status: 'submitted',
-      submittedAt: now
+      submittedAt: new Date()
     });
+
+    // 6. Populate details for response
+    await submission.populate('assignmentId');
+    await submission.populate('assignmentId.courseId');
+    await submission.populate('gradedBy', 'name');
 
     res.json({
       success: true,

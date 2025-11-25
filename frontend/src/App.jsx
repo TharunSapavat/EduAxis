@@ -126,13 +126,7 @@ function AppContent() {
 }
 
 function App() {
-  return (
-    <BrowserRouter>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
-    </BrowserRouter>
-  )
+  return <AppContent />;
 }
 
 export default App
