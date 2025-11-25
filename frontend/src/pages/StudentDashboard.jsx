@@ -27,7 +27,6 @@ import StudentLibrary from '../components/student/StudentLibrary';
 import StudentLeave from '../components/student/StudentLeave';
 import StudentFees from '../components/student/StudentFees';
 
-// Config
 import { STUDENT_MODULES } from '../config/studentModules';
 
 export default function StudentDashboard() {
