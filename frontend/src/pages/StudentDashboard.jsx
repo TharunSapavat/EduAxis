@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { X } from 'lucide-react';
 
-// Context & API
+// Context & AP
 import { useAuth } from '../context/AuthContext';
 import { studentAPI } from '../services/api';
 
