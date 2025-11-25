@@ -173,7 +173,7 @@ export default function TeacherAssignmentsList() {
                                   return (
                                     <li key={i} className="flex items-center gap-2">
                                       {fileUrl ? (
-                                        <a href={fileUrl} target="_blank" rel="noreferrer" download className="text-blue-600 hover:underline inline-flex items-center gap-2 p-2 hover:bg-blue-50 rounded flex-grow">
+                                        <a href={fileUrl} target="_blank" rel="noreferrer" download className="text-blue-600 hover:underline inline-flex items-center gap-2 p-2 hover:bg-blue-50 rounded grow">
                                           <FileText className="w-4 h-4" />
                                           <span className="font-medium">{fileName}</span>
                                           <span className="text-xs text-slate-500">{fileSize}</span>
@@ -215,7 +215,7 @@ export default function TeacherAssignmentsList() {
                         <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded">
                           <p className="text-sm font-medium text-slate-700 mb-2">Grade this submission:</p>
                           <div className="flex gap-2 items-start">
-                            <div className="flex-shrink-0">
+                            <div className="shrink-0">
                               <label className="block text-xs text-slate-600 mb-1">Marks</label>
                               <input
                                 type="number"
@@ -226,7 +226,7 @@ export default function TeacherAssignmentsList() {
                                 className="w-20 px-2 py-1 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
                               />
                             </div>
-                            <div className="flex-grow">
+                            <div className="grow">
                               <label className="block text-xs text-slate-600 mb-1">Feedback (optional)</label>
                               <textarea
                                 id={`feedback-${s._id}`}
