@@ -96,3 +96,24 @@ export const uploadLibraryFiles = multer({
     fileSize: 10 * 1024 * 1024
   }
 });
+
+// Storage for timetable attachments (PDF/images)
+const timetableStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, path.join(__dirname, '../uploads/timetables'));
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    const nameWithoutExt = path.basename(file.originalname, ext);
+    cb(null, nameWithoutExt + '-' + uniqueSuffix + ext);
+  }
+});
+
+export const uploadTimetableFiles = multer({
+  storage: timetableStorage,
+  fileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024
+  }
+});

@@ -6,6 +6,7 @@ import User from '../models/User.js';
 import Attendance from '../models/Attendance.js';
 import Course from '../models/Course.js';
 import Announcement from '../models/Announcement.js';
+import Timetable from '../models/Timetable.js';
 
 // Get teacher dashboard data
 export const getDashboard = async (req, res) => {
@@ -228,6 +229,54 @@ export const submitGrades = async (req, res) => {
     });
   } catch (error) {
     console.error('Submit grades error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// Get teacher timetable (all timetables for active classes)
+export const getTeacherTimetable = async (req, res) => {
+  try {
+    const teacherId = req.user?._id || req.user?.id;
+    if (!teacherId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    const now = new Date();
+    // Find courses taught by this teacher
+    const courses = await Course.find({ teacherId }).select('grade section');
+    
+    if (courses.length === 0) {
+      return res.json({ success: true, timetables: [], message: 'No courses assigned' });
+    }
+
+    // Build query for all classes this teacher teaches
+    const classQueries = courses.map(c => ({
+      grade: String(c.grade),
+      section: c.section || 'All'
+    }));
+
+    // Also include 'All' section timetables for each grade
+    const grades = [...new Set(courses.map(c => String(c.grade)))];
+    grades.forEach(grade => {
+      classQueries.push({ grade, section: 'All' });
+    });
+
+    // Find active timetables for those classes
+    const timetables = await Timetable.find({
+      isActive: true,
+      effectiveFrom: { $lte: now },
+      $or: [
+        { effectiveTo: null },
+        { effectiveTo: { $gte: now } }
+      ],
+      $and: [
+        {
+          $or: classQueries
+        }
+      ]
+    }).select('grade section academicYear semester file effectiveFrom effectiveTo');
+
+    res.json({ success: true, timetables });
+  } catch (error) {
+    console.error('Get teacher timetable error:', error);
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };

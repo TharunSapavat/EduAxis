@@ -1,5 +1,5 @@
-import { FileText, X } from 'lucide-react';
-import { useState } from 'react';
+import { FileText, X, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
 import { studentAPI } from '../../services/api';
 
 export default function StudentAssignments({ 
@@ -16,6 +16,56 @@ export default function StudentAssignments({
   const [recentlySubmitted, setRecentlySubmitted] = useState({});
   const [files, setFiles] = useState([]);
   const [submissionDetails, setSubmissionDetails] = useState(null);
+
+  // Filters
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterCourse, setFilterCourse] = useState('');
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
+
+  // Extract unique courses
+  const courses = useMemo(() => {
+    const uniqueCourses = new Set();
+    assignments.forEach(a => {
+      const courseName = a.courseId?.name || a.subject;
+      if (courseName) uniqueCourses.add(courseName);
+    });
+    return Array.from(uniqueCourses).sort();
+  }, [assignments]);
+
+  // Filtered assignments
+  const filteredAssignments = useMemo(() => {
+    return assignments.filter(assignment => {
+      const dueDate = new Date(assignment.dueDate);
+      const isOverdue = dueDate < new Date();
+      const isPending = assignment.status === 'active' || assignment.status === 'pending';
+      
+      if (filterStatus === 'pending' && !(isPending && !recentlySubmitted[assignment._id])) return false;
+      if (filterStatus === 'submitted' && (isPending || recentlySubmitted[assignment._id] === false)) return false;
+      if (filterStatus === 'overdue' && !(isOverdue && isPending)) return false;
+      if (filterStatus === 'graded' && assignment.status !== 'graded') return false;
+      
+      if (filterCourse) {
+        const courseName = assignment.courseId?.name || assignment.subject;
+        if (courseName !== filterCourse) return false;
+      }
+      
+      return true;
+    });
+  }, [assignments, filterStatus, filterCourse, recentlySubmitted]);
+
+  const totalPages = Math.ceil(filteredAssignments.length / itemsPerPage);
+  const paginatedAssignments = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredAssignments.slice(start, start + itemsPerPage);
+  }, [filteredAssignments, currentPage, itemsPerPage]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterStatus, filterCourse]);
 
   const openSubmit = (assignment) => {
     setActiveAssignment(assignment);
@@ -74,7 +124,11 @@ export default function StudentAssignments({
 
   return (
     <div>
-      <h1 className="text-3xl font-bold text-slate-900 mb-6">Assignments</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold text-slate-900">Assignments</h1>
+        <span className="text-sm text-slate-600">{filteredAssignments.length} total</span>
+      </div>
+
       {assignmentsLoading ? (
         <div className="text-center py-12">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -86,8 +140,43 @@ export default function StudentAssignments({
           <p className="text-slate-600 text-lg">No assignments at the moment</p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {assignments.map((assignment) => {
+        <>
+          {/* Filters */}
+          <div className="mb-4 p-4 bg-white rounded-xl shadow-md border border-slate-100">
+            <div className="flex items-center gap-2 mb-3">
+              <Filter className="w-4 h-4 text-slate-600" />
+              <h3 className="text-sm font-medium text-slate-700">Filters</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Status</label>
+                <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} className="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+                  <option value="all">All Assignments</option>
+                  <option value="pending">Pending</option>
+                  <option value="submitted">Submitted</option>
+                  <option value="overdue">Overdue</option>
+                  <option value="graded">Graded</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Course</label>
+                <select value={filterCourse} onChange={e=>setFilterCourse(e.target.value)} className="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+                  <option value="">All Courses</option>
+                  {courses.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {filteredAssignments.length === 0 ? (
+            <div className="bg-white rounded-xl shadow-md p-12 text-center border border-slate-100">
+              <FileText className="w-16 h-16 text-slate-400 mx-auto mb-4" />
+              <p className="text-slate-600 text-lg">No assignments match the filters</p>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-4">
+                {paginatedAssignments.map((assignment) => {
             const dueDate = new Date(assignment.dueDate);
             const isOverdue = dueDate < new Date();
             const isPending = assignment.status === 'active' || assignment.status === 'pending';
@@ -180,6 +269,37 @@ export default function StudentAssignments({
             );
           })}
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mt-6 p-4 bg-white rounded-xl shadow-md border border-slate-100">
+            <p className="text-sm text-slate-600">
+              Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredAssignments.length)} of {filteredAssignments.length} results
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className={`px-3 py-1 rounded border ${currentPage === 1 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white text-slate-700 hover:bg-slate-50'}`}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="text-sm text-slate-700">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className={`px-3 py-1 rounded border ${currentPage === totalPages ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white text-slate-700 hover:bg-slate-50'}`}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+      </>
+      )}
+      </>
       )}
 
       {/* Submit Modal */}

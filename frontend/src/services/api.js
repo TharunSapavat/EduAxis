@@ -118,6 +118,8 @@ export const teacherAPI = {
   getAnnouncements: () => api.get('/teacher/announcements'),
   postAnnouncement: (data) => api.post('/teacher/announcements', data),
   deleteAnnouncement: (id) => api.delete(`/teacher/announcements/${id}`),
+  // Timetable
+  getTimetable: () => api.get('/teacher/timetable'),
 };
 
 // Admin APIs
@@ -163,6 +165,11 @@ export const adminAPI = {
   // Leave Requests
   getLeaveRequests: (params) => api.get('/admin/leave-requests', { params }),
   decideLeaveRequest: (id, action, remarks) => api.patch(`/admin/leave-requests/${id}`, { action, remarks }),
+  // Timetables
+  getTimetables: (params) => api.get('/admin/timetables', { params }),
+  saveTimetable: (data) => api.post('/admin/timetables', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  updateTimetable: (id, updates) => api.patch(`/admin/timetables/${id}`, updates),
+  deleteTimetable: (id) => api.delete(`/admin/timetables/${id}`)
 };
 
 export default api;

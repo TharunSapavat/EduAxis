@@ -8,6 +8,7 @@ import Grade from '../models/Grade.js';
 import Remark from '../models/Remark.js';
 import LeaveRequest from '../models/LeaveRequest.js';
 import LibraryResource from '../models/LibraryResource.js';
+import Timetable from '../models/Timetable.js';
 
 // Library resource admin management
 export const adminCreateLibraryResource = async (req, res) => {
@@ -53,6 +54,86 @@ export const adminListLibraryResources = async (req, res) => {
     res.json({ success: true, resources });
   } catch (error) {
     console.error('Admin list library resources error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// ===== Timetable Management (Admin) =====
+export const adminListTimetables = async (req, res) => {
+  try {
+    const { grade, section, academicYear, semester, isActive } = req.query;
+    const query = {};
+    if (grade) query.grade = String(grade);
+    if (section) query.section = String(section);
+    if (academicYear) query.academicYear = String(academicYear);
+    if (semester) query.semester = String(semester);
+    if (typeof isActive !== 'undefined') query.isActive = isActive === 'true';
+    const items = await Timetable.find(query).sort({ updatedAt: -1 });
+    res.json({ success: true, timetables: items });
+  } catch (error) {
+    console.error('Admin list timetables error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+export const adminCreateOrUpdateTimetable = async (req, res) => {
+  try {
+    const { grade, section, academicYear = '2025-2026', semester = 'Fall', effectiveFrom, effectiveTo, isActive = true } = req.body;
+    if (!grade) return res.status(400).json({ success: false, message: 'grade is required' });
+    if (!req.file) return res.status(400).json({ success: false, message: 'file is required' });
+    const sectionValue = section && section !== '' ? String(section) : 'All';
+
+    // Upsert timetable with file
+    const doc = await Timetable.findOneAndUpdate(
+      { grade: String(grade), section: sectionValue, academicYear: String(academicYear), semester: String(semester) },
+      {
+        $set: {
+          file: {
+            path: `/uploads/timetables/${req.file.filename}`,
+            filename: req.file.filename,
+            size: req.file.size,
+            mimetype: req.file.mimetype
+          },
+          effectiveFrom: effectiveFrom ? new Date(effectiveFrom) : new Date(),
+          effectiveTo: effectiveTo ? new Date(effectiveTo) : undefined,
+          isActive: !!isActive
+        }
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+
+    res.status(201).json({ success: true, message: 'Timetable uploaded', timetable: doc });
+  } catch (error) {
+    console.error('Admin create/update timetable error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+export const adminUpdateTimetable = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { effectiveFrom, effectiveTo, isActive } = req.body;
+    const updates = {};
+    if (effectiveFrom) updates.effectiveFrom = new Date(effectiveFrom);
+    if (effectiveTo) updates.effectiveTo = new Date(effectiveTo);
+    if (typeof isActive !== 'undefined') updates.isActive = !!isActive;
+
+    const doc = await Timetable.findByIdAndUpdate(id, { $set: updates }, { new: true });
+    if (!doc) return res.status(404).json({ success: false, message: 'Timetable not found' });
+    res.json({ success: true, message: 'Timetable updated', timetable: doc });
+  } catch (error) {
+    console.error('Admin update timetable error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+export const adminDeleteTimetable = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await Timetable.findByIdAndDelete(id);
+    res.json({ success: true, message: 'Timetable deleted' });
+  } catch (error) {
+    console.error('Admin delete timetable error:', error);
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };

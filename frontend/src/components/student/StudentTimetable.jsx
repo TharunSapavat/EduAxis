@@ -1,65 +1,147 @@
-import React from 'react';
-import { Calendar, Clock } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Calendar, FileText, Download, Eye, X } from 'lucide-react';
+import { studentAPI } from '../../services/api';
 
-const StudentTimetable = ({ timetable, timetableLoading }) => {
-  const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  
-  // Handle null, undefined, or object timetable data
-  const timetableSchedule = Array.isArray(timetable) ? timetable : 
-                            timetable?.schedule ? timetable.schedule : [];
+export default function StudentTimetable() {
+  const [loading, setLoading] = useState(false);
+  const [timetable, setTimetable] = useState(null);
+  const [showViewer, setShowViewer] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const res = await studentAPI.getTimetable();
+        setTimetable(res.data.timetable);
+      } catch (e) {
+        console.error('Failed to load timetable', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  const handleViewTimetable = () => {
+    setShowViewer(true);
+  };
+
+  const handleDownload = () => {
+    if (timetable?.file?.path) {
+      window.open(`http://localhost:5000${timetable.file.path}`, '_blank');
+    }
+  };
 
   return (
     <div>
-      <h1 className="text-3xl font-bold text-slate-900 mb-6">Timetable</h1>
-      {timetableLoading ? (
+      <h1 className="text-3xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+        <Calendar className="w-7 h-7"/> My Timetable
+      </h1>
+      
+      {loading ? (
         <div className="text-center py-12">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           <p className="text-slate-600 mt-4">Loading timetable...</p>
         </div>
-      ) : timetableSchedule.length === 0 ? (
+      ) : !timetable ? (
         <div className="bg-white rounded-xl shadow-md p-12 text-center border border-slate-100">
-          <Calendar className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-          <p className="text-slate-600 text-lg">No timetable available</p>
+          <FileText className="w-16 h-16 text-slate-400 mx-auto mb-4" />
+          <p className="text-slate-600 text-lg">No timetable uploaded yet for your class</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-md overflow-hidden border border-slate-100">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
-            {daysOfWeek.map((day) => {
-              const daySchedule = timetableSchedule.filter(item => item.day === day);
+        <>
+          <div className="bg-white rounded-xl shadow-md p-8 border border-slate-100">
+            <div className="flex items-start justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-semibold text-slate-900 mb-3">Class Timetable</h2>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-slate-700">
+                    <span className="font-medium">Grade:</span>
+                    <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                      {timetable.grade}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-700">
+                    <span className="font-medium">Section:</span>
+                    <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                      {timetable.section}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-700">
+                    <span className="font-medium">Academic Year:</span>
+                    <span className="text-slate-600">{timetable.academicYear}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-700">
+                    <span className="font-medium">Semester:</span>
+                    <span className="text-slate-600">{timetable.semester}</span>
+                  </div>
+                </div>
+              </div>
               
-              return (
-                <div key={day} className="border border-slate-200 rounded-lg p-4">
-                  <h3 className="text-lg font-bold text-slate-900 mb-3">{day}</h3>
-                  {daySchedule.length === 0 ? (
-                    <p className="text-sm text-slate-500">No classes</p>
+              <div className="flex items-center gap-2">
+                <FileText className="w-12 h-12 text-blue-500" />
+              </div>
+            </div>
+
+            {timetable.file?.filename && (
+              <div className="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                <p className="text-sm text-slate-600 mb-1">File:</p>
+                <p className="text-slate-900 font-medium">{timetable.file.filename}</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Size: {(timetable.file.size / 1024).toFixed(2)} KB
+                </p>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleViewTimetable}
+                className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+              >
+                <Eye className="w-5 h-5"/> View Timetable
+              </button>
+              <button
+                onClick={handleDownload}
+                className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
+              >
+                <Download className="w-5 h-5"/> Download
+              </button>
+            </div>
+          </div>
+
+          {/* Fullscreen Viewer Modal */}
+          {showViewer && (
+            <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-lg w-full h-full max-w-6xl max-h-[90vh] flex flex-col">
+                <div className="flex items-center justify-between p-4 border-b border-slate-200">
+                  <h3 className="text-lg font-semibold text-slate-900">Class Timetable</h3>
+                  <button
+                    onClick={() => setShowViewer(false)}
+                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                  >
+                    <X className="w-5 h-5 text-slate-600" />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-auto p-4">
+                  {timetable.file?.mimetype?.includes('pdf') ? (
+                    <iframe
+                      src={`http://localhost:5000${timetable.file.path}`}
+                      className="w-full h-full border-0 rounded"
+                      title="Timetable PDF"
+                    />
                   ) : (
-                    <div className="space-y-2">
-                      {daySchedule.map((item) => (
-                        <div key={item._id} className="bg-blue-50 p-3 rounded-lg">
-                          <p className="font-semibold text-sm text-slate-900">
-                            {item.courseId?.name || item.subject}
-                          </p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Clock className="w-3 h-3 text-slate-600" />
-                            <p className="text-xs text-slate-600">
-                              {item.startTime} - {item.endTime}
-                            </p>
-                          </div>
-                          {item.room && (
-                            <p className="text-xs text-slate-600 mt-1">Room: {item.room}</p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
+                    <img
+                      src={`http://localhost:5000${timetable.file.path}`}
+                      alt="Timetable"
+                      className="max-w-full h-auto mx-auto"
+                    />
                   )}
                 </div>
-              );
-            })}
-          </div>
-        </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
-};
-
-export default StudentTimetable;
+}
