@@ -8,7 +8,7 @@ import DashboardFooter from '../components/DashboardFooter';
 import TeacherInbox from '../components/TeacherInbox';
 import io from 'socket.io-client';
 
-// Custom Hooks
+// Check
 import { useNotification } from '../hooks/useNotification';
 
 // Teacher Components  
