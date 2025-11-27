@@ -108,6 +108,8 @@ export const teacherAPI = {
   getAnnouncements: () => api.get('/teacher/announcements'),
   postAnnouncement: (data) => api.post('/teacher/announcements', data),
   deleteAnnouncement: (id) => api.delete(`/teacher/announcements/${id}`),
+  applyLeave: (data) => api.post('/teacher/leave', data),
+  getLeaveApplications: () => api.get('/teacher/leave'),
 };
 
 // Admin APIs
@@ -143,6 +145,10 @@ export const adminAPI = {
   getStudentAnalytics: (params) => api.get('/admin/class/students', { params }),
   getAtRiskStudents: () => api.get('/admin/class/at-risk'),
   getStudentDetails: (id) => api.get(`/admin/class/students/${id}`),
+  
+  // Leave Management
+  getLeaveApplications: (params) => api.get('/admin/leave', { params }),
+  reviewLeaveApplication: (id, data) => api.put(`/admin/leave/${id}`, data),
 };
 
 export default api;

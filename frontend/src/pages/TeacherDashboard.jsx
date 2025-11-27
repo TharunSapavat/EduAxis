@@ -1,4 +1,4 @@
-import { BookOpen, Users, Calendar, FileText, BarChart3, ClipboardList, Bell, Upload, MessageSquare, Home, X, Trash2 } from 'lucide-react';
+import { BookOpen, Users, Calendar, FileText, BarChart3, ClipboardList, Bell, Upload, MessageSquare, Home, X, Trash2, CalendarCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useState, useEffect, useRef } from 'react';
 import { teacherAPI } from '../services/api';
@@ -36,6 +36,7 @@ export default function TeacherDashboard() {
     { id: 'grading', icon: BarChart3, title: 'Grade Assignments', description: 'Grade submissions' },
     { id: 'students', icon: Users, title: 'Student Lists', description: 'View students' },
     { id: 'announcements', icon: Bell, title: 'Announcements', description: 'Post announcements' },
+    { id: 'leave', icon: CalendarCheck, title: 'Apply Leave', description: 'Request time off' },
     { id: 'materials', icon: Upload, title: 'Study Materials', description: 'Upload resources' },
     { id: 'timetable', icon: Calendar, title: 'My Timetable', description: 'View schedule' },
     { id: 'messages', icon: MessageSquare, title: 'Messages', description: 'Communicate with students' },
@@ -518,6 +519,26 @@ export default function TeacherDashboard() {
               <div className="bg-white rounded-xl shadow-md p-6 border border-slate-100">
                 <h2 className="text-xl font-semibold text-slate-900 mb-4">My Recent Announcements</h2>
                 <TeacherAnnouncementsList />
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'leave':
+        return (
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 mb-6">Leave Management</h1>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Apply Leave Form */}
+              <div className="bg-white rounded-xl shadow-md p-6 border border-slate-100">
+                <h2 className="text-xl font-semibold text-slate-900 mb-4">Apply for Leave</h2>
+                <ApplyLeaveForm />
+              </div>
+
+              {/* Leave Applications */}
+              <div className="bg-white rounded-xl shadow-md p-6 border border-slate-100">
+                <h2 className="text-xl font-semibold text-slate-900 mb-4">My Leave Applications</h2>
+                <TeacherLeaveList />
               </div>
             </div>
           </div>
@@ -1230,3 +1251,219 @@ function TeacherAnnouncementsList() {
   );
 }
 
+// Apply Leave Form component
+function ApplyLeaveForm() {
+  const [form, setForm] = useState({ 
+    leaveType: 'casual', 
+    startDate: '', 
+    endDate: '', 
+    reason: '' 
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState(null);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm(f => ({ ...f, [name]: value }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!form.startDate || !form.endDate || !form.reason) {
+      setMessage({ type: 'error', text: 'All fields are required.' });
+      return;
+    }
+
+    if (form.reason.length < 10) {
+      setMessage({ type: 'error', text: 'Reason must be at least 10 characters long.' });
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      await teacherAPI.applyLeave({
+        leaveType: form.leaveType,
+        startDate: form.startDate,
+        endDate: form.endDate,
+        reason: form.reason
+      });
+      setMessage({ type: 'success', text: 'Leave application submitted successfully!' });
+      setForm({ leaveType: 'casual', startDate: '', endDate: '', reason: '' });
+      window.dispatchEvent(new CustomEvent('leave-applied'));
+    } catch (err) {
+      console.error('Apply leave failed', err);
+      setMessage({ type: 'error', text: err.response?.data?.message || 'Failed to apply for leave' });
+    } finally {
+      setSubmitting(false);
+      setTimeout(() => setMessage(null), 4000);
+    }
+  };
+
+  const today = new Date().toISOString().split('T')[0];
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {message && (
+        <div className={`px-3 py-2 rounded text-sm ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+          {message.text}
+        </div>
+      )}
+      
+      <div>
+        <label className="block text-sm font-medium text-slate-700 mb-1">Leave Type</label>
+        <select
+          name="leaveType"
+          value={form.leaveType}
+          onChange={handleChange}
+          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
+          required
+        >
+          <option value="casual">Casual Leave</option>
+          <option value="sick">Sick Leave</option>
+          <option value="emergency">Emergency Leave</option>
+          <option value="personal">Personal Leave</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Start Date</label>
+          <input 
+            type="date" 
+            name="startDate" 
+            value={form.startDate} 
+            onChange={handleChange} 
+            min={today}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none" 
+            required 
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">End Date</label>
+          <input 
+            type="date" 
+            name="endDate" 
+            value={form.endDate} 
+            onChange={handleChange} 
+            min={form.startDate || today}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none" 
+            required 
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-slate-700 mb-1">
+          Reason <span className="text-slate-500 text-xs">(minimum 10 characters)</span>
+        </label>
+        <textarea 
+          name="reason" 
+          value={form.reason} 
+          onChange={handleChange} 
+          rows={4} 
+          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none" 
+          placeholder="Explain your reason for leave..."
+          minLength={10}
+          required
+        ></textarea>
+        {form.reason.length > 0 && form.reason.length < 10 && (
+          <p className="text-xs text-red-600 mt-1">
+            {10 - form.reason.length} more character{10 - form.reason.length !== 1 ? 's' : ''} required
+          </p>
+        )}
+      </div>
+
+      <button 
+        disabled={submitting} 
+        className="w-full py-2 bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white rounded-lg font-medium transition-colors"
+      >
+        {submitting ? 'Submitting…' : 'Submit Leave Application'}
+      </button>
+    </form>
+  );
+}
+
+// Teacher Leave List component
+function TeacherLeaveList() {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      const response = await teacherAPI.getLeaveApplications();
+      setItems(response.data.leaves || []);
+    } catch (e) {
+      console.error('Failed to load leave applications', e);
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+    const handler = () => load();
+    window.addEventListener('leave-applied', handler);
+    return () => window.removeEventListener('leave-applied', handler);
+  }, []);
+
+  if (loading) return <div className="text-slate-600">Loading leave applications…</div>;
+  if (!items.length) return <div className="text-slate-600 text-sm">No leave applications yet.</div>;
+
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'approved':
+        return 'bg-green-100 text-green-700';
+      case 'rejected':
+        return 'bg-red-100 text-red-700';
+      default:
+        return 'bg-yellow-100 text-yellow-700';
+    }
+  };
+
+  const formatDate = (date) => {
+    return new Date(date).toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric' 
+    });
+  };
+
+  return (
+    <div className="space-y-3 max-h-[600px] overflow-y-auto">
+      {items.map((leave) => (
+        <div key={leave._id} className="p-4 border border-slate-200 rounded-lg hover:border-slate-300 transition-colors">
+          <div className="flex items-start justify-between mb-2">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs font-medium text-slate-500 uppercase">{leave.leaveType}</span>
+                <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${getStatusBadge(leave.status)}`}>
+                  {leave.status.toUpperCase()}
+                </span>
+              </div>
+              <p className="text-sm text-slate-700 font-medium">
+                {formatDate(leave.startDate)} - {formatDate(leave.endDate)}
+              </p>
+            </div>
+          </div>
+          
+          <p className="text-sm text-slate-600 mt-2 line-clamp-2">{leave.reason}</p>
+          
+          {leave.reviewComment && (
+            <div className="mt-2 p-2 bg-slate-50 rounded text-xs text-slate-600">
+              <span className="font-medium">Admin Comment:</span> {leave.reviewComment}
+            </div>
+          )}
+          
+          <p className="text-xs text-slate-400 mt-2">
+            Applied: {formatDate(leave.createdAt)}
+            {leave.reviewedAt && ` • Reviewed: ${formatDate(leave.reviewedAt)}`}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}

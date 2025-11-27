@@ -5,6 +5,7 @@ import Payment from '../models/Payment.js';
 import Attendance from '../models/Attendance.js';
 import Grade from '../models/Grade.js';
 import Remark from '../models/Remark.js';
+import Leave from '../models/Leave.js';
 
 // Get admin dashboard data
 export const getDashboard = async (req, res) => {
@@ -1044,5 +1045,94 @@ export const getStudentDetails = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// Get all leave applications (for admin)
+export const getLeaveApplications = async (req, res) => {
+  try {
+    const { status, role } = req.query;
+    
+    const filter = {};
+    if (status && status !== 'all') {
+      filter.status = status;
+    }
+    if (role && role !== 'all') {
+      filter.applicantRole = role;
+    }
+
+    const leaves = await Leave.find(filter)
+      .populate('applicant', 'name email role')
+      .populate('reviewedBy', 'name')
+      .sort({ createdAt: -1 })
+      .limit(50);
+    
+    res.json({
+      success: true,
+      leaves
+    });
+  } catch (error) {
+    console.error('Get leave applications error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
+};
+
+// Approve or reject leave application
+export const reviewLeaveApplication = async (req, res) => {
+  try {
+    const adminId = req.user?._id;
+    const { id } = req.params;
+    const { status, comment } = req.body;
+    
+    if (!status || !['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Valid status (approved/rejected) is required' 
+      });
+    }
+
+    const leave = await Leave.findById(id);
+    
+    if (!leave) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Leave application not found' 
+      });
+    }
+
+    if (leave.status !== 'pending') {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Leave application has already been reviewed' 
+      });
+    }
+
+    leave.status = status;
+    leave.reviewedBy = adminId;
+    leave.reviewedAt = new Date();
+    if (comment) {
+      leave.reviewComment = comment;
+    }
+
+    await leave.save();
+    await leave.populate('applicant', 'name email role');
+    await leave.populate('reviewedBy', 'name');
+
+    res.json({
+      success: true,
+      message: `Leave application ${status} successfully`,
+      leave
+    });
+  } catch (error) {
+    console.error('Review leave application error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: error.message 
+    });
   }
 };

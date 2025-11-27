@@ -9,7 +9,9 @@ import {
   createAssignment,
   postAnnouncement,
   getAnnouncements,
-  deleteAnnouncement
+  deleteAnnouncement,
+  applyLeave,
+  getLeaveApplications
 } from '../controllers/teacherController.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
 import { uploadAssignmentFiles } from '../config/multer.js';
@@ -31,5 +33,7 @@ router.post('/assignments', uploadAssignmentFiles.array('attachments', 5), creat
 router.get('/announcements', getAnnouncements);
 router.post('/announcements', postAnnouncement);
 router.delete('/announcements/:id', deleteAnnouncement);
+router.post('/leave', applyLeave);
+router.get('/leave', getLeaveApplications);
 
 export default router;

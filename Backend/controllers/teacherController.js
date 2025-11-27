@@ -5,6 +5,7 @@ import User from '../models/User.js';
 import Attendance from '../models/Attendance.js';
 import Course from '../models/Course.js';
 import Announcement from '../models/Announcement.js';
+import Leave from '../models/Leave.js';
 
 // Get teacher dashboard data
 export const getDashboard = async (req, res) => {
@@ -480,6 +481,93 @@ export const deleteAnnouncement = async (req, res) => {
     });
   } catch (error) {
     console.error('Delete announcement error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
+};
+
+// Apply for leave
+export const applyLeave = async (req, res) => {
+  try {
+    const teacherId = req.user?._id;
+    const { leaveType, startDate, endDate, reason } = req.body;
+    
+    if (!startDate || !endDate || !reason) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Leave type, start date, end date, and reason are required' 
+      });
+    }
+
+    // Validate dates
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (start < today) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Start date cannot be in the past' 
+      });
+    }
+
+    if (end < start) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'End date cannot be before start date' 
+      });
+    }
+
+    // Create leave application
+    const leave = await Leave.create({
+      applicant: teacherId,
+      applicantRole: 'teacher',
+      leaveType: leaveType || 'casual',
+      startDate: start,
+      endDate: end,
+      reason,
+      status: 'pending'
+    });
+
+    await leave.populate('applicant', 'name email');
+
+    res.status(201).json({
+      success: true,
+      message: 'Leave application submitted successfully',
+      leave
+    });
+  } catch (error) {
+    console.error('Apply leave error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
+};
+
+// Get teacher's leave applications
+export const getLeaveApplications = async (req, res) => {
+  try {
+    const teacherId = req.user?._id;
+    
+    const leaves = await Leave.find({ 
+      applicant: teacherId 
+    })
+      .populate('reviewedBy', 'name')
+      .sort({ createdAt: -1 })
+      .limit(20);
+    
+    res.json({
+      success: true,
+      leaves
+    });
+  } catch (error) {
+    console.error('Get leave applications error:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Server error', 

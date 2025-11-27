@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, BookOpen, Calendar, FileText, BarChart3, Settings, Shield, Database, DollarSign, Library, GraduationCap, ClipboardList, Home, X, Search, Filter, Eye, Mail, Phone, MapPin, Trash2, UserPlus, Lock } from 'lucide-react';
+import { Users, BookOpen, Calendar, FileText, BarChart3, Settings, Shield, Database, DollarSign, Library, GraduationCap, ClipboardList, Home, X, Search, Filter, Eye, Mail, Phone, MapPin, Trash2, UserPlus, Lock, CalendarCheck, Check, XCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { adminAPI } from '../services/api';
 import { useForm } from 'react-hook-form';
@@ -656,8 +656,8 @@ export default function AdminDashboard() {
     { id: 'timetable', icon: Calendar, title: 'Timetable', description: 'Schedule classes and events' },
     { id: 'attendance', icon: ClipboardList, title: 'Attendance', description: 'View all attendance data' },
     { id: 'fees', icon: DollarSign, title: 'Fee Management', description: 'Manage fee structure & payments' },
+    { id: 'leave', icon: CalendarCheck, title: 'Leave Management', description: 'Approve/reject leave requests' },
     { id: 'classes', icon: GraduationCap, title: 'Class Management', description: 'Manage classes and sections' },
-    { id: 'requests', icon: Mail, title: 'Manage Requests', description: 'View and respond to user requests' },
     { id: 'security', icon: Shield, title: 'Security & Roles', description: 'Manage permissions' },
     { id: 'settings', icon: Settings, title: 'System Settings', description: 'Configure system preferences' },
   ];
@@ -2098,6 +2098,9 @@ export default function AdminDashboard() {
       case 'classes':
         return <ClassManagement />;
 
+      case 'leave':
+        return <LeaveManagement />;
+
       default:
         return (
           <div className="bg-white rounded-xl shadow-md p-6">
@@ -2174,6 +2177,262 @@ export default function AdminDashboard() {
 
       {/* Footer */}
       <DashboardFooter />
+    </div>
+  );
+}
+
+// Leave Management Component
+function LeaveManagement() {
+  const [leaves, setLeaves] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('pending');
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [processing, setProcessing] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const loadLeaves = async () => {
+    try {
+      setLoading(true);
+      const response = await adminAPI.getLeaveApplications({ 
+        status: 'all',
+        role: roleFilter 
+      });
+      setLeaves(response.data.leaves || []);
+    } catch (error) {
+      console.error('Failed to load leave applications:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadLeaves();
+  }, [roleFilter]);
+
+  const handleReview = async (id, status, comment = '') => {
+    if (!confirm(`Are you sure you want to ${status} this leave application?`)) return;
+
+    try {
+      setProcessing(id);
+      await adminAPI.reviewLeaveApplication(id, { status, comment });
+      await loadLeaves();
+    } catch (error) {
+      console.error('Failed to review leave:', error);
+      alert('Failed to review leave application');
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'approved':
+        return 'bg-green-100 text-green-700';
+      case 'rejected':
+        return 'bg-red-100 text-red-700';
+      default:
+        return 'bg-yellow-100 text-yellow-700';
+    }
+  };
+
+  const formatDate = (date) => {
+    return new Date(date).toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric' 
+    });
+  };
+
+  const stats = {
+    pending: leaves.filter(l => l.status === 'pending').length,
+    approved: leaves.filter(l => l.status === 'approved').length,
+    rejected: leaves.filter(l => l.status === 'rejected').length,
+  };
+
+  // Filter leaves for display based on status filter and search query
+  let filteredLeaves = statusFilter === 'all' 
+    ? leaves 
+    : leaves.filter(l => l.status === statusFilter);
+
+  // Apply search filter
+  if (searchQuery.trim()) {
+    const query = searchQuery.toLowerCase();
+    filteredLeaves = filteredLeaves.filter(leave => 
+      leave.applicant?.name?.toLowerCase().includes(query) ||
+      leave.applicant?.email?.toLowerCase().includes(query) ||
+      leave.leaveType?.toLowerCase().includes(query) ||
+      leave.reason?.toLowerCase().includes(query)
+    );
+  }
+
+  return (
+    <div>
+      <h1 className="text-3xl font-bold text-slate-900 mb-6">Leave Management</h1>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div 
+          onClick={() => setStatusFilter('pending')}
+          className={`bg-white rounded-xl shadow-md p-6 border-l-4 border-yellow-500 cursor-pointer transition-all hover:shadow-lg ${statusFilter === 'pending' ? 'ring-2 ring-yellow-500' : ''}`}
+        >
+          <h3 className="text-sm font-medium text-slate-600 mb-2">Pending</h3>
+          <p className="text-3xl font-bold text-slate-900">{stats.pending}</p>
+        </div>
+        <div 
+          onClick={() => setStatusFilter('approved')}
+          className={`bg-white rounded-xl shadow-md p-6 border-l-4 border-green-500 cursor-pointer transition-all hover:shadow-lg ${statusFilter === 'approved' ? 'ring-2 ring-green-500' : ''}`}
+        >
+          <h3 className="text-sm font-medium text-slate-600 mb-2">Approved</h3>
+          <p className="text-3xl font-bold text-slate-900">{stats.approved}</p>
+        </div>
+        <div 
+          onClick={() => setStatusFilter('rejected')}
+          className={`bg-white rounded-xl shadow-md p-6 border-l-4 border-red-500 cursor-pointer transition-all hover:shadow-lg ${statusFilter === 'rejected' ? 'ring-2 ring-red-500' : ''}`}
+        >
+          <h3 className="text-sm font-medium text-slate-600 mb-2">Rejected</h3>
+          <p className="text-3xl font-bold text-slate-900">{stats.rejected}</p>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+        <div className="flex flex-wrap gap-4">
+          <div className="flex-1 min-w-[250px]">
+            <label className="block text-sm font-medium text-slate-700 mb-2">Search</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search by name, email, type, or reason..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Status</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+            >
+              <option value="all">All Status</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Role</label>
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+            >
+              <option value="all">All Roles</option>
+              <option value="teacher">Teachers</option>
+              <option value="student">Students</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Leave Applications List */}
+      <div className="bg-white rounded-xl shadow-md p-6">
+        {loading ? (
+          <div className="text-center py-12">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+            <p className="text-slate-600 mt-4">Loading leave applications...</p>
+          </div>
+        ) : filteredLeaves.length === 0 ? (
+          <div className="text-center py-12">
+            <CalendarCheck className="w-16 h-16 text-slate-400 mx-auto mb-4" />
+            <p className="text-slate-600">No leave applications found</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {filteredLeaves.map((leave) => (
+              <div key={leave._id} className="p-6 border border-slate-200 rounded-lg hover:shadow-md transition-shadow">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="text-lg font-semibold text-slate-900">
+                        {leave.applicant?.name || 'Unknown'}
+                      </h3>
+                      <span className="text-xs px-2 py-1 bg-slate-100 text-slate-600 rounded-full uppercase font-medium">
+                        {leave.applicantRole}
+                      </span>
+                      <span className={`px-2 py-1 text-xs rounded-full font-medium ${getStatusBadge(leave.status)}`}>
+                        {leave.status.toUpperCase()}
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-600">{leave.applicant?.email}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <p className="text-sm font-medium text-slate-700 mb-1">Leave Type</p>
+                    <p className="text-sm text-slate-600 capitalize">{leave.leaveType}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-slate-700 mb-1">Duration</p>
+                    <p className="text-sm text-slate-600">
+                      {formatDate(leave.startDate)} - {formatDate(leave.endDate)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <p className="text-sm font-medium text-slate-700 mb-1">Reason</p>
+                  <p className="text-sm text-slate-600 bg-slate-50 p-3 rounded">{leave.reason}</p>
+                </div>
+
+                {leave.reviewComment && (
+                  <div className="mb-4">
+                    <p className="text-sm font-medium text-slate-700 mb-1">Admin Comment</p>
+                    <p className="text-sm text-slate-600 bg-blue-50 p-3 rounded">{leave.reviewComment}</p>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between text-xs text-slate-500 mb-4">
+                  <span>Applied: {formatDate(leave.createdAt)}</span>
+                  {leave.reviewedAt && (
+                    <span>
+                      Reviewed by {leave.reviewedBy?.name} on {formatDate(leave.reviewedAt)}
+                    </span>
+                  )}
+                </div>
+
+                {leave.status === 'pending' && (
+                  <div className="flex gap-3 pt-4 border-t border-slate-200">
+                    <button
+                      onClick={() => handleReview(leave._id, 'approved')}
+                      disabled={processing === leave._id}
+                      className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      <Check className="w-4 h-4" />
+                      {processing === leave._id ? 'Processing...' : 'Approve'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        const comment = prompt('Optional: Add a comment for rejection');
+                        if (comment !== null) handleReview(leave._id, 'rejected', comment);
+                      }}
+                      disabled={processing === leave._id}
+                      className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      <XCircle className="w-4 h-4" />
+                      {processing === leave._id ? 'Processing...' : 'Reject'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
