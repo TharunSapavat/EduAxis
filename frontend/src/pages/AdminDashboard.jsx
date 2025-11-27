@@ -742,7 +742,6 @@ export default function AdminDashboard() {
     { id: 'users', icon: Users, title: 'User Management', description: 'Manage students, teachers & staff' },
     { id: 'courses', icon: BookOpen, title: 'Course Management', description: 'Create and manage courses' },
     { id: 'timetable', icon: Calendar, title: 'Timetable', description: 'Schedule classes and events' },
-    { id: 'attendance', icon: ClipboardList, title: 'Attendance', description: 'View all attendance data' },
     { id: 'fees', icon: DollarSign, title: 'Fee Management', description: 'Manage fee structure & payments' },
     { id: 'classes', icon: GraduationCap, title: 'Class Management', description: 'Manage classes and sections' },
     { id: 'library', icon: Library, title: 'Library Management', description: 'Upload and manage library resources' },

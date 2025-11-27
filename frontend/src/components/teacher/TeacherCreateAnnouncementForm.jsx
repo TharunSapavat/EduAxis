@@ -76,9 +76,7 @@ export default function CreateAnnouncementForm({ courses }) {
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Target Audience</label>
           <select name="targetAudience" value={form.targetAudience} onChange={handleChange} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none">
-            <option value="all">All</option>
             <option value="students">Students</option>
-            <option value="teachers">Teachers</option>
           </select>
         </div>
         <div>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { teacherAPI } from '../../services/api';
-import { CalendarClock, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { CalendarClock, CheckCircle, XCircle, Clock, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function TeacherLeave() {
   const [formData, setFormData] = useState({
@@ -13,6 +13,9 @@ export default function TeacherLeave() {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [notification, setNotification] = useState(null);
+  const [filterType, setFilterType] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
 
   useEffect(() => {
     fetchLeaveRequests();
@@ -103,6 +106,21 @@ export default function TeacherLeave() {
     const diffTime = Math.abs(new Date(end) - new Date(start));
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
     return diffDays;
+  };
+
+  // Filter leave requests
+  const filteredRequests = filterType
+    ? leaveRequests.filter(request => request.type === filterType)
+    : leaveRequests;
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentItems = filteredRequests.slice(startIndex, endIndex);
+
+  const goToPage = (page) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
   };
 
   return (
@@ -206,16 +224,41 @@ export default function TeacherLeave() {
         <div className="bg-white rounded-xl shadow-md p-6 border border-slate-100">
           <h2 className="text-xl font-semibold text-slate-900 mb-4">My Leave Requests</h2>
           
+          {/* Filter */}
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Filter className="w-4 h-4 text-slate-600" />
+              <label className="text-sm font-medium text-slate-700">Filter by Type</label>
+            </div>
+            <select
+              value={filterType}
+              onChange={(e) => {
+                setFilterType(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+            >
+              <option value="">All Leave Types</option>
+              <option value="sick">Sick Leave</option>
+              <option value="casual">Casual Leave</option>
+              <option value="earned">Earned Leave</option>
+              <option value="maternity">Maternity Leave</option>
+              <option value="paternity">Paternity Leave</option>
+              <option value="emergency">Emergency Leave</option>
+            </select>
+          </div>
+          
           {loading ? (
             <div className="text-center py-8 text-slate-600">Loading...</div>
-          ) : leaveRequests.length === 0 ? (
+          ) : filteredRequests.length === 0 ? (
             <div className="text-center py-8 text-slate-500">
               <CalendarClock className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-              <p>No leave requests found</p>
+              <p>{filterType ? 'No leave requests found for this type' : 'No leave requests found'}</p>
             </div>
           ) : (
+            <>
             <div className="space-y-3 max-h-[600px] overflow-y-auto">
-              {leaveRequests.map((request) => (
+              {currentItems.map((request) => (
                 <div key={request._id} className="border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors">
                   <div className="flex items-start justify-between mb-2">
                     <div>
@@ -257,6 +300,68 @@ export default function TeacherLeave() {
                 </div>
               ))}
             </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="mt-4 flex items-center justify-between border-t border-slate-200 pt-4">
+                <div className="text-sm text-slate-600">
+                  Showing {startIndex + 1}-{Math.min(endIndex, filteredRequests.length)} of {filteredRequests.length} requests
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => goToPage(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="p-2 rounded-lg border border-slate-300 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    title="Previous page"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  
+                  <div className="flex items-center gap-1">
+                    {[...Array(totalPages)].map((_, i) => {
+                      const page = i + 1;
+                      if (
+                        page === 1 ||
+                        page === totalPages ||
+                        (page >= currentPage - 1 && page <= currentPage + 1)
+                      ) {
+                        return (
+                          <button
+                            key={page}
+                            onClick={() => goToPage(page)}
+                            className={`min-w-8 px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                              currentPage === page
+                                ? 'bg-green-600 text-white'
+                                : 'border border-slate-300 hover:bg-slate-50 text-slate-700'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        );
+                      }
+                      if (page === currentPage - 2 || page === currentPage + 2) {
+                        return (
+                          <span key={page} className="px-2 text-slate-400">
+                            ...
+                          </span>
+                        );
+                      }
+                      return null;
+                    })}
+                  </div>
+
+                  <button
+                    onClick={() => goToPage(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="p-2 rounded-lg border border-slate-300 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    title="Next page"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+            </>
           )}
         </div>
       </div>
