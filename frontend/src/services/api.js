@@ -97,6 +97,8 @@ export const studentAPI = {
   // Leave Requests
   createLeaveRequest: (data) => api.post('/student/leave-requests', data),
   getLeaveRequests: () => api.get('/student/leave-requests'),
+  // Study Materials
+  getStudyMaterials: () => api.get('/student/study-materials'),
 };
 
 // Teacher APIs
@@ -123,6 +125,12 @@ export const teacherAPI = {
   // Leave Requests
   applyLeave: (data) => api.post('/teacher/leave-requests', data),
   getLeaveRequests: () => api.get('/teacher/leave-requests'),
+  // Study Materials
+  uploadStudyMaterial: (formData) => api.post('/teacher/study-materials', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  getStudyMaterials: () => api.get('/teacher/study-materials'),
+  deleteStudyMaterial: (id) => api.delete(`/teacher/study-materials/${id}`),
 };
 
 // Admin APIs

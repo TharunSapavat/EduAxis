@@ -8,6 +8,7 @@ import Course from '../models/Course.js';
 import Announcement from '../models/Announcement.js';
 import Timetable from '../models/Timetable.js';
 import LeaveRequest from '../models/LeaveRequest.js';
+import StudyMaterial from '../models/StudyMaterial.js';
 
 // Get teacher dashboard data
 export const getDashboard = async (req, res) => {
@@ -713,6 +714,107 @@ export const getLeaveRequests = async (req, res) => {
     });
   } catch (error) {
     console.error('Get leave requests error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
+    });
+  }
+};
+
+// Upload study material
+export const uploadStudyMaterial = async (req, res) => {
+  try {
+    const teacherId = req.user?.id;
+    const { title, description, grade, courseId } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+
+    if (!title || !grade || !courseId) {
+      return res.status(400).json({ success: false, message: 'Title, grade, and course are required' });
+    }
+
+    // Verify the course belongs to the teacher
+    const course = await Course.findOne({ _id: courseId, teacherId });
+    if (!course) {
+      return res.status(403).json({ success: false, message: 'You can only upload materials for your courses' });
+    }
+
+    const studyMaterial = new StudyMaterial({
+      title,
+      description,
+      grade: parseInt(grade),
+      courseId,
+      subject: course.name,
+      fileUrl: `/uploads/study-materials/${req.file.filename}`,
+      fileName: req.file.originalname,
+      fileSize: req.file.size,
+      uploadedBy: teacherId
+    });
+
+    await studyMaterial.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Study material uploaded successfully',
+      material: studyMaterial
+    });
+  } catch (error) {
+    console.error('Upload study material error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
+    });
+  }
+};
+
+// Get study materials uploaded by teacher
+export const getMyStudyMaterials = async (req, res) => {
+  try {
+    const teacherId = req.user?.id;
+
+    const materials = await StudyMaterial.find({ uploadedBy: teacherId })
+      .populate('uploadedBy', 'name email')
+      .populate('courseId', 'name code')
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      materials
+    });
+  } catch (error) {
+    console.error('Get study materials error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
+    });
+  }
+};
+
+// Delete study material
+export const deleteStudyMaterial = async (req, res) => {
+  try {
+    const teacherId = req.user?.id;
+    const { id } = req.params;
+
+    const material = await StudyMaterial.findOne({ _id: id, uploadedBy: teacherId });
+    
+    if (!material) {
+      return res.status(404).json({ success: false, message: 'Study material not found' });
+    }
+
+    await StudyMaterial.deleteOne({ _id: id });
+
+    res.json({
+      success: true,
+      message: 'Study material deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete study material error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error',

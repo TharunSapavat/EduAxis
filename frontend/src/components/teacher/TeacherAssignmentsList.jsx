@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { teacherAPI } from '../../services/api';
 import { useSocket } from '../../context/SocketContext';
 import { useAuth } from '../../context/AuthContext';
-import { FileText, ListChecks, X } from 'lucide-react';
+import { FileText, ListChecks, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function TeacherAssignmentsList() {
   const [items, setItems] = useState([]);
@@ -10,6 +10,8 @@ export default function TeacherAssignmentsList() {
   const [showModal, setShowModal] = useState(false);
   const [submissions, setSubmissions] = useState([]);
   const [selectedAssignment, setSelectedAssignment] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
   const socket = useSocket();
   const { user } = useAuth();
 
@@ -57,9 +59,20 @@ export default function TeacherAssignmentsList() {
   if (loading) return <div className="text-slate-600">Loading assignments…</div>;
   if (!items.length) return <div className="text-slate-600">No assignments yet.</div>;
 
+  // Pagination calculations
+  const totalPages = Math.ceil(items.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentItems = items.slice(startIndex, endIndex);
+
+  const goToPage = (page) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  };
+
   return (
-    <div className="space-y-3">
-      {items.map((a) => (
+    <div>
+      <div className="space-y-3">
+        {currentItems.map((a) => (
         <div key={a._id} className="p-4 border border-slate-200 rounded-lg">
           <div className="flex items-start justify-between">
             <div>
@@ -110,6 +123,70 @@ export default function TeacherAssignmentsList() {
           </div>
         </div>
       ))}
+      </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="mt-6 flex items-center justify-between border-t border-slate-200 pt-4">
+          <div className="text-sm text-slate-600">
+            Showing {startIndex + 1}-{Math.min(endIndex, items.length)} of {items.length} assignments
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => goToPage(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="p-2 rounded-lg border border-slate-300 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title="Previous page"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            
+            <div className="flex items-center gap-1">
+              {[...Array(totalPages)].map((_, i) => {
+                const page = i + 1;
+                // Show first, last, current, and pages around current
+                if (
+                  page === 1 ||
+                  page === totalPages ||
+                  (page >= currentPage - 1 && page <= currentPage + 1)
+                ) {
+                  return (
+                    <button
+                      key={page}
+                      onClick={() => goToPage(page)}
+                      className={`min-w-8 px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                        currentPage === page
+                          ? 'bg-indigo-600 text-white'
+                          : 'border border-slate-300 hover:bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  );
+                }
+                // Show ellipsis
+                if (page === currentPage - 2 || page === currentPage + 2) {
+                  return (
+                    <span key={page} className="px-2 text-slate-400">
+                      ...
+                    </span>
+                  );
+                }
+                return null;
+              })}
+            </div>
+
+            <button
+              onClick={() => goToPage(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="p-2 rounded-lg border border-slate-300 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title="Next page"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowModal(false)}>

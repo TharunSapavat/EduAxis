@@ -23,6 +23,7 @@ import CreateAnnouncementForm from '../components/teacher/TeacherCreateAnnouncem
 import TeacherAnnouncementsList from '../components/teacher/TeacherAnnouncementsList';
 import TeacherTimetable from '../components/teacher/TeacherTimetable';
 import TeacherLeave from '../components/teacher/TeacherLeave';
+import TeacherMaterials from '../components/teacher/TeacherMaterials';
 
 // Config
 import { TEACHER_MODULES } from '../config/teacherModules';
@@ -266,6 +267,9 @@ export default function TeacherDashboard() {
 
       case '/teacher/leave':
         return <TeacherLeave />;
+
+      case '/teacher/materials':
+        return <TeacherMaterials />;
 
       case '/teacher/announcements':
         return (

@@ -16,7 +16,8 @@ import {
   getLibraryResources,
   createLeaveRequest,
   getMyLeaveRequests,
-  getTeachers
+  getTeachers,
+  getStudyMaterials
 } from '../controllers/studentController.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
 import { uploadSubmissionFiles } from '../config/multer.js';
@@ -66,5 +67,8 @@ router.get('/leave-requests', getMyLeaveRequests);
 
 // Teachers (for messaging)
 router.get('/teachers', getTeachers);
+
+// Study Materials
+router.get('/study-materials', getStudyMaterials);
 
 export default router;

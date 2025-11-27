@@ -26,6 +26,7 @@ import StudentAnnouncements from '../components/student/StudentAnnouncements';
 import StudentLibrary from '../components/student/StudentLibrary';
 import StudentLeave from '../components/student/StudentLeave';
 import StudentFees from '../components/student/StudentFees';
+import StudentMaterials from '../components/student/StudentMaterials';
 
 import { STUDENT_MODULES } from '../config/studentModules';
 
@@ -649,6 +650,9 @@ export default function StudentDashboard() {
           setLeaveCurrentPage={setLeaveCurrentPage}
           leaveRequestsPerPage={leaveRequestsPerPage}
         />;
+
+      case '/student/materials':
+        return <StudentMaterials />;
 
       default:
         return (
