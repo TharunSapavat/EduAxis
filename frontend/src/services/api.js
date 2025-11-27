@@ -120,6 +120,9 @@ export const teacherAPI = {
   deleteAnnouncement: (id) => api.delete(`/teacher/announcements/${id}`),
   // Timetable
   getTimetable: () => api.get('/teacher/timetable'),
+  // Leave Requests
+  applyLeave: (data) => api.post('/teacher/leave-requests', data),
+  getLeaveRequests: () => api.get('/teacher/leave-requests'),
 };
 
 // Admin APIs

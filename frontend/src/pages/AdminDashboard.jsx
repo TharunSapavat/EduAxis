@@ -247,7 +247,9 @@ export default function AdminDashboard() {
   // Leave Request States
   const [leaveRequests, setLeaveRequests] = useState([]);
   const [leaveRequestsLoading, setLeaveRequestsLoading] = useState(false);
-  const [leaveStatusFilter, setLeaveStatusFilter] = useState('pending');
+  const [leaveStatusFilter, setLeaveStatusFilter] = useState('all');
+  const [leaveRoleFilter, setLeaveRoleFilter] = useState('all');
+  const [leaveSearchQuery, setLeaveSearchQuery] = useState('');
   const [leaveCurrentPage, setLeaveCurrentPage] = useState(1);
   const leaveRequestsPerPage = 5;
   const [notification, setNotification] = useState(null);
@@ -358,7 +360,7 @@ export default function AdminDashboard() {
   const fetchLeaveRequests = async () => {
     setLeaveRequestsLoading(true);
     try {
-      const res = await adminAPI.getLeaveRequests({ status: leaveStatusFilter });
+      const res = await adminAPI.getLeaveRequests({ status: 'all' });
       if (res.data.success) {
         setLeaveRequests(res.data.leaveRequests || []);
       }
@@ -373,9 +375,13 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (location.pathname === '/admin/leave') {
       fetchLeaveRequests();
-      setLeaveCurrentPage(1); // Reset to first page when filter changes
     }
-  }, [location.pathname, leaveStatusFilter]);
+  }, [location.pathname]);
+
+  // Reset pagination when filter or search changes
+  useEffect(() => {
+    setLeaveCurrentPage(1);
+  }, [leaveStatusFilter, leaveRoleFilter, leaveSearchQuery]);
 
   // Handle leave decision
   const handleLeaveDecision = async (id, action, remarks) => {
@@ -2182,21 +2188,116 @@ export default function AdminDashboard() {
         return <AdminLibraryManagement showNotification={showNotification} />;
 
       case '/admin/leave':
+        // Calculate stats
+        const pendingCount = leaveRequests.filter(req => req.status === 'pending').length;
+        const approvedCount = leaveRequests.filter(req => req.status === 'approved').length;
+        const rejectedCount = leaveRequests.filter(req => req.status === 'rejected').length;
+        const totalCount = leaveRequests.length;
+
+        // Filter by status, role, and search
+        const filteredLeaveRequests = leaveRequests.filter(req => {
+          const matchesStatus = leaveStatusFilter === 'all' || req.status === leaveStatusFilter;
+          const matchesRole = leaveRoleFilter === 'all' || req.requesterRole === leaveRoleFilter;
+          const matchesSearch = !leaveSearchQuery || 
+            req.requesterId?.name?.toLowerCase().includes(leaveSearchQuery.toLowerCase()) ||
+            req.requesterId?.email?.toLowerCase().includes(leaveSearchQuery.toLowerCase()) ||
+            req.type?.toLowerCase().includes(leaveSearchQuery.toLowerCase());
+          return matchesStatus && matchesRole && matchesSearch;
+        });
+
         return (
           <div>
             <h1 className="text-3xl font-bold text-slate-900 mb-6">Leave Requests</h1>
-            <div className="mb-6 flex items-center gap-4">
-              <label className="text-sm font-medium text-slate-700">Filter:</label>
-              <select
-                value={leaveStatusFilter}
-                onChange={(e) => setLeaveStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <div 
+                onClick={() => setLeaveStatusFilter('all')}
+                className={`bg-white rounded-xl shadow-md p-6 border-2 cursor-pointer transition-all hover:shadow-lg ${
+                  leaveStatusFilter === 'all' ? 'border-blue-500 ring-2 ring-blue-200' : 'border-slate-100'
+                }`}
               >
-                <option value="all">All</option>
-                <option value="pending">Pending</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-              </select>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-600">Total Requests</p>
+                    <p className="text-3xl font-bold text-blue-600 mt-2">{totalCount}</p>
+                  </div>
+                  <ClipboardList className="w-12 h-12 text-blue-500 opacity-20" />
+                </div>
+              </div>
+
+              <div 
+                onClick={() => setLeaveStatusFilter('pending')}
+                className={`bg-white rounded-xl shadow-md p-6 border-2 cursor-pointer transition-all hover:shadow-lg ${
+                  leaveStatusFilter === 'pending' ? 'border-yellow-500 ring-2 ring-yellow-200' : 'border-slate-100'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-600">Pending</p>
+                    <p className="text-3xl font-bold text-yellow-600 mt-2">{pendingCount}</p>
+                  </div>
+                  <Calendar className="w-12 h-12 text-yellow-500 opacity-20" />
+                </div>
+              </div>
+
+              <div 
+                onClick={() => setLeaveStatusFilter('approved')}
+                className={`bg-white rounded-xl shadow-md p-6 border-2 cursor-pointer transition-all hover:shadow-lg ${
+                  leaveStatusFilter === 'approved' ? 'border-green-500 ring-2 ring-green-200' : 'border-slate-100'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-600">Approved</p>
+                    <p className="text-3xl font-bold text-green-600 mt-2">{approvedCount}</p>
+                  </div>
+                  <Calendar className="w-12 h-12 text-green-500 opacity-20" />
+                </div>
+              </div>
+
+              <div 
+                onClick={() => setLeaveStatusFilter('rejected')}
+                className={`bg-white rounded-xl shadow-md p-6 border-2 cursor-pointer transition-all hover:shadow-lg ${
+                  leaveStatusFilter === 'rejected' ? 'border-red-500 ring-2 ring-red-200' : 'border-slate-100'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-600">Rejected</p>
+                    <p className="text-3xl font-bold text-red-600 mt-2">{rejectedCount}</p>
+                  </div>
+                  <Calendar className="w-12 h-12 text-red-500 opacity-20" />
+                </div>
+              </div>
+            </div>
+
+            {/* Search and Role Filter */}
+            <div className="mb-6 bg-white rounded-xl shadow-md p-4 border border-slate-100">
+              <div className="flex gap-4 items-center">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+                  <input
+                    type="text"
+                    value={leaveSearchQuery}
+                    onChange={(e) => setLeaveSearchQuery(e.target.value)}
+                    placeholder="Search by name, email, or leave type..."
+                    className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Filter className="w-5 h-5 text-slate-600" />
+                  <select
+                    value={leaveRoleFilter}
+                    onChange={(e) => setLeaveRoleFilter(e.target.value)}
+                    className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                  >
+                    <option value="all">All Users</option>
+                    <option value="teacher">Teachers</option>
+                    <option value="student">Students</option>
+                  </select>
+                </div>
+              </div>
             </div>
 
             {leaveRequestsLoading ? (
@@ -2204,15 +2305,17 @@ export default function AdminDashboard() {
                 <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
                 <p className="text-slate-600 mt-4">Loading leave requests...</p>
               </div>
-            ) : leaveRequests.length === 0 ? (
+            ) : filteredLeaveRequests.length === 0 ? (
               <div className="bg-white rounded-xl shadow-md p-12 text-center border border-slate-100">
                 <Mail className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-                <p className="text-slate-600 text-lg">No leave requests found</p>
+                <p className="text-slate-600 text-lg">
+                  {leaveSearchQuery ? 'No leave requests match your search' : 'No leave requests found'}
+                </p>
               </div>
             ) : (
               <>
                 <div className="grid grid-cols-1 gap-4">
-                  {leaveRequests
+                  {filteredLeaveRequests
                     .slice((leaveCurrentPage - 1) * leaveRequestsPerPage, leaveCurrentPage * leaveRequestsPerPage)
                     .map((req) => (
                     <div key={req._id} className="bg-white rounded-xl shadow-md p-6 border border-slate-100">
@@ -2220,7 +2323,7 @@ export default function AdminDashboard() {
                         <div>
                           <h3 className="text-lg font-bold text-slate-900">{req.requesterId?.name || 'Unknown'}</h3>
                           <p className="text-sm text-slate-600">
-                            {req.requesterId?.email} • Grade {req.requesterId?.grade}{req.requesterId?.section ? ` - ${req.requesterId?.section}` : ''}
+                            {req.requesterId?.email} • {req.requesterRole === 'teacher' ? 'Teacher' : `Grade ${req.requesterId?.grade}${req.requesterId?.section ? ` - ${req.requesterId?.section}` : ''}`}
                           </p>
                         </div>
                         <span className={`px-3 py-1 text-xs font-bold rounded-full ${
@@ -2235,9 +2338,6 @@ export default function AdminDashboard() {
                         <div>
                           <span className="font-medium text-slate-700">Type:</span> <span className="capitalize">{req.type}</span>
                         </div>
-                        <div>
-                          <span className="font-medium text-slate-700">Duration:</span> {req.days} day{req.days > 1 ? 's' : ''}
-                        </div>
                         <div className="col-span-2">
                           <span className="font-medium text-slate-700">Period:</span> {new Date(req.startDate).toLocaleDateString()} to {new Date(req.endDate).toLocaleDateString()}
                         </div>
@@ -2246,10 +2346,10 @@ export default function AdminDashboard() {
                         <p className="text-sm font-medium text-slate-700 mb-1">Reason:</p>
                         <p className="text-sm text-slate-700">{req.reason}</p>
                       </div>
-                      {req.reviewRemarks && (
+                      {req.adminRemarks && (
                         <div className="mb-4 p-3 bg-blue-50 rounded border border-blue-200">
                           <p className="text-sm font-medium text-slate-700 mb-1">Admin Remarks:</p>
-                          <p className="text-sm text-slate-700">{req.reviewRemarks}</p>
+                          <p className="text-sm text-slate-700">{req.adminRemarks}</p>
                         </div>
                       )}
                       <div className="text-xs text-slate-500 mb-3">Submitted: {new Date(req.createdAt).toLocaleString()}</div>
@@ -2284,10 +2384,10 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* Pagination Controls */}
-                {leaveRequests.length > leaveRequestsPerPage && (
+                {filteredLeaveRequests.length > leaveRequestsPerPage && (
                   <div className="mt-6 flex items-center justify-between bg-white rounded-lg shadow-md p-4 border border-slate-100">
                     <div className="text-sm text-slate-600">
-                      Showing {((leaveCurrentPage - 1) * leaveRequestsPerPage) + 1} to {Math.min(leaveCurrentPage * leaveRequestsPerPage, leaveRequests.length)} of {leaveRequests.length} requests
+                      Showing {((leaveCurrentPage - 1) * leaveRequestsPerPage) + 1} to {Math.min(leaveCurrentPage * leaveRequestsPerPage, filteredLeaveRequests.length)} of {filteredLeaveRequests.length} requests
                     </div>
                     <div className="flex gap-2">
                       <button
@@ -2302,7 +2402,7 @@ export default function AdminDashboard() {
                         Previous
                       </button>
                       <div className="flex items-center gap-1">
-                        {Array.from({ length: Math.ceil(leaveRequests.length / leaveRequestsPerPage) }, (_, i) => i + 1).map(page => (
+                        {Array.from({ length: Math.ceil(filteredLeaveRequests.length / leaveRequestsPerPage) }, (_, i) => i + 1).map(page => (
                           <button
                             key={page}
                             onClick={() => setLeaveCurrentPage(page)}
@@ -2317,10 +2417,10 @@ export default function AdminDashboard() {
                         ))}
                       </div>
                       <button
-                        onClick={() => setLeaveCurrentPage(prev => Math.min(prev + 1, Math.ceil(leaveRequests.length / leaveRequestsPerPage)))}
-                        disabled={leaveCurrentPage === Math.ceil(leaveRequests.length / leaveRequestsPerPage)}
+                        onClick={() => setLeaveCurrentPage(prev => Math.min(prev + 1, Math.ceil(filteredLeaveRequests.length / leaveRequestsPerPage)))}
+                        disabled={leaveCurrentPage === Math.ceil(filteredLeaveRequests.length / leaveRequestsPerPage)}
                         className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                          leaveCurrentPage === Math.ceil(leaveRequests.length / leaveRequestsPerPage)
+                          leaveCurrentPage === Math.ceil(filteredLeaveRequests.length / leaveRequestsPerPage)
                             ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
                             : 'bg-purple-600 text-white hover:bg-purple-700'
                         }`}

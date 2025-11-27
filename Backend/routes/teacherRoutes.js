@@ -10,7 +10,9 @@ import {
   postAnnouncement,
   getAnnouncements,
   deleteAnnouncement,
-  getSubmissionsForAssignment
+  getSubmissionsForAssignment,
+  applyLeave,
+  getLeaveRequests
 } from '../controllers/teacherController.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
 import { uploadAssignmentFiles, uploadLibraryFiles } from '../config/multer.js';
@@ -39,5 +41,8 @@ router.get('/library', listMyLibraryResources);
 router.post('/library', uploadLibraryFiles.single('file'), createLibraryResource);
 // Timetable (teacher)
 router.get('/timetable', getTeacherTimetable);
+// Leave requests (teacher)
+router.post('/leave-requests', applyLeave);
+router.get('/leave-requests', getLeaveRequests);
 
 export default router;

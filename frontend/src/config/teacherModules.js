@@ -8,7 +8,8 @@ import {
   Bell, 
   Upload, 
   MessageSquare, 
-  Home 
+  Home,
+  CalendarClock
 } from 'lucide-react';
 
 export const TEACHER_MODULES = [
@@ -18,6 +19,7 @@ export const TEACHER_MODULES = [
   { id: 'grading', icon: BarChart3, title: 'Assignments', description: 'Grade submissions' },
   { id: 'students', icon: Users, title: 'Student Lists', description: 'View students' },
   { id: 'announcements', icon: Bell, title: 'Announcements', description: 'Post announcements' },
+  { id: 'leave', icon: CalendarClock, title: 'Apply Leave', description: 'Request time off' },
   { id: 'materials', icon: Upload, title: 'Study Materials', description: 'Upload resources' },
   { id: 'timetable', icon: Calendar, title: 'My Timetable', description: 'View schedule' },
   { id: 'messages', icon: MessageSquare, title: 'Messages', description: 'Communicate with students' },
