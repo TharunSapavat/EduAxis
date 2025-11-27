@@ -203,9 +203,8 @@ export default function TeacherDashboard() {
   // Handle view student list
   const handleViewStudentList = useCallback((course) => {
     setShowCourseManageModal(false);
-    fetchStudentsForCourse(course);
-    navigate('/teacher/students');
-  }, [fetchStudentsForCourse, navigate]);
+    navigate('/teacher/students', { state: { selectedCourse: course } });
+  }, [navigate]);
 
   // Render main content
   const renderMainContent = () => {
@@ -260,13 +259,7 @@ export default function TeacherDashboard() {
         );
 
       case '/teacher/students':
-        return <TeacherStudents 
-          students={students}
-          studentsLoading={studentsLoading}
-          courseForStudentView={courseForStudentView}
-          setCourseForStudentView={setCourseForStudentView}
-          setStudents={setStudents}
-        />;
+        return <TeacherStudents />;
 
       case '/teacher/timetable':
         return <TeacherTimetable />;
