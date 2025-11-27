@@ -11,10 +11,13 @@ import {
   getAnnouncements,
   deleteAnnouncement,
   applyLeave,
-  getLeaveApplications
+  getLeaveApplications,
+  uploadStudyMaterial,
+  getStudyMaterials,
+  deleteStudyMaterial
 } from '../controllers/teacherController.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
-import { uploadAssignmentFiles } from '../config/multer.js';
+import { uploadAssignmentFiles, uploadStudyMaterialFiles } from '../config/multer.js';
 
 const router = express.Router();
 
@@ -35,5 +38,8 @@ router.post('/announcements', postAnnouncement);
 router.delete('/announcements/:id', deleteAnnouncement);
 router.post('/leave', applyLeave);
 router.get('/leave', getLeaveApplications);
+router.post('/materials', uploadStudyMaterialFiles.single('file'), uploadStudyMaterial);
+router.get('/materials', getStudyMaterials);
+router.delete('/materials/:id', deleteStudyMaterial);
 
 export default router;

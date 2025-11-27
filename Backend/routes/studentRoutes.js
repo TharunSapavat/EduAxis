@@ -13,7 +13,8 @@ import {
   getFees,
   makePayment,
   downloadReceipt,
-  getLibraryResources
+  getLibraryResources,
+  getStudyMaterials
 } from '../controllers/studentController.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
 
@@ -54,5 +55,8 @@ router.get('/receipt/:paymentId', downloadReceipt);
 
 // Library
 router.get('/library', getLibraryResources);
+
+// Study Materials
+router.get('/materials', getStudyMaterials);
 
 export default router;

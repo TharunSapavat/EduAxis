@@ -1,4 +1,4 @@
-import { BookOpen, Users, Calendar, FileText, BarChart3, ClipboardList, Bell, Upload, MessageSquare, Home, X, Trash2, CalendarCheck } from 'lucide-react';
+import { BookOpen, Users, Calendar, FileText, BarChart3, ClipboardList, Bell, Upload, MessageSquare, Home, X, Trash2, CalendarCheck, FileDown, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useState, useEffect, useRef } from 'react';
 import { teacherAPI } from '../services/api';
@@ -21,7 +21,8 @@ export default function TeacherDashboard() {
   // Students List
   const [students, setStudents] = useState([]);
   const [studentsLoading, setStudentsLoading] = useState(false);
-  const [courseForStudentView, setCourseForStudentView] = useState(null);
+  const [selectedGrade, setSelectedGrade] = useState('');
+  const [studentSearchQuery, setStudentSearchQuery] = useState('');
 
   // Attendance state
   const [attendanceCourseId, setAttendanceCourseId] = useState('');
@@ -125,28 +126,23 @@ export default function TeacherDashboard() {
     setShowCourseManageModal(true);
   };
 
-  // Fetch students for a course
-  const fetchStudentsForCourse = async (course) => {
+  // Handle view student list (from course modal)
+  const handleViewStudentList = async (course) => {
+    setShowCourseManageModal(false);
+    setActiveModule('students');
+    setSelectedGrade(course.grade.toString());
+    
+    // Load students for the selected grade
+    setStudentsLoading(true);
     try {
-      setStudentsLoading(true);
-      const response = await teacherAPI.getStudents({ courseId: course._id });
-      if (response.data.success) {
-        setStudents(response.data.students || []);
-        setCourseForStudentView(course);
-      }
-    } catch (error) {
-      console.error('Error fetching students:', error);
+      const res = await teacherAPI.getStudents({ grade: course.grade });
+      setStudents(res.data.students || []);
+    } catch (err) {
+      console.error('Failed to load students by grade', err);
       setStudents([]);
     } finally {
       setStudentsLoading(false);
     }
-  };
-
-  // Handle view student list
-  const handleViewStudentList = (course) => {
-    setShowCourseManageModal(false);
-    fetchStudentsForCourse(course);
-    setActiveModule('students');
   };
 
   // Render main content
@@ -375,49 +371,99 @@ export default function TeacherDashboard() {
         );
 
       case 'students':
+        const handleGradeChange = async (grade) => {
+          setSelectedGrade(grade);
+          setStudentSearchQuery('');
+          if (!grade) {
+            setStudents([]);
+            return;
+          }
+
+          setStudentsLoading(true);
+          try {
+            const res = await teacherAPI.getStudents({ grade });
+            setStudents(res.data.students || []);
+          } catch (err) {
+            console.error('Failed to load students by grade', err);
+            setStudents([]);
+          } finally {
+            setStudentsLoading(false);
+          }
+        };
+
+        const filteredStudents = students.filter(student => {
+          if (!studentSearchQuery.trim()) return true;
+          const query = studentSearchQuery.toLowerCase();
+          return (
+            student.name?.toLowerCase().includes(query) ||
+            student.email?.toLowerCase().includes(query) ||
+            student.studentId?.toLowerCase().includes(query)
+          );
+        });
+
         return (
           <div>
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h1 className="text-3xl font-bold text-slate-900">Student List</h1>
-                {courseForStudentView && (
-                  <p className="text-slate-600 mt-1">
-                    {courseForStudentView.name} • Grade {courseForStudentView.grade} • {courseForStudentView.code}
-                  </p>
+            <div className="mb-6">
+              <h1 className="text-3xl font-bold text-slate-900 mb-4">Student List</h1>
+              
+              {/* Grade Filter and Search Bar */}
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Select Grade
+                  </label>
+                  <select
+                    value={selectedGrade}
+                    onChange={(e) => handleGradeChange(e.target.value)}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-slate-900"
+                  >
+                    <option value="">-- Select a Grade --</option>
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(grade => (
+                      <option key={grade} value={grade}>
+                        Grade {grade}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                {selectedGrade && (
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Search Students
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Search by name, email, or student ID..."
+                      value={studentSearchQuery}
+                      onChange={(e) => setStudentSearchQuery(e.target.value)}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-slate-900"
+                    />
+                  </div>
                 )}
               </div>
-              {courseForStudentView && (
-                <button
-                  onClick={() => {
-                    setCourseForStudentView(null);
-                    setStudents([]);
-                  }}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors text-sm font-medium"
-                >
-                  Clear Filter
-                </button>
-              )}
             </div>
 
             {studentsLoading ? (
               <div className="p-6 bg-white rounded-xl shadow-md border border-slate-100 text-slate-600">
                 Loading students...
               </div>
-            ) : students.length === 0 ? (
+            ) : !selectedGrade ? (
+              <div className="bg-white rounded-xl shadow-md p-12 text-center border border-slate-100">
+                <Users className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-slate-900 mb-2">Select a Grade</h3>
+                <p className="text-slate-600">
+                  Please select a grade from the dropdown above to view students.
+                </p>
+              </div>
+            ) : filteredStudents.length === 0 ? (
               <div className="bg-white rounded-xl shadow-md p-12 text-center border border-slate-100">
                 <Users className="w-16 h-16 text-slate-300 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-slate-900 mb-2">No Students Found</h3>
-                <p className="text-slate-600 mb-6">
-                  {courseForStudentView 
-                    ? `No students are enrolled in ${courseForStudentView.name} (Grade ${courseForStudentView.grade}).`
-                    : 'Select a course from "My Courses" to view enrolled students.'}
+                <p className="text-slate-600">
+                  {studentSearchQuery 
+                    ? `No students match your search "${studentSearchQuery}" in Grade ${selectedGrade}.`
+                    : `No students found in Grade ${selectedGrade}.`}
                 </p>
-                <button
-                  onClick={() => setActiveModule('courses')}
-                  className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium"
-                >
-                  View My Courses
-                </button>
               </div>
             ) : (
               <div className="bg-white rounded-xl shadow-md border border-slate-100 overflow-hidden">
@@ -428,8 +474,15 @@ export default function TeacherDashboard() {
                       <Users className="w-6 h-6" />
                     </div>
                     <div>
-                      <p className="text-green-100 text-sm">Total Enrolled Students</p>
-                      <p className="text-3xl font-bold">{students.length}</p>
+                      <p className="text-green-100 text-sm">
+                        {studentSearchQuery ? 'Filtered Students' : `Grade ${selectedGrade} Students`}
+                      </p>
+                      <p className="text-3xl font-bold">{filteredStudents.length}</p>
+                      {studentSearchQuery && students.length > filteredStudents.length && (
+                        <p className="text-green-100 text-xs mt-1">
+                          of {students.length} total
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -457,7 +510,7 @@ export default function TeacherDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200">
-                      {students.map((student, index) => (
+                      {filteredStudents.map((student, index) => (
                         <tr key={student._id} className="hover:bg-slate-50 transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
                             {index + 1}
@@ -496,7 +549,8 @@ export default function TeacherDashboard() {
                 {/* Footer */}
                 <div className="bg-slate-50 px-6 py-4 border-t border-slate-200">
                   <p className="text-sm text-slate-600">
-                    Showing {students.length} student{students.length !== 1 ? 's' : ''} enrolled in this course
+                    Showing {filteredStudents.length} student{filteredStudents.length !== 1 ? 's' : ''} 
+                    {studentSearchQuery && ` matching "${studentSearchQuery}"`}
                   </p>
                 </div>
               </div>
@@ -539,6 +593,362 @@ export default function TeacherDashboard() {
               <div className="bg-white rounded-xl shadow-md p-6 border border-slate-100">
                 <h2 className="text-xl font-semibold text-slate-900 mb-4">My Leave Applications</h2>
                 <TeacherLeaveList />
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'materials':
+        const UploadMaterialForm = () => {
+          const [formData, setFormData] = useState({
+            title: '',
+            description: '',
+            grade: '',
+            subject: '',
+            file: null
+          });
+          const [uploading, setUploading] = useState(false);
+          const [uploadSuccess, setUploadSuccess] = useState(false);
+          const fileInputRef = useRef(null);
+
+          // Get courses for selected grade taught by this teacher
+          const availableCourses = teacherCourses.filter(course => 
+            formData.grade ? course.grade === parseInt(formData.grade) : true
+          );
+
+          const handleGradeChange = (grade) => {
+            setFormData({ 
+              ...formData, 
+              grade, 
+              subject: '' // Reset subject when grade changes
+            });
+          };
+
+          const handleSubmit = async (e) => {
+            e.preventDefault();
+            
+            if (!formData.file) {
+              alert('Please select a file to upload');
+              return;
+            }
+
+            setUploading(true);
+            setUploadSuccess(false);
+
+            try {
+              const uploadData = new FormData();
+              uploadData.append('title', formData.title);
+              uploadData.append('description', formData.description);
+              uploadData.append('grade', formData.grade);
+              uploadData.append('subject', formData.subject);
+              uploadData.append('file', formData.file);
+
+              await teacherAPI.uploadStudyMaterial(uploadData);
+              
+              setUploadSuccess(true);
+              setFormData({
+                title: '',
+                description: '',
+                grade: '',
+                subject: '',
+                file: null
+              });
+              if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+              }
+              
+              // Reload materials list
+              loadMaterials();
+              
+              setTimeout(() => setUploadSuccess(false), 3000);
+            } catch (err) {
+              console.error('Upload failed:', err);
+              alert(err.response?.data?.message || 'Failed to upload material');
+            } finally {
+              setUploading(false);
+            }
+          };
+
+          return (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Title <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  required
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  placeholder="e.g., Chapter 5 Notes"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  rows="3"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  placeholder="Brief description of the material..."
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Grade <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.grade}
+                    onChange={(e) => handleGradeChange(e.target.value)}
+                    required
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  >
+                    <option value="">Select Grade</option>
+                    {[...new Set(teacherCourses.map(c => c.grade))].sort((a, b) => a - b).map(g => (
+                      <option key={g} value={g}>Grade {g}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Subject/Course <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.subject}
+                    onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                    required
+                    disabled={!formData.grade}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
+                  >
+                    <option value="">
+                      {!formData.grade ? 'Select grade first' : 'Select Course'}
+                    </option>
+                    {availableCourses.map(course => (
+                      <option key={course._id} value={course.name}>
+                        {course.name} ({course.code})
+                      </option>
+                    ))}
+                  </select>
+                  {formData.grade && availableCourses.length === 0 && (
+                    <p className="text-xs text-amber-600 mt-1">
+                      You don't teach any courses in Grade {formData.grade}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  File <span className="text-red-500">*</span>
+                </label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  onChange={(e) => setFormData({ ...formData, file: e.target.files[0] })}
+                  required
+                  accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.zip,.jpg,.jpeg,.png,.gif"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  Max file size: 50MB. Allowed: PDF, Word, PowerPoint, Excel, Images, Text, ZIP
+                </p>
+                {formData.file && (
+                  <p className="text-sm text-green-600 mt-2">
+                    Selected: {formData.file.name} ({(formData.file.size / 1024 / 1024).toFixed(2)} MB)
+                  </p>
+                )}
+              </div>
+
+              {uploadSuccess && (
+                <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
+                  ✓ Material uploaded successfully!
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={uploading}
+                className={`w-full py-3 rounded-lg font-medium transition-colors ${
+                  uploading
+                    ? 'bg-slate-300 cursor-not-allowed'
+                    : 'bg-green-600 hover:bg-green-700 text-white'
+                }`}
+              >
+                {uploading ? 'Uploading...' : 'Upload Material'}
+              </button>
+            </form>
+          );
+        };
+
+        const MaterialsList = () => {
+          const [materials, setMaterials] = useState([]);
+          const [loading, setLoading] = useState(false);
+          const [filterGrade, setFilterGrade] = useState('');
+          const [searchQuery, setSearchQuery] = useState('');
+
+          const loadMaterials = async () => {
+            setLoading(true);
+            try {
+              const params = {};
+              if (filterGrade) params.grade = filterGrade;
+              
+              const res = await teacherAPI.getStudyMaterials(params);
+              setMaterials(res.data.materials || []);
+            } catch (err) {
+              console.error('Failed to load materials:', err);
+            } finally {
+              setLoading(false);
+            }
+          };
+
+          useEffect(() => {
+            loadMaterials();
+          }, [filterGrade]);
+
+          // Make loadMaterials available to parent
+          window.loadMaterials = loadMaterials;
+
+          const handleDelete = async (id) => {
+            if (!confirm('Are you sure you want to delete this material?')) return;
+
+            try {
+              await teacherAPI.deleteStudyMaterial(id);
+              loadMaterials();
+            } catch (err) {
+              console.error('Failed to delete material:', err);
+              alert('Failed to delete material');
+            }
+          };
+
+          const formatFileSize = (bytes) => {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+            return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+          };
+
+          const formatDate = (date) => {
+            return new Date(date).toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric'
+            });
+          };
+
+          const filteredMaterials = materials.filter(material => {
+            if (!searchQuery.trim()) return true;
+            const query = searchQuery.toLowerCase();
+            return (
+              material.title?.toLowerCase().includes(query) ||
+              material.subject?.toLowerCase().includes(query) ||
+              material.description?.toLowerCase().includes(query)
+            );
+          });
+
+          return (
+            <div>
+              {/* Filters */}
+              <div className="mb-4 flex gap-4">
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    placeholder="Search by title, subject, or description..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  />
+                </div>
+                <div>
+                  <select
+                    value={filterGrade}
+                    onChange={(e) => setFilterGrade(e.target.value)}
+                    className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  >
+                    <option value="">All Grades</option>
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(g => (
+                      <option key={g} value={g}>Grade {g}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {loading ? (
+                <div className="text-slate-600 text-center py-8">Loading materials...</div>
+              ) : filteredMaterials.length === 0 ? (
+                <div className="text-center py-12 text-slate-500">
+                  <Upload className="w-12 h-12 mx-auto mb-3 text-slate-300" />
+                  <p>No study materials found</p>
+                  {searchQuery && <p className="text-sm mt-1">Try adjusting your search</p>}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredMaterials.map(material => (
+                    <div key={material._id} className="border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-slate-900">{material.title}</h3>
+                          {material.description && (
+                            <p className="text-sm text-slate-600 mt-1">{material.description}</p>
+                          )}
+                          <div className="flex gap-4 mt-2 text-xs text-slate-500">
+                            <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                              Grade {material.grade}
+                            </span>
+                            <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded">
+                              {material.subject}
+                            </span>
+                            <span>{material.fileName}</span>
+                            <span>{formatFileSize(material.fileSize)}</span>
+                            <span>{formatDate(material.uploadDate)}</span>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 ml-4">
+                          <a
+                            href={`http://localhost:5000${material.fileUrl}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                            title="Download"
+                          >
+                            <FileDown className="w-5 h-5" />
+                          </a>
+                          <button
+                            onClick={() => handleDelete(material._id)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        };
+
+        return (
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 mb-6">Study Materials</h1>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Upload Form */}
+              <div className="bg-white rounded-xl shadow-md p-6 border border-slate-100">
+                <h2 className="text-xl font-semibold text-slate-900 mb-4">Upload New Material</h2>
+                <UploadMaterialForm />
+              </div>
+
+              {/* Materials List */}
+              <div className="bg-white rounded-xl shadow-md p-6 border border-slate-100">
+                <h2 className="text-xl font-semibold text-slate-900 mb-4">My Uploaded Materials</h2>
+                <MaterialsList />
               </div>
             </div>
           </div>

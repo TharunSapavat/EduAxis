@@ -88,6 +88,7 @@ export const studentAPI = {
   makePayment: (paymentData) => api.post('/student/payment', paymentData),
   downloadReceipt: (paymentId) => api.get(`/student/receipt/${paymentId}`),
   getLibrary: () => api.get('/student/library'),
+  getStudyMaterials: (params) => api.get('/student/materials', { params }),
 };
 
 // Teacher APIs
@@ -110,6 +111,13 @@ export const teacherAPI = {
   deleteAnnouncement: (id) => api.delete(`/teacher/announcements/${id}`),
   applyLeave: (data) => api.post('/teacher/leave', data),
   getLeaveApplications: () => api.get('/teacher/leave'),
+  uploadStudyMaterial: (formData) => {
+    return api.post('/teacher/materials', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  getStudyMaterials: (params) => api.get('/teacher/materials', { params }),
+  deleteStudyMaterial: (id) => api.delete(`/teacher/materials/${id}`),
 };
 
 // Admin APIs

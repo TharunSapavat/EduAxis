@@ -1,4 +1,4 @@
-import { BookOpen, Users, Calendar, FileText, BarChart3, ClipboardList, Bell, Library, DollarSign, Home, X, RefreshCw } from 'lucide-react';
+import { BookOpen, Users, Calendar, FileText, BarChart3, ClipboardList, Bell, Library, DollarSign, Home, X, RefreshCw, Upload, FileDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { studentAPI } from '../services/api';
 import { useState, useEffect, useRef } from 'react';
@@ -36,6 +36,12 @@ export default function StudentDashboard() {
   const [libraryLoading, setLibraryLoading] = useState(false);
   const socketRef = useRef(null);
   const [socketConnected, setSocketConnected] = useState(false);
+
+  // Study Materials States
+  const [materials, setMaterials] = useState([]);
+  const [materialsLoading, setMaterialsLoading] = useState(false);
+  const [filterSubject, setFilterSubject] = useState('');
+  const [materialSearchQuery, setMaterialSearchQuery] = useState('');
 
   // Course Details Modal States
   const [showCourseModal, setShowCourseModal] = useState(false);
@@ -129,6 +135,9 @@ export default function StudentDashboard() {
       case 'announcements':
         fetchAnnouncements();
         break;
+      case 'materials':
+        fetchMaterials();
+        break;
       case 'library':
         fetchLibrary();
         break;
@@ -189,6 +198,13 @@ export default function StudentDashboard() {
       socket.off('announcementCreated', handler);
     };
   }, [activeModule, user]);
+
+  // Reload materials when filterSubject changes
+  useEffect(() => {
+    if (activeModule === 'materials') {
+      fetchMaterials();
+    }
+  }, [filterSubject]);
 
   const fetchFeeData = async () => {
     try {
@@ -456,6 +472,27 @@ export default function StudentDashboard() {
     }
   };
 
+  const fetchMaterials = async () => {
+    try {
+      setMaterialsLoading(true);
+      const params = {};
+      if (filterSubject) params.subject = filterSubject;
+      
+      const response = await studentAPI.getStudyMaterials(params);
+      console.log('Materials response:', response.data);
+      if (response.data.success) {
+        setMaterials(response.data.materials || []);
+      } else {
+        setMaterials([]);
+      }
+    } catch (error) {
+      console.error('Error fetching materials:', error);
+      setMaterials([]);
+    } finally {
+      setMaterialsLoading(false);
+    }
+  };
+
   const modules = [
     { id: 'home', icon: Home, title: 'Dashboard', description: 'Overview and statistics' },
     { id: 'courses', icon: BookOpen, title: 'My Courses', description: 'View enrolled courses' },
@@ -464,6 +501,7 @@ export default function StudentDashboard() {
     { id: 'assignments', icon: FileText, title: 'Assignments', description: 'Submit and track assignments' },
     { id: 'timetable', icon: Calendar, title: 'Timetable', description: 'View class schedule' },
     { id: 'announcements', icon: Bell, title: 'Announcements', description: 'Stay updated' },
+    { id: 'materials', icon: Upload, title: 'Study Materials', description: 'Access learning resources' },
     { id: 'library', icon: Library, title: 'Library', description: 'Access resources' },
     { id: 'fees', icon: DollarSign, title: 'Fees', description: 'View and pay fees' },
   ];
@@ -1367,6 +1405,145 @@ export default function StudentDashboard() {
                     <p className="text-slate-700 whitespace-pre-wrap">{announcement.content}</p>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        );
+
+      case 'materials':
+        const formatFileSize = (bytes) => {
+          if (bytes < 1024) return bytes + ' B';
+          if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+          return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+        };
+
+        const formatDate = (date) => {
+          return new Date(date).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+          });
+        };
+
+        const filteredMaterials = materials.filter(material => {
+          if (!materialSearchQuery.trim()) return true;
+          const query = materialSearchQuery.toLowerCase();
+          return (
+            material.title?.toLowerCase().includes(query) ||
+            material.subject?.toLowerCase().includes(query) ||
+            material.description?.toLowerCase().includes(query) ||
+            material.uploadedBy?.name?.toLowerCase().includes(query)
+          );
+        });
+
+        // Get unique subjects
+        const subjects = [...new Set(materials.map(m => m.subject))];
+
+        return (
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 mb-6">Study Materials</h1>
+            
+            {/* Filters */}
+            <div className="bg-white rounded-xl shadow-md p-4 mb-6 border border-slate-100">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    placeholder="Search by title, subject, teacher, or description..."
+                    value={materialSearchQuery}
+                    onChange={(e) => setMaterialSearchQuery(e.target.value)}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <select
+                    value={filterSubject}
+                    onChange={(e) => setFilterSubject(e.target.value)}
+                    className="w-full sm:w-auto px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">All Subjects</option>
+                    {subjects.map(subject => (
+                      <option key={subject} value={subject}>{subject}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Materials List */}
+            {materialsLoading ? (
+              <div className="text-center py-12">
+                <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                <p className="text-slate-600 mt-4">Loading materials...</p>
+              </div>
+            ) : filteredMaterials.length === 0 ? (
+              <div className="bg-white rounded-xl shadow-md p-12 text-center border border-slate-100">
+                <Upload className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-slate-900 mb-2">No Study Materials Found</h3>
+                <p className="text-slate-600">
+                  {materialSearchQuery 
+                    ? `No materials match your search "${materialSearchQuery}"`
+                    : materials.length === 0
+                    ? `No study materials have been uploaded for Grade ${user?.grade || 'your grade'} yet.`
+                    : 'Try adjusting your filters'}
+                </p>
+              </div>
+            ) : (
+              <div>
+                <div className="bg-white rounded-xl shadow-md p-4 mb-4 border border-slate-100">
+                  <p className="text-sm text-slate-600">
+                    Showing {filteredMaterials.length} material{filteredMaterials.length !== 1 ? 's' : ''}
+                    {filterSubject && ` in ${filterSubject}`}
+                    {materialSearchQuery && ` matching "${materialSearchQuery}"`}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4">
+                  {filteredMaterials.map(material => (
+                    <div key={material._id} className="bg-white rounded-xl shadow-md border border-slate-100 overflow-hidden hover:shadow-lg transition-shadow">
+                      <div className="p-6">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h3 className="text-xl font-semibold text-slate-900 mb-2">
+                              {material.title}
+                            </h3>
+                            {material.description && (
+                              <p className="text-slate-600 mb-3">{material.description}</p>
+                            )}
+                            <div className="flex flex-wrap gap-2 mb-3">
+                              <span className="px-3 py-1 bg-blue-100 text-blue-700 text-sm font-medium rounded-full">
+                                {material.subject}
+                              </span>
+                              <span className="px-3 py-1 bg-purple-100 text-purple-700 text-sm font-medium rounded-full">
+                                Grade {material.grade}
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap gap-4 text-sm text-slate-500">
+                              <span className="flex items-center gap-1">
+                                <Users className="w-4 h-4" />
+                                {material.uploadedBy?.name || 'Teacher'}
+                              </span>
+                              <span>📄 {material.fileName}</span>
+                              <span>📦 {formatFileSize(material.fileSize)}</span>
+                              <span>📅 {formatDate(material.uploadDate)}</span>
+                            </div>
+                          </div>
+                          <div className="ml-4">
+                            <a
+                              href={`http://localhost:5000${material.fileUrl}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
+                            >
+                              <FileDown className="w-5 h-5" />
+                              Download
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>

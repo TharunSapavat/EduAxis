@@ -6,6 +6,7 @@ import Attendance from '../models/Attendance.js';
 import Course from '../models/Course.js';
 import Announcement from '../models/Announcement.js';
 import Leave from '../models/Leave.js';
+import StudyMaterial from '../models/StudyMaterial.js';
 
 // Get teacher dashboard data
 export const getDashboard = async (req, res) => {
@@ -572,6 +573,126 @@ export const getLeaveApplications = async (req, res) => {
       success: false, 
       message: 'Server error', 
       error: error.message 
+    });
+  }
+};
+
+// Upload study material
+export const uploadStudyMaterial = async (req, res) => {
+  try {
+    const teacherId = req.user?.id;
+    const { title, description, grade, subject } = req.body;
+    
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No file uploaded'
+      });
+    }
+    
+    // Validate required fields
+    if (!title || !grade || !subject) {
+      return res.status(400).json({
+        success: false,
+        message: 'Title, grade, and subject are required'
+      });
+    }
+    
+    // Create study material document
+    const studyMaterial = new StudyMaterial({
+      title,
+      description: description || '',
+      grade: Number(grade),
+      subject,
+      fileUrl: `/uploads/study-materials/${req.file.filename}`,
+      fileName: req.file.originalname,
+      fileSize: req.file.size,
+      fileType: req.file.mimetype,
+      uploadedBy: teacherId
+    });
+    
+    await studyMaterial.save();
+    
+    res.status(201).json({
+      success: true,
+      message: 'Study material uploaded successfully',
+      material: studyMaterial
+    });
+  } catch (error) {
+    console.error('Upload study material error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to upload study material',
+      error: error.message
+    });
+  }
+};
+
+// Get study materials (for teachers - can see all their uploads)
+export const getStudyMaterials = async (req, res) => {
+  try {
+    const teacherId = req.user?.id;
+    const { grade, subject } = req.query;
+    
+    // Build query
+    let query = { uploadedBy: teacherId };
+    
+    if (grade) {
+      query.grade = Number(grade);
+    }
+    
+    if (subject) {
+      query.subject = subject;
+    }
+    
+    const materials = await StudyMaterial.find(query)
+      .populate('uploadedBy', 'name email')
+      .sort({ uploadDate: -1 });
+    
+    res.json({
+      success: true,
+      materials
+    });
+  } catch (error) {
+    console.error('Get study materials error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch study materials',
+      error: error.message
+    });
+  }
+};
+
+// Delete study material
+export const deleteStudyMaterial = async (req, res) => {
+  try {
+    const teacherId = req.user?.id;
+    const { id } = req.params;
+    
+    const material = await StudyMaterial.findOne({
+      _id: id,
+      uploadedBy: teacherId
+    });
+    
+    if (!material) {
+      return res.status(404).json({
+        success: false,
+        message: 'Study material not found or you do not have permission to delete it'
+      });
+    }
+    
+    await StudyMaterial.deleteOne({ _id: id });
+    
+    res.json({
+      success: true,
+      message: 'Study material deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete study material error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete study material',
+      error: error.message
     });
   }
 };

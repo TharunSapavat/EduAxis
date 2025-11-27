@@ -7,6 +7,7 @@ import Fee from '../models/Fee.js';
 import Payment from '../models/Payment.js';
 import Submission from '../models/Submission.js';
 import Timetable from '../models/Timetable.js';
+import StudyMaterial from '../models/StudyMaterial.js';
 
 // Get student dashboard data
 export const getDashboard = async (req, res) => {
@@ -755,6 +756,47 @@ export const getLibraryResources = async (req, res) => {
       success: false, 
       message: 'Server error', 
       error: error.message 
+    });
+  }
+};
+
+// Get study materials for student (by their grade)
+export const getStudyMaterials = async (req, res) => {
+  try {
+    const studentId = req.user?.id;
+    const { subject } = req.query;
+    
+    // Find student to get their grade
+    const student = await User.findById(studentId);
+    
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: 'Student not found'
+      });
+    }
+    
+    // Build query - filter by student's grade
+    let query = { grade: student.grade };
+    
+    if (subject) {
+      query.subject = subject;
+    }
+    
+    const materials = await StudyMaterial.find(query)
+      .populate('uploadedBy', 'name email')
+      .sort({ uploadDate: -1 });
+    
+    res.json({
+      success: true,
+      materials
+    });
+  } catch (error) {
+    console.error('Get study materials error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch study materials',
+      error: error.message
     });
   }
 };
