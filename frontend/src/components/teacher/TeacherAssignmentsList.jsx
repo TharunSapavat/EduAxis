@@ -17,6 +17,13 @@ export default function TeacherAssignmentsList() {
   const socket = useSocket();
   const { user } = useAuth();
 
+  const clearFilters = () => {
+    setFilters({ grade: '', courseId: '' });
+    setCurrentPage(1);
+  };
+
+  const hasActiveFilters = filters.grade !== '' || filters.courseId !== '';
+
   const load = async () => {
     try {
       setLoading(true);
@@ -103,9 +110,20 @@ export default function TeacherAssignmentsList() {
     <div>
       {/* Filters */}
       <div className="mb-4 p-4 bg-white rounded-lg border border-slate-200">
-        <div className="flex items-center gap-2 mb-3">
-          <Filter className="w-5 h-5 text-slate-600" />
-          <h3 className="font-semibold text-slate-900">Filter Assignments</h3>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Filter className="w-5 h-5 text-slate-600" />
+            <h3 className="font-semibold text-slate-900">Filter Assignments</h3>
+          </div>
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+            >
+              <X className="w-3 h-3" />
+              Clear Filters
+            </button>
+          )}
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
