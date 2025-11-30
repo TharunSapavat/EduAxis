@@ -8,6 +8,7 @@ import Payment from '../models/Payment.js';
 import Submission from '../models/Submission.js';
 import Timetable from '../models/Timetable.js';
 import LeaveRequest from '../models/LeaveRequest.js';
+import StudyMaterial from '../models/StudyMaterial.js';
 
 // Get student dashboard data
 export const getDashboard = async (req, res) => {
@@ -877,5 +878,41 @@ export const getTeachers = async (req, res) => {
   } catch (error) {
     console.error('Get teachers error:', error);
     return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// Get study materials for student's grade
+export const getStudyMaterials = async (req, res) => {
+  try {
+    const student = await User.findById(req.user.id);
+    
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    // Find all courses for the student's grade
+    const courses = await Course.find({ grade: student.grade });
+    const courseIds = courses.map(c => c._id);
+
+    // Get materials for those courses
+    const materials = await StudyMaterial.find({ 
+      grade: student.grade,
+      courseId: { $in: courseIds }
+    })
+      .populate('uploadedBy', 'name email')
+      .populate('courseId', 'name code')
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      materials
+    });
+  } catch (error) {
+    console.error('Get study materials error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
+    });
   }
 };

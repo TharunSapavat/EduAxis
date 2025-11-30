@@ -117,3 +117,24 @@ export const uploadTimetableFiles = multer({
     fileSize: 10 * 1024 * 1024
   }
 });
+
+// Storage for study materials
+const studyMaterialStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, path.join(__dirname, '../uploads/study-materials'));
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    const nameWithoutExt = path.basename(file.originalname, ext);
+    cb(null, nameWithoutExt + '-' + uniqueSuffix + ext);
+  }
+});
+
+export const uploadStudyMaterialFiles = multer({
+  storage: studyMaterialStorage,
+  fileFilter,
+  limits: {
+    fileSize: 50 * 1024 * 1024 // 50MB limit for study materials
+  }
+});

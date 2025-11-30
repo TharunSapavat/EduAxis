@@ -2,14 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { teacherAPI } from '../../services/api';
 import { useSocket } from '../../context/SocketContext';
 import { useAuth } from '../../context/AuthContext';
-import { FileText, ListChecks, X } from 'lucide-react';
+import { FileText, ListChecks, X, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 
 export default function TeacherAssignmentsList() {
   const [items, setItems] = useState([]);
+  const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [submissions, setSubmissions] = useState([]);
   const [selectedAssignment, setSelectedAssignment] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [filters, setFilters] = useState({ grade: '', courseId: '' });
+  const itemsPerPage = 5;
   const socket = useSocket();
   const { user } = useAuth();
 
@@ -26,8 +30,20 @@ export default function TeacherAssignmentsList() {
     }
   };
 
+  const fetchCourses = async () => {
+    try {
+      const response = await teacherAPI.getCourses();
+      if (response.data.courses) {
+        setCourses(response.data.courses);
+      }
+    } catch (error) {
+      console.error('Error fetching courses:', error);
+    }
+  };
+
   useEffect(() => {
     load();
+    fetchCourses();
     // Remove the old window event listener
     // const handler = () => load();
     // window.addEventListener('assignment-created', handler);
@@ -57,9 +73,87 @@ export default function TeacherAssignmentsList() {
   if (loading) return <div className="text-slate-600">Loading assignments…</div>;
   if (!items.length) return <div className="text-slate-600">No assignments yet.</div>;
 
+  // Get courses filtered by selected grade
+  const coursesForGrade = filters.grade
+    ? courses.filter(c => c.grade.toString() === filters.grade)
+    : [];
+
+  // Filter assignments
+  const filteredItems = items.filter(assignment => {
+    if (filters.grade && assignment.grade?.toString() !== filters.grade) {
+      return false;
+    }
+    if (filters.courseId && assignment.courseId?._id !== filters.courseId) {
+      return false;
+    }
+    return true;
+  });
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentItems = filteredItems.slice(startIndex, endIndex);
+
+  const goToPage = (page) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  };
+
   return (
-    <div className="space-y-3">
-      {items.map((a) => (
+    <div>
+      {/* Filters */}
+      <div className="mb-4 p-4 bg-white rounded-lg border border-slate-200">
+        <div className="flex items-center gap-2 mb-3">
+          <Filter className="w-5 h-5 text-slate-600" />
+          <h3 className="font-semibold text-slate-900">Filter Assignments</h3>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Grade</label>
+            <select
+              value={filters.grade}
+              onChange={(e) => {
+                setFilters({ ...filters, grade: e.target.value, courseId: '' });
+                setCurrentPage(1);
+              }}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            >
+              <option value="">All Grades</option>
+              {[...new Set(items.map(a => a.grade).filter(Boolean))].sort((a, b) => a - b).map(g => (
+                <option key={g} value={g}>Grade {g}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Course</label>
+            <select
+              value={filters.courseId}
+              onChange={(e) => {
+                setFilters({ ...filters, courseId: e.target.value });
+                setCurrentPage(1);
+              }}
+              disabled={!filters.grade}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-slate-100"
+            >
+              <option value="">All Courses</option>
+              {coursesForGrade.map(course => (
+                <option key={course._id} value={course._id}>
+                  {course.name} ({course.code})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {filteredItems.length === 0 ? (
+        <div className="text-center py-12 text-slate-600">
+          No assignments match your filters
+        </div>
+      ) : (
+        <>
+      <div className="space-y-3">
+        {currentItems.map((a) => (
         <div key={a._id} className="p-4 border border-slate-200 rounded-lg">
           <div className="flex items-start justify-between">
             <div>
@@ -110,6 +204,72 @@ export default function TeacherAssignmentsList() {
           </div>
         </div>
       ))}
+      </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="mt-6 flex items-center justify-between border-t border-slate-200 pt-4">
+          <div className="text-sm text-slate-600">
+            Showing {startIndex + 1}-{Math.min(endIndex, filteredItems.length)} of {filteredItems.length} assignments
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => goToPage(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="p-2 rounded-lg border border-slate-300 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title="Previous page"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            
+            <div className="flex items-center gap-1">
+              {[...Array(totalPages)].map((_, i) => {
+                const page = i + 1;
+                // Show first, last, current, and pages around current
+                if (
+                  page === 1 ||
+                  page === totalPages ||
+                  (page >= currentPage - 1 && page <= currentPage + 1)
+                ) {
+                  return (
+                    <button
+                      key={page}
+                      onClick={() => goToPage(page)}
+                      className={`min-w-8 px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                        currentPage === page
+                          ? 'bg-indigo-600 text-white'
+                          : 'border border-slate-300 hover:bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  );
+                }
+                // Show ellipsis
+                if (page === currentPage - 2 || page === currentPage + 2) {
+                  return (
+                    <span key={page} className="px-2 text-slate-400">
+                      ...
+                    </span>
+                  );
+                }
+                return null;
+              })}
+            </div>
+
+            <button
+              onClick={() => goToPage(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="p-2 rounded-lg border border-slate-300 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title="Next page"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+        </>
+      )}
 
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowModal(false)}>
@@ -173,7 +333,7 @@ export default function TeacherAssignmentsList() {
                                   return (
                                     <li key={i} className="flex items-center gap-2">
                                       {fileUrl ? (
-                                        <a href={fileUrl} target="_blank" rel="noreferrer" download className="text-blue-600 hover:underline inline-flex items-center gap-2 p-2 hover:bg-blue-50 rounded flex-grow">
+                                        <a href={fileUrl} target="_blank" rel="noreferrer" download className="text-blue-600 hover:underline inline-flex items-center gap-2 p-2 hover:bg-blue-50 rounded grow">
                                           <FileText className="w-4 h-4" />
                                           <span className="font-medium">{fileName}</span>
                                           <span className="text-xs text-slate-500">{fileSize}</span>
@@ -215,7 +375,7 @@ export default function TeacherAssignmentsList() {
                         <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded">
                           <p className="text-sm font-medium text-slate-700 mb-2">Grade this submission:</p>
                           <div className="flex gap-2 items-start">
-                            <div className="flex-shrink-0">
+                            <div className="shrink-0">
                               <label className="block text-xs text-slate-600 mb-1">Marks</label>
                               <input
                                 type="number"
@@ -226,7 +386,7 @@ export default function TeacherAssignmentsList() {
                                 className="w-20 px-2 py-1 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
                               />
                             </div>
-                            <div className="flex-grow">
+                            <div className="grow">
                               <label className="block text-xs text-slate-600 mb-1">Feedback (optional)</label>
                               <textarea
                                 id={`feedback-${s._id}`}

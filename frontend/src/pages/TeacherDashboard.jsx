@@ -22,6 +22,8 @@ import TeacherAssignmentsList from '../components/teacher/TeacherAssignmentsList
 import CreateAnnouncementForm from '../components/teacher/TeacherCreateAnnouncementForm';
 import TeacherAnnouncementsList from '../components/teacher/TeacherAnnouncementsList';
 import TeacherTimetable from '../components/teacher/TeacherTimetable';
+import TeacherLeave from '../components/teacher/TeacherLeave';
+import TeacherMaterials from '../components/teacher/TeacherMaterials';
 
 // Config
 import { TEACHER_MODULES } from '../config/teacherModules';
@@ -202,9 +204,8 @@ export default function TeacherDashboard() {
   // Handle view student list
   const handleViewStudentList = useCallback((course) => {
     setShowCourseManageModal(false);
-    fetchStudentsForCourse(course);
-    navigate('/teacher/students');
-  }, [fetchStudentsForCourse, navigate]);
+    navigate('/teacher/students', { state: { selectedCourse: course } });
+  }, [navigate]);
 
   // Render main content
   const renderMainContent = () => {
@@ -259,16 +260,16 @@ export default function TeacherDashboard() {
         );
 
       case '/teacher/students':
-        return <TeacherStudents 
-          students={students}
-          studentsLoading={studentsLoading}
-          courseForStudentView={courseForStudentView}
-          setCourseForStudentView={setCourseForStudentView}
-          setStudents={setStudents}
-        />;
+        return <TeacherStudents />;
 
       case '/teacher/timetable':
         return <TeacherTimetable />;
+
+      case '/teacher/leave':
+        return <TeacherLeave />;
+
+      case '/teacher/materials':
+        return <TeacherMaterials />;
 
       case '/teacher/announcements':
         return (

@@ -10,10 +10,15 @@ import {
   postAnnouncement,
   getAnnouncements,
   deleteAnnouncement,
-  getSubmissionsForAssignment
+  getSubmissionsForAssignment,
+  applyLeave,
+  getLeaveRequests,
+  uploadStudyMaterial,
+  getMyStudyMaterials,
+  deleteStudyMaterial
 } from '../controllers/teacherController.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
-import { uploadAssignmentFiles, uploadLibraryFiles } from '../config/multer.js';
+import { uploadAssignmentFiles, uploadLibraryFiles, uploadStudyMaterialFiles } from '../config/multer.js';
 
 const router = express.Router();
 
@@ -39,5 +44,12 @@ router.get('/library', listMyLibraryResources);
 router.post('/library', uploadLibraryFiles.single('file'), createLibraryResource);
 // Timetable (teacher)
 router.get('/timetable', getTeacherTimetable);
+// Leave requests (teacher)
+router.post('/leave-requests', applyLeave);
+router.get('/leave-requests', getLeaveRequests);
+// Study materials (teacher)
+router.post('/study-materials', uploadStudyMaterialFiles.single('file'), uploadStudyMaterial);
+router.get('/study-materials', getMyStudyMaterials);
+router.delete('/study-materials/:id', deleteStudyMaterial);
 
 export default router;
