@@ -17,7 +17,7 @@ export default function AdminTimetableManagement({ showNotification }) {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 5;
 
   const [form, setForm] = useState({
     grade: '1',

@@ -21,6 +21,15 @@ export default function StudentAssignments({
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterCourse, setFilterCourse] = useState('');
 
+  // Clear filters
+  const clearFilters = () => {
+    setFilterStatus('all');
+    setFilterCourse('');
+    setCurrentPage(1);
+  };
+
+  const hasActiveFilters = filterStatus !== 'all' || filterCourse !== '';
+
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
@@ -143,9 +152,21 @@ export default function StudentAssignments({
         <>
           {/* Filters */}
           <div className="mb-4 p-4 bg-white rounded-xl shadow-md border border-slate-100">
-            <div className="flex items-center gap-2 mb-3">
-              <Filter className="w-4 h-4 text-slate-600" />
-              <h3 className="text-sm font-medium text-slate-700">Filters</h3>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-slate-600" />
+                <h3 className="text-sm font-medium text-slate-700">Filters</h3>
+                <span className="text-xs text-slate-500">({filteredAssignments.length} assignments)</span>
+              </div>
+              {hasActiveFilters && (
+                <button
+                  onClick={clearFilters}
+                  className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                  Clear Filters
+                </button>
+              )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>

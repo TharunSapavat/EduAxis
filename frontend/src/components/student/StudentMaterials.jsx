@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { studentAPI } from '../../services/api';
-import { Download, FileText, Search } from 'lucide-react';
+import { Download, FileText, Search, Filter } from 'lucide-react';
 
 export default function StudentMaterials() {
   const [materials, setMaterials] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
 
   useEffect(() => {
     fetchMaterials();
@@ -39,6 +41,22 @@ export default function StudentMaterials() {
     return matchesSubject && matchesSearch;
   });
 
+  // Pagination
+  const totalPages = Math.ceil(filteredMaterials.length / itemsPerPage);
+  const paginatedMaterials = filteredMaterials.slice((currentPage - 1) * itemsPerPage, (currentPage) * itemsPerPage);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedSubject, searchQuery]);
+
+  const clearFilters = () => {
+    setSelectedSubject('all');
+    setSearchQuery('');
+    setCurrentPage(1);
+  };
+  const hasActiveFilters = selectedSubject !== 'all' || searchQuery.trim() !== '';
+
   const formatFileSize = (bytes) => {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
@@ -63,6 +81,19 @@ export default function StudentMaterials() {
 
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-md p-4 mb-6 border border-slate-100">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Filter className="w-5 h-5 text-slate-600" />
+            <h3 className="text-sm font-medium text-slate-700">Filters</h3>
+            <span className="text-xs text-slate-500">({filteredMaterials.length} materials)</span>
+          </div>
+          {hasActiveFilters && (
+            <button onClick={clearFilters} className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
+              <span className="inline-block w-3 h-3">✕</span>
+              Clear Filters
+            </button>
+          )}
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Subject Filter */}
           <div>
@@ -118,13 +149,13 @@ export default function StudentMaterials() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredMaterials.map((material) => (
+          {paginatedMaterials.map((material) => (
             <div
               key={material._id}
               className="bg-white rounded-xl shadow-md p-5 border border-slate-100 hover:shadow-lg transition-shadow"
             >
               <div className="flex items-start gap-3 mb-3">
-                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center shrink-0">
                   <FileText className="w-5 h-5 text-blue-600" />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -163,10 +194,33 @@ export default function StudentMaterials() {
       {/* Summary */}
       {!loading && filteredMaterials.length > 0 && (
         <div className="mt-6 bg-white rounded-xl shadow-md p-4 border border-slate-100">
-          <p className="text-sm text-slate-600 text-center">
-            Showing {filteredMaterials.length} material{filteredMaterials.length !== 1 ? 's' : ''}
-            {selectedSubject !== 'all' && ` in ${selectedSubject}`}
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-slate-600">
+              Showing {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, filteredMaterials.length)} of {filteredMaterials.length} materials
+              {selectedSubject !== 'all' && ` in ${selectedSubject}`}
+            </p>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="p-2 rounded-lg border border-slate-300 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Previous page"
+                >
+                  ‹
+                </button>
+                <span className="text-sm text-slate-700">Page {currentPage} of {totalPages}</span>
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="p-2 rounded-lg border border-slate-300 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Next page"
+                >
+                  ›
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
