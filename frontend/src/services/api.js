@@ -77,6 +77,7 @@ export const authAPI = {
   register: (userData) => api.post('/auth/register', userData),
   logout: () => api.post('/auth/logout'),
   getCurrentUser: (userId) => api.get('/auth/me', { params: { userId } }),
+  changePassword: (data) => api.post('/auth/change-password', data),
 };
 
 // Student APIs

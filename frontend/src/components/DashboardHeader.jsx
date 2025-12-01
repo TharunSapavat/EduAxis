@@ -1,7 +1,8 @@
-import { GraduationCap, LogOut, User } from 'lucide-react';
+import { GraduationCap, LogOut, User, Lock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useState } from 'react';
 import NotificationToast from './NotificationToast';
+import ChangePassword from './ChangePassword';
 import { useDispatch, useSelector } from 'react-redux';
 import { logoutUser, selectAuth } from '../store/slices/authSlice';
 
@@ -10,6 +11,7 @@ export default function DashboardHeader({ title, userRole }) {
   const { user } = useSelector(selectAuth);
   const { logout: contextLogout } = useAuth();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
   const [notification, setNotification] = useState(null);
 
   const showNotification = (message, type = 'success') => {
@@ -92,6 +94,15 @@ export default function DashboardHeader({ title, userRole }) {
 
               {/* Logout Button */}
               <button
+                onClick={() => setShowChangePassword(true)}
+                className="flex items-center space-x-2 px-4 py-2 bg-purple-50 hover:bg-purple-100 text-purple-600 rounded-lg transition-colors duration-200"
+                title="Change Password"
+              >
+                <Lock className="w-4 h-4" />
+                <span className="hidden sm:inline font-medium">Password</span>
+              </button>
+
+              <button
                 onClick={() => setShowLogoutModal(true)}
                 className="flex items-center space-x-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors duration-200 "
                 title="Logout"
@@ -136,6 +147,13 @@ export default function DashboardHeader({ title, userRole }) {
           onClose={() => setNotification(null)}
         />
       )}
+
+      {/* Change Password Modal */}
+      <ChangePassword 
+        isOpen={showChangePassword}
+        onClose={() => setShowChangePassword(false)}
+        showNotification={showNotification}
+      />
     </>
   );
 }
