@@ -195,6 +195,8 @@ export default function AdminDashboard() {
   const [showUserForm, setShowUserForm] = useState(false);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersError, setUsersError] = useState('');
+  const [currentUserPage, setCurrentUserPage] = useState(1);
+  const usersPerPage = 10;
 
   // User form with React Hook Form
   const {
@@ -528,6 +530,8 @@ export default function AdminDashboard() {
     }
 
     setFilteredUsers(result);
+    // Reset to first page when filters change
+    setCurrentUserPage(1);
   }, [searchQuery, roleFilter, users]);
 
   const handleViewDetails = (user) => {
@@ -932,55 +936,60 @@ export default function AdminDashboard() {
                         </td>
                       </tr>
                     ) : filteredUsers.length > 0 ? (
-                      filteredUsers.map((user) => (
-                        <tr key={user.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold ${
-                                user.role === 'student' ? 'bg-blue-500' : user.role === 'teacher' ? 'bg-green-500' : 'bg-purple-500'
+                      (() => {
+                        const indexOfLastUser = currentUserPage * usersPerPage;
+                        const indexOfFirstUser = indexOfLastUser - usersPerPage;
+                        const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
+                        return currentUsers.map((user) => (
+                          <tr key={user.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold ${
+                                  user.role === 'student' ? 'bg-blue-500' : user.role === 'teacher' ? 'bg-green-500' : 'bg-purple-500'
+                                }`}>
+                                  {(user.name || '?').charAt(0)}
+                                </div>
+                                <div className="ml-3">
+                                  <p className="text-sm font-medium text-slate-900">{user.name || 'Unnamed'}</p>
+                                  <p className="text-xs text-slate-500">{user.phone || '—'}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <p className="text-sm text-slate-900">{user.email}</p>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                user.role === 'student' 
+                                  ? 'bg-blue-100 text-blue-800' 
+                                  : user.role === 'teacher'
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-purple-100 text-purple-800'
                               }`}>
-                                {(user.name || '?').charAt(0)}
+                                {user.role ? (user.role.charAt(0).toUpperCase() + user.role.slice(1)) : '—'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                              <div className="flex items-center space-x-3">
+                                <button
+                                  onClick={() => handleViewDetails(user)}
+                                  className="text-purple-600 hover:text-purple-900 font-medium flex items-center space-x-1"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                  <span>View</span>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteUser(user.id)}
+                                  className="text-red-600 hover:text-red-900 font-medium flex items-center space-x-1"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  <span>Delete</span>
+                                </button>
                               </div>
-                              <div className="ml-3">
-                                <p className="text-sm font-medium text-slate-900">{user.name || 'Unnamed'}</p>
-                                <p className="text-xs text-slate-500">{user.phone || '—'}</p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <p className="text-sm text-slate-900">{user.email}</p>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              user.role === 'student' 
-                                ? 'bg-blue-100 text-blue-800' 
-                                : user.role === 'teacher'
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-purple-100 text-purple-800'
-                            }`}>
-                              {user.role ? (user.role.charAt(0).toUpperCase() + user.role.slice(1)) : '—'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            <div className="flex items-center space-x-3">
-                              <button
-                                onClick={() => handleViewDetails(user)}
-                                className="text-purple-600 hover:text-purple-900 font-medium flex items-center space-x-1"
-                              >
-                                <Eye className="w-4 h-4" />
-                                <span>View</span>
-                              </button>
-                              <button
-                                onClick={() => handleDeleteUser(user.id)}
-                                className="text-red-600 hover:text-red-900 font-medium flex items-center space-x-1"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                                <span>Delete</span>
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
+                            </td>
+                          </tr>
+                        ));
+                      })()
                     ) : (
                       <tr>
                         <td colSpan="4" className="px-6 py-12 text-center">
@@ -992,6 +1001,51 @@ export default function AdminDashboard() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Pagination Controls */}
+              {filteredUsers.length > usersPerPage && (
+                <div className="px-6 py-4 border-t border-slate-200 bg-slate-50">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-slate-600">
+                      Showing {((currentUserPage - 1) * usersPerPage) + 1} to {Math.min(currentUserPage * usersPerPage, filteredUsers.length)} of {filteredUsers.length} users
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => setCurrentUserPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentUserPage === 1}
+                        className="px-3 py-1 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Previous
+                      </button>
+                      
+                      {/* Page Numbers */}
+                      <div className="flex items-center space-x-1">
+                        {Array.from({ length: Math.ceil(filteredUsers.length / usersPerPage) }, (_, i) => i + 1).map((page) => (
+                          <button
+                            key={page}
+                            onClick={() => setCurrentUserPage(page)}
+                            className={`px-3 py-1 rounded-lg transition-colors ${
+                              currentUserPage === page
+                                ? 'bg-purple-600 text-white'
+                                : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        ))}
+                      </div>
+
+                      <button
+                        onClick={() => setCurrentUserPage(prev => Math.min(prev + 1, Math.ceil(filteredUsers.length / usersPerPage)))}
+                        disabled={currentUserPage === Math.ceil(filteredUsers.length / usersPerPage)}
+                        className="px-3 py-1 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* User Details Modal */}
