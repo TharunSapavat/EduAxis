@@ -8,6 +8,7 @@ const TeacherAttendance = ({
   attendanceLoading, 
   attendanceStudents, 
   attendanceMarking, 
+  attendanceMap = {},
   markAttendanceStatus 
 }) => {
   return (
@@ -38,30 +39,49 @@ const TeacherAttendance = ({
           <div className="p-4 bg-slate-50 rounded-lg text-slate-600">No students found for this course.</div>
         ) : (
           <div className="space-y-3">
-            {attendanceStudents.map((s, idx) => (
-              <div key={s._id || idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                <div>
-                  <p className="font-medium text-slate-900">{s.name}</p>
-                  <p className="text-sm text-slate-600">ID: {s.studentId || 'N/A'}</p>
+            {attendanceStudents.map((s, idx) => {
+              const sid = String(s._id || s.id);
+              const status = attendanceMap[sid]?.status;
+              const isPresent = status === 'present';
+              const isAbsent = status === 'absent';
+              return (
+                <div key={sid || idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                  <div>
+                    <p className="font-medium text-slate-900">{s.name}</p>
+                    <p className="text-sm text-slate-600">ID: {s.studentId || 'N/A'}</p>
+                    {status && (
+                      <span className={`inline-block mt-1 text-xs font-semibold px-2 py-1 rounded-full ${
+                        isPresent ? 'bg-green-100 text-green-700' : isAbsent ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-700'
+                      }`}>
+                        {isPresent ? 'Present today' : isAbsent ? 'Absent today' : status}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => markAttendanceStatus(sid, 'present')}
+                      disabled={!!attendanceMarking[sid] || isPresent}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium text-white ${
+                        isPresent ? 'bg-green-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
+                      }`}
+                      title={isPresent ? 'Already marked present' : 'Mark as present'}
+                    >
+                      Present
+                    </button>
+                    <button
+                      onClick={() => markAttendanceStatus(sid, 'absent')}
+                      disabled={!!attendanceMarking[sid] || isAbsent}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium text-white ${
+                        isAbsent ? 'bg-red-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'
+                      }`}
+                      title={isAbsent ? 'Already marked absent' : 'Mark as absent'}
+                    >
+                      Absent
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => markAttendanceStatus(s._id || s.id, 'present')}
-                    disabled={!!attendanceMarking[s._id || s.id]}
-                    className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white rounded-lg text-sm font-medium"
-                  >
-                    Present
-                  </button>
-                  <button
-                    onClick={() => markAttendanceStatus(s._id || s.id, 'absent')}
-                    disabled={!!attendanceMarking[s._id || s.id]}
-                    className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white rounded-lg text-sm font-medium"
-                  >
-                    Absent
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

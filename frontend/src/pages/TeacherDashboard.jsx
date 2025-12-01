@@ -22,6 +22,7 @@ import TeacherAssignmentsList from '../components/teacher/TeacherAssignmentsList
 import CreateAnnouncementForm from '../components/teacher/TeacherCreateAnnouncementForm';
 import TeacherAnnouncementsList from '../components/teacher/TeacherAnnouncementsList';
 import TeacherTimetable from '../components/teacher/TeacherTimetable';
+import TeacherSchedule from '../components/teacher/TeacherSchedule';
 import TeacherLeave from '../components/teacher/TeacherLeave';
 import TeacherMaterials from '../components/teacher/TeacherMaterials';
 
@@ -38,6 +39,7 @@ export default function TeacherDashboard() {
   const [coursesLoading, setCoursesLoading] = useState(false);
   const [statsLoading, setStatsLoading] = useState(false);
   const socketRef = useRef(null);
+  const joinedRef = useRef(null);
   
   // Custom hooks
   const { notification, showNotification, hideNotification } = useNotification();
@@ -56,6 +58,7 @@ export default function TeacherDashboard() {
   const [attendanceStudents, setAttendanceStudents] = useState([]);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [attendanceMarking, setAttendanceMarking] = useState({});
+  const [attendanceMap, setAttendanceMap] = useState({}); // { [studentId]: { status, date, remarks } }
 
   // Mark attendance helper
   const markAttendanceStatus = useCallback(async (studentId, status) => {
@@ -63,6 +66,15 @@ export default function TeacherDashboard() {
     try {
       setAttendanceMarking(prev => ({ ...prev, [studentId]: true }));
       await teacherAPI.markAttendance({ studentId, courseId: attendanceCourseId, status });
+      // Optimistically update local map
+      setAttendanceMap(prev => ({
+        ...prev,
+        [String(studentId)]: {
+          ...(prev[String(studentId)] || {}),
+          status,
+          date: new Date().toISOString()
+        }
+      }));
       showNotification('Attendance marked successfully', 'success');
     } catch (e) {
       console.error('Failed to mark attendance', e);
@@ -96,11 +108,65 @@ export default function TeacherDashboard() {
       }
     });
 
-    socketRef.current = socket;
+    socket.on('attendanceUpdated', (payload) => {
+      // payload: { studentId, courseId, record }
+      if (!payload) return;
+      if (attendanceCourseId && String(payload.courseId) !== String(attendanceCourseId)) return;
+      const sid = String(payload.studentId);
+      const rec = payload.record || {};
+      setAttendanceMap(prev => ({
+        ...prev,
+        [sid]: {
+          status: rec.status,
+          date: rec.date || rec.updatedAt || new Date().toISOString(),
+          remarks: rec.remarks || ''
+        }
+      }));
+    });
 
-    return () => {
-      socket.disconnect();
-    };
+    socketRef.current = socket;
+    // Initialize once
+    if (!socketRef.current) {
+      const socket = io(import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000', {
+        withCredentials: true,
+        transports: ['websocket', 'polling']
+      });
+
+      socket.on('connect', () => {
+        console.log('Teacher socket connected');
+        const joinId = user?._id || user?.id;
+        if (joinId) {
+          socket.emit('join', { userId: joinId });
+          joinedRef.current = joinId;
+        }
+      });
+
+      socket.on('message:received', (payload) => {
+        console.log('New message received', payload);
+        if (Notification.permission === 'granted') {
+          new Notification('New Message', {
+            body: `${payload.sender.name}: ${payload.text.substring(0, 50)}...`
+          });
+        }
+      });
+
+      socketRef.current = socket;
+
+      return () => {
+        socket.disconnect();
+        joinedRef.current = null;
+      };
+    }
+  }, []);
+
+  // Ensure join when user becomes available after connect
+  useEffect(() => {
+    const socket = socketRef.current;
+    const joinId = user?._id || user?.id;
+    if (socket && socket.connected && joinId && joinedRef.current !== joinId) {
+      socket.emit('join', { userId: joinId });
+      joinedRef.current = joinId;
+    }
   }, [user]);
 
   // Request notification permission
@@ -129,10 +195,10 @@ export default function TeacherDashboard() {
     }
   }, [user]);
 
-  // Load teacher courses when viewing Home, Courses, Attendance, Grading or Announcements
+  // Load teacher courses when viewing Home, Courses, Attendance, Grading, Announcements, or Schedule
   useEffect(() => {
     if (!user || user.role !== 'teacher') return;
-    const shouldFetch = ['/teacher/home','/teacher/courses','/teacher/attendance','/teacher/grading','/teacher/announcements'].includes(location.pathname) || location.pathname === '/teacher';
+    const shouldFetch = ['/teacher/home','/teacher/courses','/teacher/attendance','/teacher/grading','/teacher/announcements','/teacher/schedule'].includes(location.pathname) || location.pathname === '/teacher';
     if (!shouldFetch) return;
 
     const loadCourses = async () => {
@@ -167,9 +233,23 @@ export default function TeacherDashboard() {
       try {
         const res = await teacherAPI.getStudents({ courseId: attendanceCourseId });
         setAttendanceStudents(res.data.students || []);
+        // After students load, fetch today's attendance
+        try {
+          const att = await teacherAPI.getAttendance({ courseId: attendanceCourseId });
+          const map = {};
+          (att.data.records || []).forEach(r => {
+            const sid = String(r.studentId?._id || r.studentId);
+            map[sid] = { status: r.status, date: r.date, remarks: r.remarks };
+          });
+          setAttendanceMap(map);
+        } catch (e) {
+          console.warn('Failed to load attendance records', e);
+          setAttendanceMap({});
+        }
       } catch (e) {
         console.error('Failed to load students for attendance', e);
         setAttendanceStudents([]);
+        setAttendanceMap({});
       } finally {
         setAttendanceLoading(false);
       }
@@ -234,6 +314,7 @@ export default function TeacherDashboard() {
           attendanceLoading={attendanceLoading}
           attendanceStudents={attendanceStudents}
           attendanceMarking={attendanceMarking}
+          attendanceMap={attendanceMap}
           markAttendanceStatus={markAttendanceStatus}
         />;
 
@@ -264,6 +345,9 @@ export default function TeacherDashboard() {
 
       case '/teacher/timetable':
         return <TeacherTimetable />;
+
+      case '/teacher/schedule':
+        return <TeacherSchedule teacherCourses={teacherCourses} />;
 
       case '/teacher/leave':
         return <TeacherLeave />;

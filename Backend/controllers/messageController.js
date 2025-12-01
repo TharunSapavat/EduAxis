@@ -195,7 +195,7 @@ export const deleteMessage = async (req, res) => {
     }
 
     // Only sender can delete their own messages
-    if (message.sender.toString() !== userId) {
+    if (message.sender.toString() !== userId.toString()) {
       return res.status(403).json({ success: false, message: 'Not authorized to delete this message' });
     }
 
@@ -205,7 +205,9 @@ export const deleteMessage = async (req, res) => {
     try {
       const io = req.app.get('io');
       if (io) {
+        // Emit to recipient and sender rooms for consistency
         io.to(`user:${message.recipient}`).emit('message:deleted', { messageId });
+        io.to(`user:${message.sender}`).emit('message:deleted', { messageId });
       }
     } catch (socketErr) {
       console.error('Socket emit failed', socketErr);
