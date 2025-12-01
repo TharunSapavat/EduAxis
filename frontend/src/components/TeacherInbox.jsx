@@ -25,6 +25,7 @@ export default function TeacherInbox({ user, socket }) {
   const [showDeleteMenu, setShowDeleteMenu] = useState(false);
 
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   // Responsive list visibility
   const [showList, setShowList] = useState(true);
@@ -45,9 +46,11 @@ export default function TeacherInbox({ user, socket }) {
   const API_BASE =
     import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll inside the messages panel only to avoid page scroll jumps
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
   };
 
   useEffect(() => {
@@ -507,7 +510,7 @@ export default function TeacherInbox({ user, socket }) {
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
+            <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
               {loading ? (
                 <div className="text-center py-8">
                   <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
