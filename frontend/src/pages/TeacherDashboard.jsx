@@ -22,6 +22,7 @@ import TeacherAssignmentsList from '../components/teacher/TeacherAssignmentsList
 import CreateAnnouncementForm from '../components/teacher/TeacherCreateAnnouncementForm';
 import TeacherAnnouncementsList from '../components/teacher/TeacherAnnouncementsList';
 import TeacherTimetable from '../components/teacher/TeacherTimetable';
+import TeacherSchedule from '../components/teacher/TeacherSchedule';
 import TeacherLeave from '../components/teacher/TeacherLeave';
 import TeacherMaterials from '../components/teacher/TeacherMaterials';
 
@@ -155,10 +156,10 @@ export default function TeacherDashboard() {
     }
   }, [user]);
 
-  // Load teacher courses when viewing Home, Courses, Attendance, Grading or Announcements
+  // Load teacher courses when viewing Home, Courses, Attendance, Grading, Announcements, or Schedule
   useEffect(() => {
     if (!user || user.role !== 'teacher') return;
-    const shouldFetch = ['/teacher/home','/teacher/courses','/teacher/attendance','/teacher/grading','/teacher/announcements'].includes(location.pathname) || location.pathname === '/teacher';
+    const shouldFetch = ['/teacher/home','/teacher/courses','/teacher/attendance','/teacher/grading','/teacher/announcements','/teacher/schedule'].includes(location.pathname) || location.pathname === '/teacher';
     if (!shouldFetch) return;
 
     const loadCourses = async () => {
@@ -305,6 +306,9 @@ export default function TeacherDashboard() {
 
       case '/teacher/timetable':
         return <TeacherTimetable />;
+
+      case '/teacher/schedule':
+        return <TeacherSchedule teacherCourses={teacherCourses} />;
 
       case '/teacher/leave':
         return <TeacherLeave />;

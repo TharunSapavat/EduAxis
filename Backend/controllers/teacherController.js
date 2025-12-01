@@ -9,6 +9,7 @@ import Announcement from '../models/Announcement.js';
 import Timetable from '../models/Timetable.js';
 import LeaveRequest from '../models/LeaveRequest.js';
 import StudyMaterial from '../models/StudyMaterial.js';
+import Schedule from '../models/Schedule.js';
 
 // Get teacher dashboard data
 export const getDashboard = async (req, res) => {
@@ -315,6 +316,102 @@ export const getTeacherTimetable = async (req, res) => {
     res.json({ success: true, timetables });
   } catch (error) {
     console.error('Get teacher timetable error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// Create or update a class schedule entry
+export const createScheduleEntry = async (req, res) => {
+  try {
+    const teacherId = req.user?._id || req.user?.id;
+    const { courseId, grade, subject, dayOfWeek, startTime, endTime, room } = req.body;
+
+    if (!teacherId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    if (!courseId || !grade || !subject || !dayOfWeek || !startTime || !endTime) {
+      return res.status(400).json({ success: false, message: 'Missing required fields' });
+    }
+
+    const course = await Course.findById(courseId);
+    if (!course || String(course.teacherId) !== String(teacherId)) {
+      return res.status(403).json({ success: false, message: 'You can only schedule classes for your courses' });
+    }
+
+    // Optional overlap check: ensure no overlapping times for same teacher and day
+    const overlap = await Schedule.findOne({
+      teacherId,
+      dayOfWeek,
+      $or: [
+        { $and: [{ startTime: { $lt: endTime } }, { endTime: { $gt: startTime } }] }
+      ]
+    });
+    if (overlap) {
+      return res.status(409).json({ success: false, message: 'Time slot overlaps with an existing class' });
+    }
+
+    const entry = await Schedule.create({
+      teacherId,
+      courseId,
+      grade: String(grade),
+      subject,
+      dayOfWeek,
+      startTime,
+      endTime,
+      room: room || ''
+    });
+
+    // Emit realtime schedule update to all clients
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        await entry.populate('courseId', 'name code grade');
+        // Include a concise payload with routing hints so teacher UIs for the same grade/course can refetch
+        io.emit('scheduleUpdated', {
+          entry,
+          courseId: String(entry.courseId?._id || courseId),
+          grade: String(entry.grade),
+          dayOfWeek: entry.dayOfWeek,
+          startTime: entry.startTime,
+          endTime: entry.endTime
+        });
+      }
+    } catch (e) {
+      console.warn('Socket emit (scheduleUpdated) failed:', e.message);
+    }
+
+    res.status(201).json({ success: true, entry });
+  } catch (error) {
+    console.error('Create schedule entry error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// List weekly schedule for teacher (optionally by course)
+export const getMySchedule = async (req, res) => {
+  try {
+    const teacherId = req.user?._id || req.user?.id;
+    const { courseId } = req.query;
+    if (!teacherId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    // Find courses taught by this teacher
+    const myCourses = await Course.find({ teacherId }).select('_id grade');
+    const myCourseIds = myCourses.map(c => c._id);
+    const myGrades = [...new Set(myCourses.map(c => String(c.grade)))];
+
+    // Build query: include own entries, and entries for courses this teacher teaches
+    const query = { $or: [ { teacherId }, { courseId: { $in: myCourseIds } }, { grade: { $in: myGrades } } ] };
+    if (courseId) {
+      // Narrow to a specific course if provided
+      query.$and = [{ courseId }];
+    }
+
+    const entries = await Schedule.find(query)
+      .populate({ path: 'courseId', select: 'name code grade teacherId', populate: { path: 'teacherId', select: 'name email' } })
+      .populate('teacherId', 'name email')
+      .sort({ dayOfWeek: 1, startTime: 1 });
+
+    res.json({ success: true, entries });
+  } catch (error) {
+    console.error('Get schedule error:', error);
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };

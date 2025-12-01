@@ -19,7 +19,7 @@ export const STUDENT_MODULES = [
   { id: 'attendance', icon: ClipboardList, title: 'Attendance', description: 'View attendance records' },
   { id: 'assignments', icon: FileText, title: 'Assignments', description: 'Submit and track assignments' },
   { id: 'materials', icon: Download, title: 'Study Materials', description: 'Download resources' },
-  { id: 'timetable', icon: Calendar, title: 'Timetable', description: 'View class schedule' },
+  { id: 'schedule', icon: Calendar, title: 'Weekly Schedule', description: 'See weekly classes' },
   { id: 'announcements', icon: Bell, title: 'Announcements', description: 'Stay updated' },
   { id: 'messages', icon: MessageSquare, title: 'Messages', description: 'Chat with teachers' },
   { id: 'library', icon: Library, title: 'Library', description: 'Access resources' },

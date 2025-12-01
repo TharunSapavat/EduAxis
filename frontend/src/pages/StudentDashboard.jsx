@@ -22,6 +22,7 @@ import StudentAssignments from '../components/student/StudentAssignments';
 import StudentGrades from '../components/student/StudentGrades';
 import StudentAttendance from '../components/student/StudentAttendance';
 import StudentTimetable from '../components/student/StudentTimetable';
+import StudentSchedule from '../components/student/StudentSchedule';
 import StudentAnnouncements from '../components/student/StudentAnnouncements';
 import StudentLibrary from '../components/student/StudentLibrary';
 import StudentLeave from '../components/student/StudentLeave';
@@ -612,6 +613,8 @@ export default function StudentDashboard() {
           timetable={timetable}
           timetableLoading={timetableLoading}
         />;
+      case '/student/schedule':
+        return <StudentSchedule />;
 
       case '/student/announcements':
         return <StudentAnnouncements 
