@@ -60,9 +60,9 @@ export default function StudentHome({ user, stats, loading, error, fetchDashboar
         <div className="bg-white p-6 rounded-xl shadow-md border border-slate-100">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-slate-600 text-sm font-medium">Current Grade</p>
+              <p className="text-slate-600 text-sm font-medium">Completed Assignments</p>
               <p className="text-3xl font-bold text-purple-600 mt-1">
-                {loading ? '...' : stats.currentGrade}
+                {loading ? '...' : `${stats.completedAssignments}/${stats.totalAssignments}`}
               </p>
             </div>
             <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
