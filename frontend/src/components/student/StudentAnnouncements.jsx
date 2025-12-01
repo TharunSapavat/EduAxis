@@ -141,7 +141,14 @@ const StudentAnnouncements = ({ announcements, announcementsLoading }) => {
             <div key={announcement._id} className="bg-white rounded-xl shadow-md p-6 border-l-4 border-blue-600">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <h3 className="text-lg font-bold text-slate-900">{announcement.title}</h3>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-lg font-bold text-slate-900">{announcement.title}</h3>
+                    {announcement.createdBy && (
+                      <span className="text-xs font-medium text-purple-600 bg-purple-50 px-3 py-1 rounded-full">
+                         {announcement.createdBy.name}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm text-slate-600 mt-1">
                     {new Date(announcement.createdAt).toLocaleDateString('en-US', { 
                       month: 'long', 
@@ -152,11 +159,6 @@ const StudentAnnouncements = ({ announcements, announcementsLoading }) => {
                     })}
                   </p>
                   <p className="text-sm text-slate-700 mt-3">{announcement.content}</p>
-                  {announcement.author && (
-                    <p className="text-xs text-slate-500 mt-3">
-                      By: {announcement.author.name || 'Administration'}
-                    </p>
-                  )}
                 </div>
                 {announcement.priority === 'high' && (
                   <span className="px-3 py-1 text-xs font-medium rounded-full bg-red-100 text-red-700 ml-4">
