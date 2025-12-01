@@ -2,9 +2,13 @@ import { GraduationCap, LogOut, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useState } from 'react';
 import NotificationToast from './NotificationToast';
+import { useDispatch, useSelector } from 'react-redux';
+import { logoutUser, selectAuth } from '../store/slices/authSlice';
 
 export default function DashboardHeader({ title, userRole }) {
-  const { user, logout } = useAuth();
+  const dispatch = useDispatch();
+  const { user } = useSelector(selectAuth);
+  const { logout: contextLogout } = useAuth();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [notification, setNotification] = useState(null);
 
@@ -14,7 +18,10 @@ export default function DashboardHeader({ title, userRole }) {
 
   const handleLogout = async () => {
     try {
-      await logout();
+      // Dispatch Redux logout action
+      await dispatch(logoutUser()).unwrap();
+      // Also call context logout for navigation
+      await contextLogout();
       showNotification('Logged out successfully!', 'success');
     } catch (err) {
       showNotification('Failed to logout', 'error');

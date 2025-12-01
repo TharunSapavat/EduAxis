@@ -60,14 +60,24 @@ export default function TeacherAssignmentsList() {
 
   useEffect(() => {
     if (!socket) return;
-    const onCreated = (assignment) => {
+    const onCreated = (payload) => {
       // If the event is relevant, prepend; otherwise just reload
-      if (!user || !assignment) return load();
+      if (!user || !payload || !payload.assignment) return load();
+      const assignment = payload.assignment;
+      
+      // Enrich assignment with full course object if we have it
+      if (assignment.courseId && typeof assignment.courseId === 'string') {
+        const course = courses.find(c => c._id === assignment.courseId);
+        if (course) {
+          assignment.courseId = course;
+        }
+      }
+      
       setItems((prev) => [assignment, ...prev]);
     };
     socket.on('assignmentCreated', onCreated);
     return () => socket.off('assignmentCreated', onCreated);
-  }, [socket, user]);
+  }, [socket, user, courses]);
 
   // Derived: filtered + paginated assignments
   const filteredItems = items.filter((a) => {
