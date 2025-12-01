@@ -6,7 +6,7 @@ import {
   ClipboardList, 
   Bell, 
   Library, 
-  DollarSign, 
+  IndianRupee, 
   Home, 
   MessageSquare,
   Download
@@ -23,6 +23,6 @@ export const STUDENT_MODULES = [
   { id: 'announcements', icon: Bell, title: 'Announcements', description: 'Stay updated' },
   { id: 'messages', icon: MessageSquare, title: 'Messages', description: 'Chat with teachers' },
   { id: 'library', icon: Library, title: 'Library', description: 'Access resources' },
-  { id: 'fees', icon: DollarSign, title: 'Fees', description: 'View and pay fees' },
+  { id: 'fees', icon: IndianRupee, title: 'Fees', description: 'View and pay fees' },
   { id: 'leave', icon: Calendar, title: 'Leave Requests', description: 'Apply & track leave' },
 ];

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Search, Filter, AlertTriangle, TrendingUp, TrendingDown, Minus, Eye, Download, ChevronDown, X, GraduationCap, DollarSign, Calendar, Award } from 'lucide-react';
+import { Users, Search, Filter, AlertTriangle, TrendingUp, TrendingDown, Minus, Eye, Download, ChevronDown, X, GraduationCap, IndianRupee, Calendar, Award } from 'lucide-react';
 import { adminAPI } from '../services/api';
 // Removed AtRiskStudentsModal in favor of simple inline list view
 
@@ -456,7 +456,7 @@ export default function ClassManagement() {
                 {[
                   { id: 'performance', label: 'Performance', icon: Award },
                   { id: 'attendance', label: 'Attendance', icon: Calendar },
-                  { id: 'fees', label: 'Fees & Payments', icon: DollarSign },
+                  { id: 'fees', label: 'Fees & Payments', icon: IndianRupee },
                   { id: 'info', label: 'Personal Info', icon: Users }
                 ].map((tab) => (
                   <button

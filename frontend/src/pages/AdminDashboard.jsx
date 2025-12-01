@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Users, BookOpen, Calendar, FileText, BarChart3, Settings, Shield, Database, DollarSign, Library, GraduationCap, ClipboardList, Home, X, Search, Filter, Eye, Mail, Phone, MapPin, Trash2, UserPlus, Lock } from 'lucide-react';
+import { Users, BookOpen, Calendar, FileText, BarChart3, Settings, Shield, Database, IndianRupee, Library, GraduationCap, ClipboardList, Home, X, Search, Filter, Eye, Mail, Phone, MapPin, Trash2, UserPlus, Lock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { adminAPI } from '../services/api';
 import { useForm } from 'react-hook-form';
@@ -789,7 +789,7 @@ export default function AdminDashboard() {
     { id: 'users', icon: Users, title: 'User Management', description: 'Manage students, teachers & staff' },
     { id: 'courses', icon: BookOpen, title: 'Course Management', description: 'Create and manage courses' },
     { id: 'timetable', icon: Calendar, title: 'Timetable', description: 'Schedule classes and events' },
-    { id: 'fees', icon: DollarSign, title: 'Fee Management', description: 'Manage fee structure & payments' },
+    { id: 'fees', icon: IndianRupee, title: 'Fee Management', description: 'Manage fee structure & payments' },
     { id: 'classes', icon: GraduationCap, title: 'Class Management', description: 'Manage classes and sections' },
     { id: 'library', icon: Library, title: 'Library Management', description: 'Upload and manage library resources' },
     { id: 'leave', icon: Mail, title: 'Leave Requests', description: 'Review leave applications' },
@@ -850,7 +850,7 @@ export default function AdminDashboard() {
                     <p className="text-3xl font-bold text-purple-600 mt-1">₹{paymentStats.totalAmount ? (paymentStats.totalAmount / 1000).toFixed(1) + 'K' : '0'}</p>
                   </div>
                   <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <DollarSign className="w-6 h-6 text-purple-600" />
+                    <IndianRupee className="w-6 h-6 text-purple-600" />
                   </div>
                 </div>
               </div>
@@ -1452,7 +1452,7 @@ export default function AdminDashboard() {
                   onClick={() => setShowFeeForm(true)}
                   className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
                 >
-                  <DollarSign className="w-4 h-4" />
+                  <IndianRupee className="w-4 h-4" />
                   <span>Set New Fee</span>
                 </button>
               </div>
@@ -1675,7 +1675,7 @@ export default function AdminDashboard() {
                     ) : (
                       <tr>
                         <td colSpan="6" className="px-6 py-12 text-center">
-                          <DollarSign className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                          <IndianRupee className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                           <p className="text-slate-500">No payments found</p>
                         </td>
                       </tr>

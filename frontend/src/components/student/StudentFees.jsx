@@ -1,5 +1,5 @@
 import React from 'react';
-import { DollarSign, X } from 'lucide-react';
+import { IndianRupee, X } from 'lucide-react';
 
 const StudentFees = ({ 
   fees, 
@@ -53,7 +53,7 @@ const StudentFees = ({
           </div>
         ) : fees.length === 0 ? (
           <div className="bg-white rounded-xl shadow-md p-8 text-center border border-slate-100">
-            <DollarSign className="w-16 h-16 text-slate-400 mx-auto mb-4" />
+            <IndianRupee className="w-16 h-16 text-slate-400 mx-auto mb-4" />
             <p className="text-slate-600">No active fees at the moment</p>
           </div>
         ) : (
