@@ -256,13 +256,11 @@ const StudentFees = ({
                     className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
                   >
-                    <option value="Cash">Cash</option>
                     <option value="Credit Card">Credit Card</option>
                     <option value="Debit Card">Debit Card</option>
                     <option value="Bank Transfer">Bank Transfer</option>
                     <option value="Online Payment">Online Payment</option>
                     <option value="UPI">UPI</option>
-                    <option value="Check">Check</option>
                   </select>
                 </div>
 

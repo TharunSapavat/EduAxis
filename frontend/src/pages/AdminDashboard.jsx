@@ -11,7 +11,6 @@ import DashboardFooter from '../components/DashboardFooter';
 import NotificationToast from '../components/NotificationToast';
 import ClassManagement from '../components/ClassManagement.jsx';
 import AdminLibraryManagement from '../components/adminComp/AdminLibraryManagement.jsx';
-import AdminTimetableManagement from '../components/adminComp/AdminTimetableManagement.jsx';
 
 // User creation validation schema
 const userSchema = yup.object({
@@ -790,7 +789,6 @@ export default function AdminDashboard() {
     { id: 'home', icon: Home, title: 'Home', description: 'Overview and statistics' },
     { id: 'users', icon: Users, title: 'User Management', description: 'Manage students, teachers & staff' },
     { id: 'courses', icon: BookOpen, title: 'Course Management', description: 'Create and manage courses' },
-    { id: 'timetable', icon: Calendar, title: 'Timetable', description: 'Schedule classes and events' },
     { id: 'fees', icon: IndianRupee, title: 'Fee Management', description: 'Manage fee structure & payments' },
     { id: 'classes', icon: GraduationCap, title: 'Class Management', description: 'Manage classes and sections' },
     { id: 'library', icon: Library, title: 'Library Management', description: 'Upload and manage library resources' },
@@ -2445,9 +2443,6 @@ export default function AdminDashboard() {
 
       case '/admin/classes':
         return <ClassManagement />;
-
-      case '/admin/timetable':
-        return <AdminTimetableManagement showNotification={showNotification} />;
 
       case '/admin/library':
         return <AdminLibraryManagement showNotification={showNotification} />;
