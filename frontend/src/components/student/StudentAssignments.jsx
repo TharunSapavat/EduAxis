@@ -66,7 +66,7 @@ export default function StudentAssignments({
       }
       
       return true;
-    });
+    }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }, [assignments, filterStatus, filterCourse, recentlySubmitted]);
 
   const totalPages = Math.ceil(filteredAssignments.length / itemsPerPage);

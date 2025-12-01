@@ -38,7 +38,7 @@ const StudentAnnouncements = ({ announcements, announcementsLoading }) => {
         if (!title.includes(search) && !content.includes(search)) return false;
       }
       return true;
-    });
+    }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }, [announcements, filterPriority, filterMonth, searchText]);
 
   const totalPages = Math.ceil(filteredAnnouncements.length / itemsPerPage);

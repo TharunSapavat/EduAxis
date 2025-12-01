@@ -116,17 +116,26 @@ const CourseDetailsModal = ({
                 <div>
                   <h4 className="font-semibold text-slate-900 mb-3">Most Recent Announcement</h4>
                   {courseDetails.recentAnnouncements && courseDetails.recentAnnouncements.length > 0 ? (
-                    <div className="p-4 bg-white rounded-lg border border-slate-200 shadow-sm">
-                      <p className="font-medium text-slate-900">{courseDetails.recentAnnouncements[0].title}</p>
-                      <p className="text-sm text-slate-600 mt-1">
-                        {new Date(courseDetails.recentAnnouncements[0].createdAt).toLocaleDateString()}
-                      </p>
-                      {courseDetails.recentAnnouncements[0].content && (
-                        <p className="text-sm text-slate-700 mt-1 line-clamp-3">
-                          {courseDetails.recentAnnouncements[0].content}
-                        </p>
-                      )}
-                    </div>
+                    (() => {
+                      // Sort announcements by createdAt descending to ensure latest is first
+                      const sortedAnnouncements = [...courseDetails.recentAnnouncements].sort((a, b) => 
+                        new Date(b.createdAt) - new Date(a.createdAt)
+                      );
+                      const latestAnnouncement = sortedAnnouncements[0];
+                      return (
+                        <div className="p-4 bg-white rounded-lg border border-slate-200 shadow-sm">
+                          <p className="font-medium text-slate-900">{latestAnnouncement.title}</p>
+                          <p className="text-sm text-slate-600 mt-1">
+                            {new Date(latestAnnouncement.createdAt).toLocaleDateString()}
+                          </p>
+                          {latestAnnouncement.content && (
+                            <p className="text-sm text-slate-700 mt-1 line-clamp-3">
+                              {latestAnnouncement.content}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })()
                   ) : (
                     <p className="text-sm text-slate-600">No recent announcements</p>
                   )}
