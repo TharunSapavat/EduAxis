@@ -9,6 +9,7 @@ import Submission from '../models/Submission.js';
 import Timetable from '../models/Timetable.js';
 import LeaveRequest from '../models/LeaveRequest.js';
 import StudyMaterial from '../models/StudyMaterial.js';
+import Schedule from '../models/Schedule.js';
 import Grade from '../models/Grade.js';
 
 // Get student dashboard data
@@ -367,6 +368,27 @@ export const getTimetable = async (req, res) => {
       message: 'Server error', 
       error: error.message 
     });
+  }
+};
+
+// Weekly class schedule for student (by grade and enrolled courses)
+export const getSchedule = async (req, res) => {
+  try {
+    const student = req.user;
+    if (!student) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    // Find active courses for the student's grade
+    const courses = await Course.find({ status: 'active', grade: Number(student.grade) }).select('_id name grade');
+    const courseIds = courses.map(c => c._id);
+
+    const entries = await Schedule.find({ courseId: { $in: courseIds } })
+      .populate('courseId', 'name code grade')
+      .sort({ dayOfWeek: 1, startTime: 1 });
+
+    res.json({ success: true, entries });
+  } catch (error) {
+    console.error('Get student schedule error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
 
