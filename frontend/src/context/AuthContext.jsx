@@ -43,9 +43,9 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = (userData) => {
-    if (!userData) {
-      console.error('User data is required');
-      return;
+    if (!userData || !userData.role) {
+      console.error('Valid user data with role is required for login');
+      return false; // Return false to indicate login failed
     }
     
     setUser(userData);
@@ -61,6 +61,8 @@ export const AuthProvider = ({ children }) => {
     } else if (userData.role === 'admin') {
       navigate('/admin/home');
     }
+    
+    return true; // Return true to indicate successful login
   };
 
   const logout = async () => {

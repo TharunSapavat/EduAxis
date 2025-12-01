@@ -9,6 +9,7 @@ import {
   submitAssignment,
   getSubmissionDetails,
   getTimetable,
+  getSchedule,
   getAnnouncements,
   getFees,
   makePayment,
@@ -49,6 +50,8 @@ router.get('/assignments/:assignmentId/submission', getSubmissionDetails);
 
 // Timetable
 router.get('/timetable', getTimetable);
+// Weekly schedule
+router.get('/schedule', getSchedule);
 
 // Announcements
 router.get('/announcements', getAnnouncements);

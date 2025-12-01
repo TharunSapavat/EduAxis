@@ -22,6 +22,7 @@ import TeacherAssignmentsList from '../components/teacher/TeacherAssignmentsList
 import CreateAnnouncementForm from '../components/teacher/TeacherCreateAnnouncementForm';
 import TeacherAnnouncementsList from '../components/teacher/TeacherAnnouncementsList';
 import TeacherTimetable from '../components/teacher/TeacherTimetable';
+import TeacherSchedule from '../components/teacher/TeacherSchedule';
 import TeacherLeave from '../components/teacher/TeacherLeave';
 import TeacherMaterials from '../components/teacher/TeacherMaterials';
 
@@ -38,6 +39,7 @@ export default function TeacherDashboard() {
   const [coursesLoading, setCoursesLoading] = useState(false);
   const [statsLoading, setStatsLoading] = useState(false);
   const socketRef = useRef(null);
+  const joinedRef = useRef(null);
   
   // Custom hooks
   const { notification, showNotification, hideNotification } = useNotification();
@@ -56,6 +58,7 @@ export default function TeacherDashboard() {
   const [attendanceStudents, setAttendanceStudents] = useState([]);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [attendanceMarking, setAttendanceMarking] = useState({});
+  const [attendanceMap, setAttendanceMap] = useState({}); // { [studentId]: { status, date, remarks } }
 
   // Mark attendance helper
   const markAttendanceStatus = useCallback(async (studentId, status) => {
@@ -63,6 +66,15 @@ export default function TeacherDashboard() {
     try {
       setAttendanceMarking(prev => ({ ...prev, [studentId]: true }));
       await teacherAPI.markAttendance({ studentId, courseId: attendanceCourseId, status });
+      // Optimistically update local map
+      setAttendanceMap(prev => ({
+        ...prev,
+        [String(studentId)]: {
+          ...(prev[String(studentId)] || {}),
+          status,
+          date: new Date().toISOString()
+        }
+      }));
       showNotification('Attendance marked successfully', 'success');
     } catch (e) {
       console.error('Failed to mark attendance', e);
@@ -96,11 +108,65 @@ export default function TeacherDashboard() {
       }
     });
 
-    socketRef.current = socket;
+    socket.on('attendanceUpdated', (payload) => {
+      // payload: { studentId, courseId, record }
+      if (!payload) return;
+      if (attendanceCourseId && String(payload.courseId) !== String(attendanceCourseId)) return;
+      const sid = String(payload.studentId);
+      const rec = payload.record || {};
+      setAttendanceMap(prev => ({
+        ...prev,
+        [sid]: {
+          status: rec.status,
+          date: rec.date || rec.updatedAt || new Date().toISOString(),
+          remarks: rec.remarks || ''
+        }
+      }));
+    });
 
-    return () => {
-      socket.disconnect();
-    };
+    socketRef.current = socket;
+    // Initialize once
+    if (!socketRef.current) {
+      const socket = io(import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000', {
+        withCredentials: true,
+        transports: ['websocket', 'polling']
+      });
+
+      socket.on('connect', () => {
+        console.log('Teacher socket connected');
+        const joinId = user?._id || user?.id;
+        if (joinId) {
+          socket.emit('join', { userId: joinId });
+          joinedRef.current = joinId;
+        }
+      });
+
+      socket.on('message:received', (payload) => {
+        console.log('New message received', payload);
+        if (Notification.permission === 'granted') {
+          new Notification('New Message', {
+            body: `${payload.sender.name}: ${payload.text.substring(0, 50)}...`
+          });
+        }
+      });
+
+      socketRef.current = socket;
+
+      return () => {
+        socket.disconnect();
+        joinedRef.current = null;
+      };
+    }
+  }, []);
+
+  // Ensure join when user becomes available after connect
+  useEffect(() => {
+    const socket = socketRef.current;
+    const joinId = user?._id || user?.id;
+    if (socket && socket.connected && joinId && joinedRef.current !== joinId) {
+      socket.emit('join', { userId: joinId });
+      joinedRef.current = joinId;
+    }
   }, [user]);
 
   // Request notification permission
@@ -129,10 +195,10 @@ export default function TeacherDashboard() {
     }
   }, [user]);
 
-  // Load teacher courses when viewing Home, Courses, Attendance, Grading or Announcements
+  // Load teacher courses when viewing Home, Courses, Attendance, Grading, Announcements, or Schedule
   useEffect(() => {
     if (!user || user.role !== 'teacher') return;
-    const shouldFetch = ['/teacher/home','/teacher/courses','/teacher/attendance','/teacher/grading','/teacher/announcements'].includes(location.pathname) || location.pathname === '/teacher';
+    const shouldFetch = ['/teacher/home','/teacher/courses','/teacher/attendance','/teacher/grading','/teacher/announcements','/teacher/schedule'].includes(location.pathname) || location.pathname === '/teacher';
     if (!shouldFetch) return;
 
     const loadCourses = async () => {
@@ -167,9 +233,23 @@ export default function TeacherDashboard() {
       try {
         const res = await teacherAPI.getStudents({ courseId: attendanceCourseId });
         setAttendanceStudents(res.data.students || []);
+        // After students load, fetch today's attendance
+        try {
+          const att = await teacherAPI.getAttendance({ courseId: attendanceCourseId });
+          const map = {};
+          (att.data.records || []).forEach(r => {
+            const sid = String(r.studentId?._id || r.studentId);
+            map[sid] = { status: r.status, date: r.date, remarks: r.remarks };
+          });
+          setAttendanceMap(map);
+        } catch (e) {
+          console.warn('Failed to load attendance records', e);
+          setAttendanceMap({});
+        }
       } catch (e) {
         console.error('Failed to load students for attendance', e);
         setAttendanceStudents([]);
+        setAttendanceMap({});
       } finally {
         setAttendanceLoading(false);
       }
@@ -234,6 +314,7 @@ export default function TeacherDashboard() {
           attendanceLoading={attendanceLoading}
           attendanceStudents={attendanceStudents}
           attendanceMarking={attendanceMarking}
+          attendanceMap={attendanceMap}
           markAttendanceStatus={markAttendanceStatus}
         />;
 
@@ -264,6 +345,9 @@ export default function TeacherDashboard() {
 
       case '/teacher/timetable':
         return <TeacherTimetable />;
+
+      case '/teacher/schedule':
+        return <TeacherSchedule teacherCourses={teacherCourses} />;
 
       case '/teacher/leave':
         return <TeacherLeave />;
@@ -366,9 +450,10 @@ export default function TeacherDashboard() {
         </div>
       )}
 
-      <div className="flex">
+      <div className="flex relative">
         {/* Sidebar */}
-        <aside className={`${sidebarOpen ? 'w-64' : 'w-0'} transition-all duration-300 bg-white border-r border-slate-200 min-h-screen overflow-hidden`}>
+        {/* Desktop sidebar */}
+        <aside className={`${sidebarOpen ? 'w-64' : 'w-0'} transition-all duration-300 bg-white border-r border-slate-200 min-h-screen overflow-hidden hidden md:block`}>
           <nav className="p-4 space-y-1">
             {TEACHER_MODULES.map((module) => (
               <button
@@ -388,6 +473,45 @@ export default function TeacherDashboard() {
             ))}
           </nav>
         </aside>
+
+        {/* Mobile/half-screen overlay sidebar */}
+        {sidebarOpen && (
+          <>
+            <div
+              className="fixed inset-0 bg-slate-900/40 md:hidden"
+              onClick={() => setSidebarOpen(false)}
+            />
+            <aside className="fixed top-0 left-0 h-full w-64 bg-white border-r border-slate-200 shadow-2xl z-40 md:hidden">
+              <div className="p-4 flex items-center justify-between border-b border-slate-200">
+                <p className="text-sm font-medium text-slate-700">Menu</p>
+                <button
+                  onClick={() => setSidebarOpen(false)}
+                  className="p-2 hover:bg-slate-100 rounded-lg"
+                >
+                  <X className="w-5 h-5 text-slate-600" />
+                </button>
+              </div>
+              <nav className="p-4 space-y-1">
+                {TEACHER_MODULES.map((module) => (
+                  <button
+                    key={module.id}
+                    onClick={() => { navigate(`/teacher/${module.id}`); setSidebarOpen(false); }}
+                    className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
+                      location.pathname === `/teacher/${module.id}` || (module.id === 'home' && location.pathname === '/teacher')
+                        ? 'bg-green-600 text-white shadow-md'
+                        : 'text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <module.icon className="w-5 h-5" />
+                    <div className="text-left flex-1">
+                      <p className="text-sm font-medium">{module.title}</p>
+                    </div>
+                  </button>
+                ))}
+              </nav>
+            </aside>
+          </>
+        )}
 
         {/* Main Content Area */}
         <main className="flex-1">

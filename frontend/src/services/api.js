@@ -34,10 +34,17 @@ api.interceptors.response.use(
       
       switch (status) {
         case 401:
-          // Unauthorized - clear user session (cookie is cleared by backend)
-          console.error('Unauthorized access - logging out');
-          localStorage.removeItem('user');
-          window.location.href = '/';
+          // Unauthorized - Only redirect if it's NOT a login/register request
+          const isAuthRequest = error.config.url.includes('/auth/login') || 
+                                error.config.url.includes('/auth/register');
+          
+          if (!isAuthRequest) {
+            // User is not authenticated for a protected route - clear session
+            console.error('Unauthorized access - logging out');
+            localStorage.removeItem('user');
+            window.location.href = '/';
+          }
+          // For auth requests (login/register), let the component handle the error
           break;
         case 403:
           console.error('Forbidden:', data.message);
@@ -87,6 +94,7 @@ export const studentAPI = {
   },
   getSubmissionDetails: (assignmentId) => api.get(`/student/assignments/${assignmentId}/submission`),
   getTimetable: (day) => api.get('/student/timetable', { params: { day } }),
+  getSchedule: () => api.get('/student/schedule'),
   getAnnouncements: () => api.get('/student/announcements'),
   getFees: () => api.get('/student/fees'),
   makePayment: (paymentData) => api.post('/student/payment', paymentData),
@@ -107,6 +115,7 @@ export const teacherAPI = {
   getCourses: (teacherId) => api.get(`/teacher/courses?teacherId=${teacherId}`),
   getStudents: (params) => api.get('/teacher/students', { params }),
   markAttendance: (data) => api.post('/teacher/attendance', data),
+  getAttendance: (params) => api.get('/teacher/attendance', { params }),
   submitGrades: (data) => api.post('/teacher/grades', data),
   getAssignments: () => api.get('/teacher/assignments'),
   createAssignment: (formData) => {
@@ -122,6 +131,9 @@ export const teacherAPI = {
   deleteAnnouncement: (id) => api.delete(`/teacher/announcements/${id}`),
   // Timetable
   getTimetable: () => api.get('/teacher/timetable'),
+  // Weekly schedule
+  getSchedule: (params) => api.get('/teacher/schedule', { params }),
+  createSchedule: (data) => api.post('/teacher/schedule', data),
   // Leave Requests
   applyLeave: (data) => api.post('/teacher/leave-requests', data),
   getLeaveRequests: () => api.get('/teacher/leave-requests'),

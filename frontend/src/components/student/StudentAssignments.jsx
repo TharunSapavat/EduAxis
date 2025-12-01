@@ -21,6 +21,15 @@ export default function StudentAssignments({
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterCourse, setFilterCourse] = useState('');
 
+  // Clear filters
+  const clearFilters = () => {
+    setFilterStatus('all');
+    setFilterCourse('');
+    setCurrentPage(1);
+  };
+
+  const hasActiveFilters = filterStatus !== 'all' || filterCourse !== '';
+
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
@@ -40,12 +49,16 @@ export default function StudentAssignments({
     return assignments.filter(assignment => {
       const dueDate = new Date(assignment.dueDate);
       const isOverdue = dueDate < new Date();
-      const isPending = assignment.status === 'active' || assignment.status === 'pending';
+      const submissionStatus = assignment.submissionStatus || 'pending';
+      const isSubmitted = submissionStatus === 'submitted' || submissionStatus === 'graded' || recentlySubmitted[assignment._id];
+      const isPending = !isSubmitted;
       
-      if (filterStatus === 'pending' && !(isPending && !recentlySubmitted[assignment._id])) return false;
-      if (filterStatus === 'submitted' && (isPending || recentlySubmitted[assignment._id] === false)) return false;
+      // Pending: not submitted AND not overdue
+      if (filterStatus === 'pending' && (!isPending || isOverdue)) return false;
+      if (filterStatus === 'submitted' && (!isSubmitted || submissionStatus === 'graded')) return false;
+      // Overdue: not submitted AND past due date
       if (filterStatus === 'overdue' && !(isOverdue && isPending)) return false;
-      if (filterStatus === 'graded' && assignment.status !== 'graded') return false;
+      if (filterStatus === 'graded' && submissionStatus !== 'graded') return false;
       
       if (filterCourse) {
         const courseName = assignment.courseId?.name || assignment.subject;
@@ -143,9 +156,21 @@ export default function StudentAssignments({
         <>
           {/* Filters */}
           <div className="mb-4 p-4 bg-white rounded-xl shadow-md border border-slate-100">
-            <div className="flex items-center gap-2 mb-3">
-              <Filter className="w-4 h-4 text-slate-600" />
-              <h3 className="text-sm font-medium text-slate-700">Filters</h3>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-slate-600" />
+                <h3 className="text-sm font-medium text-slate-700">Filters</h3>
+                <span className="text-xs text-slate-500">({filteredAssignments.length} assignments)</span>
+              </div>
+              {hasActiveFilters && (
+                <button
+                  onClick={clearFilters}
+                  className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                  Clear Filters
+                </button>
+              )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
@@ -179,7 +204,9 @@ export default function StudentAssignments({
                 {paginatedAssignments.map((assignment) => {
             const dueDate = new Date(assignment.dueDate);
             const isOverdue = dueDate < new Date();
-            const isPending = assignment.status === 'active' || assignment.status === 'pending';
+            const submissionStatus = assignment.submissionStatus || 'pending';
+            const isSubmitted = submissionStatus === 'submitted' || submissionStatus === 'graded' || recentlySubmitted[assignment._id];
+            const isPending = !isSubmitted;
             
             return (
               <div key={assignment._id} className="bg-white rounded-xl shadow-md p-6 border border-slate-100 hover:shadow-lg transition-shadow">
@@ -232,11 +259,17 @@ export default function StudentAssignments({
                       ? 'bg-red-100 text-red-700'
                       : isPending
                       ? 'bg-orange-100 text-orange-700'
-                      : assignment.status === 'graded'
+                      : submissionStatus === 'graded'
                       ? 'bg-green-100 text-green-700'
                       : 'bg-blue-100 text-blue-700'
                   }`}>
-                    {isOverdue && isPending ? 'Overdue' : assignment.status || 'Pending'}
+                    {isOverdue && isPending 
+                      ? 'Overdue' 
+                      : submissionStatus === 'graded' 
+                      ? 'Graded' 
+                      : submissionStatus === 'submitted'
+                      ? 'Submitted'
+                      : 'Pending'}
                   </span>
                 </div>
                 <div className="flex gap-3 mt-4">
