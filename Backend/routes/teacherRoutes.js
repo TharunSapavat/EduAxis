@@ -4,6 +4,7 @@ import {
   getCourses,
   getStudents,
   markAttendance,
+  getAttendanceForCourse,
   submitGrades,
   getAssignments,
   createAssignment,
@@ -30,6 +31,7 @@ router.get('/dashboard', getDashboard);
 router.get('/courses', getCourses);
 router.get('/students', getStudents);
 router.post('/attendance', markAttendance);
+router.get('/attendance', getAttendanceForCourse);
 router.post('/grades', submitGrades);
 router.get('/assignments', getAssignments);
 // Update to handle file uploads - allow up to 5 attachment files

@@ -167,6 +167,42 @@ export const markAttendance = async (req, res) => {
   }
 };
 
+// Get attendance for a course on a specific day (defaults to today)
+export const getAttendanceForCourse = async (req, res) => {
+  try {
+    const teacherId = req.user?._id;
+    const { courseId, date } = req.query;
+
+    if (!courseId) {
+      return res.status(400).json({ success: false, message: 'courseId is required' });
+    }
+
+    const course = await Course.findById(courseId).select('teacherId');
+    if (!course) {
+      return res.status(404).json({ success: false, message: 'Course not found' });
+    }
+    if (String(course.teacherId) !== String(teacherId)) {
+      return res.status(403).json({ success: false, message: 'Not allowed to view attendance for this course' });
+    }
+
+    const d = date ? new Date(date) : new Date();
+    const startOfDay = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const endOfDay = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate() + 1));
+
+    const records = await Attendance.find({
+      courseId,
+      date: { $gte: startOfDay, $lt: endOfDay }
+    })
+      .select('studentId status remarks date')
+      .populate('studentId', 'name email studentId grade');
+
+    res.json({ success: true, records });
+  } catch (error) {
+    console.error('Get attendance error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
 // Submit grades
 export const submitGrades = async (req, res) => {
   try {

@@ -107,6 +107,7 @@ export const teacherAPI = {
   getCourses: (teacherId) => api.get(`/teacher/courses?teacherId=${teacherId}`),
   getStudents: (params) => api.get('/teacher/students', { params }),
   markAttendance: (data) => api.post('/teacher/attendance', data),
+  getAttendance: (params) => api.get('/teacher/attendance', { params }),
   submitGrades: (data) => api.post('/teacher/grades', data),
   getAssignments: () => api.get('/teacher/assignments'),
   createAssignment: (formData) => {

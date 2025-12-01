@@ -56,6 +56,7 @@ export default function TeacherDashboard() {
   const [attendanceStudents, setAttendanceStudents] = useState([]);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [attendanceMarking, setAttendanceMarking] = useState({});
+  const [attendanceMap, setAttendanceMap] = useState({}); // { [studentId]: { status, date, remarks } }
 
   // Mark attendance helper
   const markAttendanceStatus = useCallback(async (studentId, status) => {
@@ -63,6 +64,15 @@ export default function TeacherDashboard() {
     try {
       setAttendanceMarking(prev => ({ ...prev, [studentId]: true }));
       await teacherAPI.markAttendance({ studentId, courseId: attendanceCourseId, status });
+      // Optimistically update local map
+      setAttendanceMap(prev => ({
+        ...prev,
+        [String(studentId)]: {
+          ...(prev[String(studentId)] || {}),
+          status,
+          date: new Date().toISOString()
+        }
+      }));
       showNotification('Attendance marked successfully', 'success');
     } catch (e) {
       console.error('Failed to mark attendance', e);
@@ -94,6 +104,22 @@ export default function TeacherDashboard() {
           body: `${payload.sender.name}: ${payload.text.substring(0, 50)}...`
         });
       }
+    });
+
+    socket.on('attendanceUpdated', (payload) => {
+      // payload: { studentId, courseId, record }
+      if (!payload) return;
+      if (attendanceCourseId && String(payload.courseId) !== String(attendanceCourseId)) return;
+      const sid = String(payload.studentId);
+      const rec = payload.record || {};
+      setAttendanceMap(prev => ({
+        ...prev,
+        [sid]: {
+          status: rec.status,
+          date: rec.date || rec.updatedAt || new Date().toISOString(),
+          remarks: rec.remarks || ''
+        }
+      }));
     });
 
     socketRef.current = socket;
@@ -167,9 +193,23 @@ export default function TeacherDashboard() {
       try {
         const res = await teacherAPI.getStudents({ courseId: attendanceCourseId });
         setAttendanceStudents(res.data.students || []);
+        // After students load, fetch today's attendance
+        try {
+          const att = await teacherAPI.getAttendance({ courseId: attendanceCourseId });
+          const map = {};
+          (att.data.records || []).forEach(r => {
+            const sid = String(r.studentId?._id || r.studentId);
+            map[sid] = { status: r.status, date: r.date, remarks: r.remarks };
+          });
+          setAttendanceMap(map);
+        } catch (e) {
+          console.warn('Failed to load attendance records', e);
+          setAttendanceMap({});
+        }
       } catch (e) {
         console.error('Failed to load students for attendance', e);
         setAttendanceStudents([]);
+        setAttendanceMap({});
       } finally {
         setAttendanceLoading(false);
       }
@@ -234,6 +274,7 @@ export default function TeacherDashboard() {
           attendanceLoading={attendanceLoading}
           attendanceStudents={attendanceStudents}
           attendanceMarking={attendanceMarking}
+          attendanceMap={attendanceMap}
           markAttendanceStatus={markAttendanceStatus}
         />;
 
