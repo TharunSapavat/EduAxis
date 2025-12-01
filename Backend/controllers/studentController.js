@@ -9,6 +9,7 @@ import Submission from '../models/Submission.js';
 import Timetable from '../models/Timetable.js';
 import LeaveRequest from '../models/LeaveRequest.js';
 import StudyMaterial from '../models/StudyMaterial.js';
+import Grade from '../models/Grade.js';
 
 // Get student dashboard data
 export const getDashboard = async (req, res) => {
@@ -55,12 +56,25 @@ export const getDashboard = async (req, res) => {
       ? Math.round((presentCount / totalAttendance) * 100) 
       : 0;
     
+    // Get completed assignments count
+    const completedAssignments = await Submission.countDocuments({
+      studentId: student._id,
+      status: { $in: ['submitted', 'graded'] }
+    });
+    
+    // Get total assignments count for the student's grade (all active assignments for their grade)
+    const totalAssignments = await Assignment.countDocuments({
+      grade: String(student.grade),
+      status: 'active'
+    });
+    
     res.json({
       success: true,
       stats: {
         totalCourses,
         attendance: attendancePercentage,
-        currentGrade: 'A-', // TODO: Calculate from grades
+        completedAssignments,
+        totalAssignments,
         pendingAssignments
       }
     });
@@ -244,9 +258,42 @@ export const getAssignments = async (req, res) => {
       .populate('teacherId', 'name')
       .sort({ dueDate: -1, createdAt: -1 });
     
+    // Get all submissions for this student
+    const submissions = await Submission.find({ 
+      studentId: student._id 
+    }).select('assignmentId status marks submittedAt gradedAt');
+
+    // Create a map of assignmentId -> submission
+    const submissionMap = {};
+    submissions.forEach(sub => {
+      submissionMap[sub.assignmentId.toString()] = {
+        status: sub.status,
+        marks: sub.marks,
+        submittedAt: sub.submittedAt,
+        gradedAt: sub.gradedAt
+      };
+    });
+
+    // Attach submission info to each assignment
+    const assignmentsWithSubmissions = assignments.map(assignment => {
+      const assignmentObj = assignment.toObject();
+      const submission = submissionMap[assignment._id.toString()];
+      
+      if (submission) {
+        assignmentObj.submissionStatus = submission.status;
+        assignmentObj.submittedAt = submission.submittedAt;
+        assignmentObj.marks = submission.marks;
+        assignmentObj.gradedAt = submission.gradedAt;
+      } else {
+        assignmentObj.submissionStatus = 'pending';
+      }
+      
+      return assignmentObj;
+    });
+    
     res.json({ 
       success: true,
-      assignments 
+      assignments: assignmentsWithSubmissions 
     });
   } catch (error) {
     console.error('Get assignments error:', error);

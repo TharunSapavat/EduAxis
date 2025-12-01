@@ -212,6 +212,13 @@ export default function StudentInbox({ user, socket }) {
     e.preventDefault();
     if (!newMessage.trim() || !selectedConversation) return;
 
+    // Prevent self-messaging from UI as extra safety
+    const currentUserId = user.id || user._id;
+    if (selectedConversation.userId?.toString() === currentUserId?.toString()) {
+      alert('You cannot send a message to yourself');
+      return;
+    }
+
     // Stop typing indicator
     if (isTyping && socket) {
       setIsTyping(false);

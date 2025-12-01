@@ -49,12 +49,16 @@ export default function StudentAssignments({
     return assignments.filter(assignment => {
       const dueDate = new Date(assignment.dueDate);
       const isOverdue = dueDate < new Date();
-      const isPending = assignment.status === 'active' || assignment.status === 'pending';
+      const submissionStatus = assignment.submissionStatus || 'pending';
+      const isSubmitted = submissionStatus === 'submitted' || submissionStatus === 'graded' || recentlySubmitted[assignment._id];
+      const isPending = !isSubmitted;
       
-      if (filterStatus === 'pending' && !(isPending && !recentlySubmitted[assignment._id])) return false;
-      if (filterStatus === 'submitted' && (isPending || recentlySubmitted[assignment._id] === false)) return false;
+      // Pending: not submitted AND not overdue
+      if (filterStatus === 'pending' && (!isPending || isOverdue)) return false;
+      if (filterStatus === 'submitted' && (!isSubmitted || submissionStatus === 'graded')) return false;
+      // Overdue: not submitted AND past due date
       if (filterStatus === 'overdue' && !(isOverdue && isPending)) return false;
-      if (filterStatus === 'graded' && assignment.status !== 'graded') return false;
+      if (filterStatus === 'graded' && submissionStatus !== 'graded') return false;
       
       if (filterCourse) {
         const courseName = assignment.courseId?.name || assignment.subject;
@@ -200,7 +204,9 @@ export default function StudentAssignments({
                 {paginatedAssignments.map((assignment) => {
             const dueDate = new Date(assignment.dueDate);
             const isOverdue = dueDate < new Date();
-            const isPending = assignment.status === 'active' || assignment.status === 'pending';
+            const submissionStatus = assignment.submissionStatus || 'pending';
+            const isSubmitted = submissionStatus === 'submitted' || submissionStatus === 'graded' || recentlySubmitted[assignment._id];
+            const isPending = !isSubmitted;
             
             return (
               <div key={assignment._id} className="bg-white rounded-xl shadow-md p-6 border border-slate-100 hover:shadow-lg transition-shadow">
@@ -253,11 +259,17 @@ export default function StudentAssignments({
                       ? 'bg-red-100 text-red-700'
                       : isPending
                       ? 'bg-orange-100 text-orange-700'
-                      : assignment.status === 'graded'
+                      : submissionStatus === 'graded'
                       ? 'bg-green-100 text-green-700'
                       : 'bg-blue-100 text-blue-700'
                   }`}>
-                    {isOverdue && isPending ? 'Overdue' : assignment.status || 'Pending'}
+                    {isOverdue && isPending 
+                      ? 'Overdue' 
+                      : submissionStatus === 'graded' 
+                      ? 'Graded' 
+                      : submissionStatus === 'submitted'
+                      ? 'Submitted'
+                      : 'Pending'}
                   </span>
                 </div>
                 <div className="flex gap-3 mt-4">
