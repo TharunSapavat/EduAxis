@@ -193,6 +193,8 @@ export default function AdminDashboard() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [showUserDetails, setShowUserDetails] = useState(false);
   const [showUserForm, setShowUserForm] = useState(false);
+  const [showDeleteUserModal, setShowDeleteUserModal] = useState(false);
+  const [userToDelete, setUserToDelete] = useState(null);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersError, setUsersError] = useState('');
   const [currentUserPage, setCurrentUserPage] = useState(1);
@@ -227,6 +229,8 @@ export default function AdminDashboard() {
   const [payments, setPayments] = useState([]);
   const [filteredPayments, setFilteredPayments] = useState([]);
   const [showFeeForm, setShowFeeForm] = useState(false);
+  const [showDeleteFeeModal, setShowDeleteFeeModal] = useState(false);
+  const [feeToDelete, setFeeToDelete] = useState(null);
   const [paymentSearchQuery, setPaymentSearchQuery] = useState('');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState('all');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('all');
@@ -244,11 +248,14 @@ export default function AdminDashboard() {
   const [showCourseForm, setShowCourseForm] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [showCourseDetails, setShowCourseDetails] = useState(false);
+  const [showDeleteCourseModal, setShowDeleteCourseModal] = useState(false);
+  const [courseToDelete, setCourseToDelete] = useState(null);
   const [courseSearchQuery, setCourseSearchQuery] = useState('');
   const [courseStatusFilter, setCourseStatusFilter] = useState('all');
   const [coursesLoading, setCoursesLoading] = useState(false);
   const [coursesError, setCoursesError] = useState('');
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isEditUserMode, setIsEditUserMode] = useState(false);
   const [currentCoursePage, setCurrentCoursePage] = useState(1);
   const coursesPerPage = 9;
 
@@ -495,28 +502,33 @@ export default function AdminDashboard() {
         setShowFeeForm(false);
         resetFeeForm();
         fetchFees();
-        alert('Fee created successfully!');
+        showNotification('Fee created successfully!', 'success');
       }
     } catch (err) {
       console.error('Failed to create fee:', err);
-      alert(err.response?.data?.message || 'Failed to create fee');
+      showNotification(err.response?.data?.message || 'Failed to create fee', 'error');
     }
   };
 
-  const handleDeleteFee = async (feeId) => {
-    if (!window.confirm('Are you sure you want to delete this fee? This action cannot be undone.')) {
-      return;
-    }
+  const confirmDeleteFee = (feeId) => {
+    setFeeToDelete(feeId);
+    setShowDeleteFeeModal(true);
+  };
+
+  const handleDeleteFee = async () => {
+    if (!feeToDelete) return;
 
     try {
-      const res = await adminAPI.deleteFee(feeId);
+      setShowDeleteFeeModal(false);
+      const res = await adminAPI.deleteFee(feeToDelete);
       if (res.data.success) {
+        setFeeToDelete(null);
         fetchFees();
-        alert('Fee deleted successfully!');
+        showNotification('Fee deleted successfully!', 'success');
       }
     } catch (err) {
       console.error('Failed to delete fee:', err);
-      alert(err.response?.data?.message || 'Failed to delete fee');
+      showNotification(err.response?.data?.message || 'Failed to delete fee', 'error');
     }
   };
 
@@ -562,11 +574,15 @@ export default function AdminDashboard() {
       const userData = {
         name: data.name,
         email: data.email,
-        password: data.password,
         role: data.role,
         phone: data.phone,
         dateOfBirth: dateOfBirthFormatted
       };
+      
+      // Only include password if provided (for create or optional update)
+      if (data.password) {
+        userData.password = data.password;
+      }
       
       // Only include grade and section for students
       if (data.role === 'student') {
@@ -576,40 +592,52 @@ export default function AdminDashboard() {
       
       console.log('Sending to backend:', JSON.stringify(userData, null, 2)); // Debug log
       
-      const response = await adminAPI.createUser(userData);
+      let response;
+      if (isEditUserMode && selectedUser) {
+        response = await adminAPI.updateUser(selectedUser.id, userData);
+      } else {
+        response = await adminAPI.createUser(userData);
+      }
       
       if (response.data.success) {
         setShowUserForm(false);
+        setIsEditUserMode(false);
+        setSelectedUser(null);
         resetUserForm();
         fetchUsers();
-        alert('User created successfully!');
+        showNotification(isEditUserMode ? 'User updated successfully!' : 'User created successfully!', 'success');
       }
     } catch (err) {
-      console.error('Failed to create user:', err);
-      alert(err.response?.data?.message || 'Failed to create user');
+      console.error(isEditUserMode ? 'Failed to update user:' : 'Failed to create user:', err);
+      showNotification(err.response?.data?.message || (isEditUserMode ? 'Failed to update user' : 'Failed to create user'), 'error');
     } finally {
       setUsersLoading(false);
     }
   };
 
-  const handleDeleteUser = async (userId) => {
-    if (!window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-      return;
-    }
+  const confirmDeleteUser = (userId) => {
+    setUserToDelete(userId);
+    setShowDeleteUserModal(true);
+  };
+
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return;
 
     try {
       setUsersLoading(true);
-      const response = await adminAPI.deleteUser(userId);
+      setShowDeleteUserModal(false);
+      const response = await adminAPI.deleteUser(userToDelete);
       
       if (response.data.success) {
         setShowUserDetails(false);
         setSelectedUser(null);
+        setUserToDelete(null);
         fetchUsers();
-        alert('User deleted successfully!');
+        showNotification('User deleted successfully!', 'success');
       }
     } catch (err) {
       console.error('Failed to delete user:', err);
-      alert(err.response?.data?.message || 'Failed to delete user');
+      showNotification(err.response?.data?.message || 'Failed to delete user', 'error');
     } finally {
       setUsersLoading(false);
     }
@@ -649,11 +677,11 @@ export default function AdminDashboard() {
         setIsEditMode(false);
         resetCourseForm();
         fetchCourses();
-        alert('Course created successfully!');
+        showNotification('Course created successfully!', 'success');
       }
     } catch (err) {
       console.error('Failed to create course:', err);
-      alert(err.response?.data?.message || 'Failed to create course');
+      showNotification(err.response?.data?.message || 'Failed to create course', 'error');
     } finally {
       setCoursesLoading(false);
     }
@@ -676,34 +704,39 @@ export default function AdminDashboard() {
         setSelectedCourse(null);
         resetCourseForm();
         fetchCourses();
-        alert('Course updated successfully!');
+        showNotification('Course updated successfully!', 'success');
       }
     } catch (err) {
       console.error('Failed to update course:', err);
-      alert(err.response?.data?.message || 'Failed to update course');
+      showNotification(err.response?.data?.message || 'Failed to update course', 'error');
     } finally {
       setCoursesLoading(false);
     }
   };
 
-  const handleDeleteCourse = async (courseId) => {
-    if (!window.confirm('Are you sure you want to delete this course? This action cannot be undone.')) {
-      return;
-    }
+  const confirmDeleteCourse = (courseId) => {
+    setCourseToDelete(courseId);
+    setShowDeleteCourseModal(true);
+  };
+
+  const handleDeleteCourse = async () => {
+    if (!courseToDelete) return;
 
     try {
       setCoursesLoading(true);
-      const response = await adminAPI.deleteCourse(courseId);
+      setShowDeleteCourseModal(false);
+      const response = await adminAPI.deleteCourse(courseToDelete);
       
       if (response.data.success) {
         setShowCourseDetails(false);
         setSelectedCourse(null);
+        setCourseToDelete(null);
         fetchCourses();
-        alert('Course deleted successfully!');
+        showNotification('Course deleted successfully!', 'success');
       }
     } catch (err) {
       console.error('Failed to delete course:', err);
-      alert(err.response?.data?.message || 'Failed to delete course');
+      showNotification(err.response?.data?.message || 'Failed to delete course', 'error');
     } finally {
       setCoursesLoading(false);
     }
@@ -989,7 +1022,7 @@ export default function AdminDashboard() {
                                   <span>View</span>
                                 </button>
                                 <button
-                                  onClick={() => handleDeleteUser(user.id)}
+                                  onClick={() => confirmDeleteUser(user.id)}
                                   className="text-red-600 hover:text-red-900 font-medium flex items-center space-x-1"
                                 >
                                   <Trash2 className="w-4 h-4" />
@@ -1169,14 +1202,30 @@ export default function AdminDashboard() {
 
                       {/* Action Buttons */}
                       <div className="flex space-x-3 pt-6 border-t border-slate-200">
-                        <button className="flex-1 bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 transition-colors font-medium">
+                        <button 
+                          onClick={() => {
+                            setShowUserDetails(false);
+                            setShowUserForm(true);
+                            setIsEditUserMode(true);
+                            resetUserForm({
+                              name: selectedUser.name,
+                              email: selectedUser.email,
+                              role: selectedUser.role,
+                              studentId: selectedUser.studentId || '',
+                              teacherId: selectedUser.teacherId || '',
+                              phone: selectedUser.phone || '',
+                              grade: selectedUser.grade || '',
+                              section: selectedUser.section || '',
+                              dateOfBirth: selectedUser.dateOfBirth ? new Date(selectedUser.dateOfBirth).toISOString().split('T')[0] : '',
+                              address: selectedUser.address || ''
+                            });
+                          }}
+                          className="flex-1 bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 transition-colors font-medium"
+                        >
                           Edit User
                         </button>
-                        <button className="flex-1 bg-slate-100 text-slate-700 py-2 rounded-lg hover:bg-slate-200 transition-colors font-medium">
-                          View History
-                        </button>
                         <button 
-                          onClick={() => handleDeleteUser(selectedUser.id)}
+                          onClick={() => confirmDeleteUser(selectedUser.id)}
                           className="px-4 bg-red-100 text-red-700 py-2 rounded-lg hover:bg-red-200 transition-colors font-medium flex items-center space-x-1"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -1196,6 +1245,8 @@ export default function AdminDashboard() {
                   <button
                     onClick={() => {
                       setShowUserForm(false);
+                      setIsEditUserMode(false);
+                      setSelectedUser(null);
                       resetUserForm();
                     }}
                     className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors z-10"
@@ -1208,8 +1259,8 @@ export default function AdminDashboard() {
                       <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
                         <UserPlus className="w-8 h-8 text-purple-600" />
                       </div>
-                      <h2 className="text-3xl font-bold text-slate-900">Add New User</h2>
-                      <p className="text-slate-600 mt-2">Create a new account for student, teacher, or admin</p>
+                      <h2 className="text-3xl font-bold text-slate-900">{isEditUserMode ? 'Edit User' : 'Add New User'}</h2>
+                      <p className="text-slate-600 mt-2">{isEditUserMode ? 'Update user information' : 'Create a new account for student, teacher, or admin'}</p>
                     </div>
 
                     <form onSubmit={handleUserFormSubmit(handleCreateUser)} className="space-y-5">
@@ -1248,7 +1299,7 @@ export default function AdminDashboard() {
                           className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all ${
                             userErrors.name ? 'border-red-500' : 'border-slate-300'
                           }`}
-                          placeholder="John Doe"
+                          placeholder="Enter full name"
                         />
                         {userErrors.name && (
                           <p className="mt-1 text-sm text-red-600">{userErrors.name.message}</p>
@@ -1264,7 +1315,7 @@ export default function AdminDashboard() {
                           className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all ${
                             userErrors.email ? 'border-red-500' : 'border-slate-300'
                           }`}
-                          placeholder="user@example.com"
+                          placeholder="Enter email address"
                           autoComplete="email"
                         />
                         {userErrors.email && (
@@ -1446,7 +1497,7 @@ export default function AdminDashboard() {
                                 {fee.status}
                               </span>
                               <button
-                                onClick={() => handleDeleteFee(fee._id)}
+                                onClick={() => confirmDeleteFee(fee._id)}
                                 className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
                                 title="Delete fee"
                               >
@@ -2001,7 +2052,7 @@ export default function AdminDashboard() {
                           Edit
                         </button>
                         <button
-                          onClick={() => handleDeleteCourse(course._id)}
+                          onClick={() => confirmDeleteCourse(course._id)}
                           className="px-3 py-2 text-sm bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors font-medium"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -2732,6 +2783,96 @@ export default function AdminDashboard() {
 
       {/* Footer */}
       <DashboardFooter />
+
+      {/* Delete User Confirmation Modal */}
+      {showDeleteUserModal && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">Delete User</h3>
+            <p className="text-slate-600 mb-6">Are you sure you want to delete this user? This action cannot be undone.</p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowDeleteUserModal(false);
+                  setUserToDelete(null);
+                }}
+                className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteUser}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Fee Confirmation Modal */}
+      {showDeleteFeeModal && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">Delete Fee</h3>
+            <p className="text-slate-600 mb-6">Are you sure you want to delete this fee? This action cannot be undone.</p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowDeleteFeeModal(false);
+                  setFeeToDelete(null);
+                }}
+                className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteFee}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Course Confirmation Modal */}
+      {showDeleteCourseModal && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">Delete Course</h3>
+            <p className="text-slate-600 mb-6">Are you sure you want to delete this course? This action cannot be undone.</p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowDeleteCourseModal(false);
+                  setCourseToDelete(null);
+                }}
+                className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteCourse}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {notification && (
+        <NotificationToast
+          message={notification.message}
+          type={notification.type}
+          onClose={() => setNotification(null)}
+        />
+      )}
     </div>
   );
 }
