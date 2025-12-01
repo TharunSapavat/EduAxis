@@ -1,18 +1,29 @@
 import { useEffect, useRef, useState } from 'react';
 import { X, Mail, Lock, User } from 'lucide-react';
+import { useDispatch, useSelector } from 'react-redux';
 import { useAuth } from '../context/AuthContext';
-import { authAPI } from '../services/api';
+import { loginUser } from '../store/slices/authSlice';
+import { selectAuth } from '../store/store';
 
 export default function Login({ onClose, onSwitchToRegister }) {
   const { login } = useAuth();
+  const dispatch = useDispatch();
+  const { loading: authLoading, error: authError } = useSelector(selectAuth);
   const dialogRef = useRef(null);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     role: 'student'
   });
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const loading = authLoading;
+
+  // Sync Redux error to local error
+  useEffect(() => {
+    if (authError) {
+      setError(authError);
+    }
+  }, [authError]);
 
   // Auto-dismiss error after 5 seconds
   useEffect(() => {
@@ -26,45 +37,32 @@ export default function Login({ onClose, onSwitchToRegister }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
     
     // Client-side validation
     if (!formData.email || !formData.password) {
       setError('Please enter both email and password');
-      setLoading(false);
       return;
     }
 
     if (formData.password.length < 6) {
       setError('Password must be at least 6 characters long');
-      setLoading(false);
       return;
     }
     
     try {
-      const response = await authAPI.login(formData);
+      const result = await dispatch(loginUser(formData)).unwrap();
       
-      if (response.data.success && response.data.user) {
-        // Cookie is set automatically by backend!
-        // Just pass user data
-        const loginSuccess = login(response.data.user);
+      if (result.success && result.user) {
+        // Call the context login to handle navigation
+        const loginSuccess = login(result.user);
         if (loginSuccess !== false) {
-          onClose(); // Only close on successful login
+          onClose();
         }
-      } else {
-        // Login failed - keep form open and show error
-        setError(response.data.message || 'Login failed');
-        setLoading(false);
       }
     } catch (err) {
       console.error('Login error:', err);
-      setError(
-        err.response?.data?.message || 
-        err.message || 
-        'Login failed. Please try again.'
-      );
-      setLoading(false); // Ensure loading is set to false
+      setError(err || 'Login failed. Please try again.');
     }
   };
 

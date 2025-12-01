@@ -1,6 +1,8 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { authAPI } from '../services/api';
+import { useDispatch, useSelector } from 'react-redux';
+import { setUser, logoutUser } from '../store/slices/authSlice';
+import { selectAuth } from '../store/store';
 
 const AuthContext = createContext(null);
 
@@ -14,43 +16,36 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const dispatch = useDispatch();
+  const { user, isAuthenticated, loading } = useSelector(selectAuth);
 
-  // Restore user from localStorage on mount
+  // Restore user from localStorage on mount (if not already in Redux)
   useEffect(() => {
     const restoreSession = async () => {
       try {
-        // Cookie is automatically sent with requests
-        // Just restore user data from localStorage
-        const storedUser = localStorage.getItem('user');
-        
-        if (storedUser) {
-          const userData = JSON.parse(storedUser);
-          setUser(userData);
-          setIsAuthenticated(true);
+        if (!user) {
+          const storedUser = localStorage.getItem('user');
+          if (storedUser) {
+            const userData = JSON.parse(storedUser);
+            dispatch(setUser(userData));
+          }
         }
       } catch (error) {
         console.error('Error restoring user session:', error);
         localStorage.removeItem('user');
-      } finally {
-        setLoading(false);
       }
     };
 
     restoreSession();
-  }, []);
+  }, [dispatch, user]);
 
   const login = (userData) => {
     if (!userData || !userData.role) {
       console.error('Valid user data with role is required for login');
-      return false; // Return false to indicate login failed
+      return false;
     }
     
-    setUser(userData);
-    setIsAuthenticated(true);
-    // Cookie is set automatically by backend, we just store user info
+    dispatch(setUser(userData));
     localStorage.setItem('user', JSON.stringify(userData));
     
     // Navigate to appropriate dashboard
@@ -62,21 +57,15 @@ export const AuthProvider = ({ children }) => {
       navigate('/admin/home');
     }
     
-    return true; // Return true to indicate successful login
+    return true;
   };
 
   const logout = async () => {
     try {
-      // Call backend to clear cookie
-      await authAPI.logout();
+      await dispatch(logoutUser()).unwrap();
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      // Clear frontend state regardless of API call result
-      setUser(null);
-      setIsAuthenticated(false);
-      localStorage.removeItem('user');
-      // Navigate to landing page
       navigate('/');
     }
   };
