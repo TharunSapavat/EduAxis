@@ -62,6 +62,7 @@ export default function StudentDashboard() {
   const [libraryLoading, setLibraryLoading] = useState(false);
   const socketRef = useRef(null);
   const [socketConnected, setSocketConnected] = useState(false);
+  const joinedRef = useRef(null);
 
   // Leave Request States
   const [leaveRequests, setLeaveRequests] = useState([]);
@@ -126,6 +127,7 @@ export default function StudentDashboard() {
               console.warn('No MongoDB _id found on user for socket join');
             } else {
               socket.emit('join', { userId: joinId });
+              joinedRef.current = joinId;
             }
           } catch (err) {
             console.error('Socket join error', err);
@@ -138,9 +140,25 @@ export default function StudentDashboard() {
         socketRef.current.disconnect();
         socketRef.current = null;
         setSocketConnected(false);
+        joinedRef.current = null;
       }
     };
   }, []);
+
+  // Ensure we join the user room when user becomes available after initial connect
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket) return;
+    const joinId = user?._id || user?.id;
+    if (socketConnected && joinId && joinedRef.current !== joinId) {
+      try {
+        socket.emit('join', { userId: joinId });
+        joinedRef.current = joinId;
+      } catch (err) {
+        console.error('Deferred socket join error', err);
+      }
+    }
+  }, [socketConnected, user]);
 
   useEffect(() => {
     if (user && location.pathname === '/student/fees') {
