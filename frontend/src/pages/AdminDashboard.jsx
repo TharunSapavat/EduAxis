@@ -248,6 +248,10 @@ export default function AdminDashboard() {
   const [feesLoading, setFeesLoading] = useState(false);
   const [paymentsLoading, setPaymentsLoading] = useState(false);
   const [paymentStats, setPaymentStats] = useState({ total: 0, completed: 0, totalAmount: 0 });
+  const [currentFeePage, setCurrentFeePage] = useState(1);
+  const [currentPaymentPage, setCurrentPaymentPage] = useState(1);
+  const feesPerPage = 6;
+  const paymentsPerPage = 10;
 
   // Course Management States
   const [courses, setCourses] = useState([]);
@@ -470,6 +474,8 @@ export default function AdminDashboard() {
     }
 
     setFilteredPayments(result);
+    // Reset to first page when filters change
+    setCurrentPaymentPage(1);
   }, [paymentSearchQuery, paymentMethodFilter, paymentStatusFilter, payments]);
 
   // Fetch functions
@@ -554,6 +560,8 @@ export default function AdminDashboard() {
     }
 
     setFilteredUsers(result);
+    // Reset to first page when filters change
+    setCurrentUserPage(1);
   }, [searchQuery, roleFilter, users]);
 
   const handleViewDetails = (user) => {
@@ -863,6 +871,8 @@ export default function AdminDashboard() {
     }
 
     setFilteredCourses(result);
+    // Reset to first page when filters change
+    setCurrentCoursePage(1);
   }, [courseSearchQuery, courseStatusFilter, courses]);
 
   const modules = [
@@ -1065,18 +1075,55 @@ export default function AdminDashboard() {
                         </td>
                       </tr>
                     ) : filteredUsers.length > 0 ? (
-                      filteredUsers.map((user) => (
-                        <tr key={user.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold ${
-                                user.role === 'student' ? 'bg-blue-500' : user.role === 'teacher' ? 'bg-green-500' : 'bg-purple-500'
-                              }`}>
-                                {(user.name || '?').charAt(0)}
+                      (() => {
+                        const indexOfLastUser = currentUserPage * usersPerPage;
+                        const indexOfFirstUser = indexOfLastUser - usersPerPage;
+                        const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
+                        return currentUsers.map((user) => (
+                          <tr key={user.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold ${
+                                  user.role === 'student' ? 'bg-blue-500' : user.role === 'teacher' ? 'bg-green-500' : 'bg-purple-500'
+                                }`}>
+                                  {(user.name || '?').charAt(0)}
+                                </div>
+                                <div className="ml-3">
+                                  <p className="text-sm font-medium text-slate-900">{user.name || 'Unnamed'}</p>
+                                  <p className="text-xs text-slate-500">{user.phone || '—'}</p>
+                                </div>
                               </div>
-                              <div className="ml-3">
-                                <p className="text-sm font-medium text-slate-900">{user.name || 'Unnamed'}</p>
-                                <p className="text-xs text-slate-500">{user.phone || '—'}</p>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <p className="text-sm text-slate-900">{user.email}</p>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                user.role === 'student' 
+                                  ? 'bg-blue-100 text-blue-800' 
+                                  : user.role === 'teacher'
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-purple-100 text-purple-800'
+                              }`}>
+                                {user.role ? (user.role.charAt(0).toUpperCase() + user.role.slice(1)) : '—'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                              <div className="flex items-center space-x-3">
+                                <button
+                                  onClick={() => handleViewDetails(user)}
+                                  className="text-purple-600 hover:text-purple-900 font-medium flex items-center space-x-1"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                  <span>View</span>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteUser(user.id)}
+                                  className="text-red-600 hover:text-red-900 font-medium flex items-center space-x-1"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  <span>Delete</span>
+                                </button>
                               </div>
                             </div>
                           </td>
@@ -1125,6 +1172,51 @@ export default function AdminDashboard() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Pagination Controls */}
+              {filteredUsers.length > usersPerPage && (
+                <div className="px-6 py-4 border-t border-slate-200 bg-slate-50">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-slate-600">
+                      Showing {((currentUserPage - 1) * usersPerPage) + 1} to {Math.min(currentUserPage * usersPerPage, filteredUsers.length)} of {filteredUsers.length} users
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => setCurrentUserPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentUserPage === 1}
+                        className="px-3 py-1 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Previous
+                      </button>
+                      
+                      {/* Page Numbers */}
+                      <div className="flex items-center space-x-1">
+                        {Array.from({ length: Math.ceil(filteredUsers.length / usersPerPage) }, (_, i) => i + 1).map((page) => (
+                          <button
+                            key={page}
+                            onClick={() => setCurrentUserPage(page)}
+                            className={`px-3 py-1 rounded-lg transition-colors ${
+                              currentUserPage === page
+                                ? 'bg-purple-600 text-white'
+                                : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        ))}
+                      </div>
+
+                      <button
+                        onClick={() => setCurrentUserPage(prev => Math.min(prev + 1, Math.ceil(filteredUsers.length / usersPerPage)))}
+                        disabled={currentUserPage === Math.ceil(filteredUsers.length / usersPerPage)}
+                        className="px-3 py-1 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* User Details Modal */}
@@ -1531,19 +1623,52 @@ export default function AdminDashboard() {
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
+                      ));
+                    })()}
+                  </div>
+                  
+                  {/* Fees Pagination */}
+                  {fees.length > feesPerPage && (
+                    <div className="mt-6 flex items-center justify-between">
+                      <div className="text-sm text-slate-600">
+                        Showing {((currentFeePage - 1) * feesPerPage) + 1} to {Math.min(currentFeePage * feesPerPage, fees.length)} of {fees.length} fees
                       </div>
-                      <p className="text-2xl font-bold text-purple-600 mb-2">₹{fee.amount}</p>
-                      <p className="text-sm text-slate-600 mb-2">{fee.description}</p>
-                      <div className="text-xs text-slate-500 space-y-1">
-                        <p>Due: {new Date(fee.dueDate).toLocaleDateString()}</p>
-                        <p>Semester: {fee.semester}</p>
-                        <p>
-                          Scope: {fee.appliesTo === 'all' ? 'All students' : `Grades: ${(fee.grades || []).join(', ')}`}
-                        </p>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => setCurrentFeePage(prev => Math.max(prev - 1, 1))}
+                          disabled={currentFeePage === 1}
+                          className="px-3 py-1 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          Previous
+                        </button>
+                        
+                        <div className="flex items-center space-x-1">
+                          {Array.from({ length: Math.ceil(fees.length / feesPerPage) }, (_, i) => i + 1).map((page) => (
+                            <button
+                              key={page}
+                              onClick={() => setCurrentFeePage(page)}
+                              className={`px-3 py-1 rounded-lg transition-colors ${
+                                currentFeePage === page
+                                  ? 'bg-purple-600 text-white'
+                                  : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                              }`}
+                            >
+                              {page}
+                            </button>
+                          ))}
+                        </div>
+
+                        <button
+                          onClick={() => setCurrentFeePage(prev => Math.min(prev + 1, Math.ceil(fees.length / feesPerPage)))}
+                          disabled={currentFeePage === Math.ceil(fees.length / feesPerPage)}
+                          className="px-3 py-1 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          Next
+                        </button>
                       </div>
                     </div>
-                  ))}
-                </div>
+                  )}
+                </>
               ) : (
                 <p className="text-slate-500 text-center py-8">No fees set yet. Click "Set New Fee" to create one.</p>
               )}
@@ -1620,36 +1745,41 @@ export default function AdminDashboard() {
                         <td colSpan="6" className="px-6 py-8 text-center text-slate-500">Loading payments...</td>
                       </tr>
                     ) : filteredPayments.length > 0 ? (
-                      filteredPayments.map((payment) => (
-                        <tr key={payment._id} className="hover:bg-slate-50">
-                          <td className="px-6 py-4">
-                            <div>
-                              <p className="text-sm font-medium text-slate-900">{payment.studentName}</p>
-                              <p className="text-xs text-slate-500">{payment.studentEmail}</p>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-sm text-slate-900">{payment.feeTitle}</td>
-                          <td className="px-6 py-4 text-sm font-semibold text-purple-600">₹{payment.amount}</td>
-                          <td className="px-6 py-4">
-                            <span className="px-3 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
-                              {payment.paymentMethod}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-sm text-slate-600">
-                            {new Date(payment.paymentDate).toLocaleDateString()}
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className={`px-3 py-1 text-xs rounded-full ${
-                              payment.status === 'completed' ? 'bg-green-100 text-green-800' :
-                              payment.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                              payment.status === 'failed' ? 'bg-red-100 text-red-800' :
-                              'bg-slate-100 text-slate-800'
-                            }`}>
-                              {payment.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))
+                      (() => {
+                        const indexOfLastPayment = currentPaymentPage * paymentsPerPage;
+                        const indexOfFirstPayment = indexOfLastPayment - paymentsPerPage;
+                        const currentPayments = filteredPayments.slice(indexOfFirstPayment, indexOfLastPayment);
+                        return currentPayments.map((payment) => (
+                          <tr key={payment._id} className="hover:bg-slate-50">
+                            <td className="px-6 py-4">
+                              <div>
+                                <p className="text-sm font-medium text-slate-900">{payment.studentName}</p>
+                                <p className="text-xs text-slate-500">{payment.studentEmail}</p>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-slate-900">{payment.feeTitle}</td>
+                            <td className="px-6 py-4 text-sm font-semibold text-purple-600">₹{payment.amount}</td>
+                            <td className="px-6 py-4">
+                              <span className="px-3 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                                {payment.paymentMethod}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-slate-600">
+                              {new Date(payment.paymentDate).toLocaleDateString()}
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={`px-3 py-1 text-xs rounded-full ${
+                                payment.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                payment.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                payment.status === 'failed' ? 'bg-red-100 text-red-800' :
+                                'bg-slate-100 text-slate-800'
+                              }`}>
+                                {payment.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ));
+                      })()
                     ) : (
                       <tr>
                         <td colSpan="6" className="px-6 py-12 text-center">
@@ -1661,6 +1791,50 @@ export default function AdminDashboard() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Payments Pagination */}
+              {filteredPayments.length > paymentsPerPage && (
+                <div className="px-6 py-4 border-t border-slate-200 bg-slate-50">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-slate-600">
+                      Showing {((currentPaymentPage - 1) * paymentsPerPage) + 1} to {Math.min(currentPaymentPage * paymentsPerPage, filteredPayments.length)} of {filteredPayments.length} payments
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => setCurrentPaymentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentPaymentPage === 1}
+                        className="px-3 py-1 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Previous
+                      </button>
+                      
+                      <div className="flex items-center space-x-1">
+                        {Array.from({ length: Math.ceil(filteredPayments.length / paymentsPerPage) }, (_, i) => i + 1).map((page) => (
+                          <button
+                            key={page}
+                            onClick={() => setCurrentPaymentPage(page)}
+                            className={`px-3 py-1 rounded-lg transition-colors ${
+                              currentPaymentPage === page
+                                ? 'bg-purple-600 text-white'
+                                : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        ))}
+                      </div>
+
+                      <button
+                        onClick={() => setCurrentPaymentPage(prev => Math.min(prev + 1, Math.ceil(filteredPayments.length / paymentsPerPage)))}
+                        disabled={currentPaymentPage === Math.ceil(filteredPayments.length / paymentsPerPage)}
+                        className="px-3 py-1 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Fee Form Modal */}
@@ -1915,17 +2089,22 @@ export default function AdminDashboard() {
             </div>
 
             {/* Courses Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {coursesLoading ? (
-                <div className="col-span-full bg-white rounded-xl shadow-md p-12 text-center">
-                  <p className="text-slate-500">Loading courses...</p>
-                </div>
-              ) : coursesError ? (
-                <div className="col-span-full bg-white rounded-xl shadow-md p-12 text-center">
-                  <p className="text-red-600">{coursesError}</p>
-                </div>
-              ) : filteredCourses.length > 0 ? (
-                filteredCourses.map((course) => (
+            <div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+                {coursesLoading ? (
+                  <div className="col-span-full bg-white rounded-xl shadow-md p-12 text-center">
+                    <p className="text-slate-500">Loading courses...</p>
+                  </div>
+                ) : coursesError ? (
+                  <div className="col-span-full bg-white rounded-xl shadow-md p-12 text-center">
+                    <p className="text-red-600">{coursesError}</p>
+                  </div>
+                ) : filteredCourses.length > 0 ? (
+                  (() => {
+                    const indexOfLastCourse = currentCoursePage * coursesPerPage;
+                    const indexOfFirstCourse = indexOfLastCourse - coursesPerPage;
+                    const currentCourses = filteredCourses.slice(indexOfFirstCourse, indexOfLastCourse);
+                    return currentCourses.map((course) => (
                   <div
                     key={course._id}
                     className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden border border-slate-100"
@@ -1989,23 +2168,69 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                   </div>
-                ))
-              ) : (
-                <div className="col-span-full bg-white rounded-xl shadow-md p-12 text-center">
-                  <BookOpen className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                  <p className="text-slate-500 mb-4">No courses found</p>
-                  <button
-                    onClick={() => {
-                      setIsEditMode(false);
-                      setSelectedCourse(null);
-                      resetCourseForm();
-                      setShowCourseForm(true);
-                    }}
-                    className="inline-flex items-center space-x-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
-                  >
-                    <BookOpen className="w-4 h-4" />
-                    <span>Add Your First Course</span>
-                  </button>
+                ));
+                  })()
+                ) : (
+                  <div className="col-span-full bg-white rounded-xl shadow-md p-12 text-center">
+                    <BookOpen className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                    <p className="text-slate-500 mb-4">No courses found</p>
+                    <button
+                      onClick={() => {
+                        setIsEditMode(false);
+                        setSelectedCourse(null);
+                        resetCourseForm();
+                        setShowCourseForm(true);
+                      }}
+                      className="inline-flex items-center space-x-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+                    >
+                      <BookOpen className="w-4 h-4" />
+                      <span>Add Your First Course</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Courses Pagination */}
+              {filteredCourses.length > coursesPerPage && (
+                <div className="bg-white rounded-xl shadow-md p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-slate-600">
+                      Showing {((currentCoursePage - 1) * coursesPerPage) + 1} to {Math.min(currentCoursePage * coursesPerPage, filteredCourses.length)} of {filteredCourses.length} courses
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => setCurrentCoursePage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentCoursePage === 1}
+                        className="px-3 py-1 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Previous
+                      </button>
+                      
+                      <div className="flex items-center space-x-1">
+                        {Array.from({ length: Math.ceil(filteredCourses.length / coursesPerPage) }, (_, i) => i + 1).map((page) => (
+                          <button
+                            key={page}
+                            onClick={() => setCurrentCoursePage(page)}
+                            className={`px-3 py-1 rounded-lg transition-colors ${
+                              currentCoursePage === page
+                                ? 'bg-purple-600 text-white'
+                                : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        ))}
+                      </div>
+
+                      <button
+                        onClick={() => setCurrentCoursePage(prev => Math.min(prev + 1, Math.ceil(filteredCourses.length / coursesPerPage)))}
+                        disabled={currentCoursePage === Math.ceil(filteredCourses.length / coursesPerPage)}
+                        className="px-3 py-1 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -2359,61 +2584,61 @@ export default function AdminDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
               <div 
                 onClick={() => setLeaveStatusFilter('all')}
-                className={`bg-white rounded-xl shadow-md p-6 border-2 cursor-pointer transition-all hover:shadow-lg ${
+                className={`bg-white rounded-lg shadow-md p-4 border-2 cursor-pointer transition-all hover:shadow-lg ${
                   leaveStatusFilter === 'all' ? 'border-blue-500 ring-2 ring-blue-200' : 'border-slate-100'
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-slate-600">Total Requests</p>
-                    <p className="text-3xl font-bold text-blue-600 mt-2">{totalCount}</p>
+                    <p className="text-xs font-medium text-slate-600">Total Requests</p>
+                    <p className="text-2xl font-bold text-blue-600 mt-1">{totalCount}</p>
                   </div>
-                  <ClipboardList className="w-12 h-12 text-blue-500 opacity-20" />
+                  <ClipboardList className="w-10 h-10 text-blue-500 opacity-20" />
                 </div>
               </div>
 
               <div 
                 onClick={() => setLeaveStatusFilter('pending')}
-                className={`bg-white rounded-xl shadow-md p-6 border-2 cursor-pointer transition-all hover:shadow-lg ${
+                className={`bg-white rounded-lg shadow-md p-4 border-2 cursor-pointer transition-all hover:shadow-lg ${
                   leaveStatusFilter === 'pending' ? 'border-yellow-500 ring-2 ring-yellow-200' : 'border-slate-100'
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-slate-600">Pending</p>
-                    <p className="text-3xl font-bold text-yellow-600 mt-2">{pendingCount}</p>
+                    <p className="text-xs font-medium text-slate-600">Pending</p>
+                    <p className="text-2xl font-bold text-yellow-600 mt-1">{pendingCount}</p>
                   </div>
-                  <Calendar className="w-12 h-12 text-yellow-500 opacity-20" />
+                  <Calendar className="w-10 h-10 text-yellow-500 opacity-20" />
                 </div>
               </div>
 
               <div 
                 onClick={() => setLeaveStatusFilter('approved')}
-                className={`bg-white rounded-xl shadow-md p-6 border-2 cursor-pointer transition-all hover:shadow-lg ${
+                className={`bg-white rounded-lg shadow-md p-4 border-2 cursor-pointer transition-all hover:shadow-lg ${
                   leaveStatusFilter === 'approved' ? 'border-green-500 ring-2 ring-green-200' : 'border-slate-100'
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-slate-600">Approved</p>
-                    <p className="text-3xl font-bold text-green-600 mt-2">{approvedCount}</p>
+                    <p className="text-xs font-medium text-slate-600">Approved</p>
+                    <p className="text-2xl font-bold text-green-600 mt-1">{approvedCount}</p>
                   </div>
-                  <Calendar className="w-12 h-12 text-green-500 opacity-20" />
+                  <Calendar className="w-10 h-10 text-green-500 opacity-20" />
                 </div>
               </div>
 
               <div 
                 onClick={() => setLeaveStatusFilter('rejected')}
-                className={`bg-white rounded-xl shadow-md p-6 border-2 cursor-pointer transition-all hover:shadow-lg ${
+                className={`bg-white rounded-lg shadow-md p-4 border-2 cursor-pointer transition-all hover:shadow-lg ${
                   leaveStatusFilter === 'rejected' ? 'border-red-500 ring-2 ring-red-200' : 'border-slate-100'
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-slate-600">Rejected</p>
-                    <p className="text-3xl font-bold text-red-600 mt-2">{rejectedCount}</p>
+                    <p className="text-xs font-medium text-slate-600">Rejected</p>
+                    <p className="text-2xl font-bold text-red-600 mt-1">{rejectedCount}</p>
                   </div>
-                  <Calendar className="w-12 h-12 text-red-500 opacity-20" />
+                  <Calendar className="w-10 h-10 text-red-500 opacity-20" />
                 </div>
               </div>
             </div>
@@ -2464,15 +2689,15 @@ export default function AdminDashboard() {
                   {filteredLeaveRequests
                     .slice((leaveCurrentPage - 1) * leaveRequestsPerPage, leaveCurrentPage * leaveRequestsPerPage)
                     .map((req) => (
-                    <div key={req._id} className="bg-white rounded-xl shadow-md p-6 border border-slate-100">
-                      <div className="flex items-start justify-between mb-4">
+                    <div key={req._id} className="bg-white rounded-lg shadow-md p-4 border border-slate-100">
+                      <div className="flex items-start justify-between mb-3">
                         <div>
-                          <h3 className="text-lg font-bold text-slate-900">{req.requesterId?.name || 'Unknown'}</h3>
-                          <p className="text-sm text-slate-600">
+                          <h3 className="text-base font-bold text-slate-900">{req.requesterId?.name || 'Unknown'}</h3>
+                          <p className="text-xs text-slate-600">
                             {req.requesterId?.email} • {req.requesterRole === 'teacher' ? 'Teacher' : `Grade ${req.requesterId?.grade}${req.requesterId?.section ? ` - ${req.requesterId?.section}` : ''}`}
                           </p>
                         </div>
-                        <span className={`px-3 py-1 text-xs font-bold rounded-full ${
+                        <span className={`px-2 py-1 text-xs font-bold rounded-full ${
                           req.status === 'approved' ? 'bg-green-100 text-green-700' :
                           req.status === 'rejected' ? 'bg-red-100 text-red-700' :
                           'bg-yellow-100 text-yellow-700'
@@ -2480,7 +2705,7 @@ export default function AdminDashboard() {
                           {req.status.toUpperCase()}
                         </span>
                       </div>
-                      <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
+                      <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
                         <div>
                           <span className="font-medium text-slate-700">Type:</span> <span className="capitalize">{req.type}</span>
                         </div>
@@ -2488,23 +2713,23 @@ export default function AdminDashboard() {
                           <span className="font-medium text-slate-700">Period:</span> {new Date(req.startDate).toLocaleDateString()} to {new Date(req.endDate).toLocaleDateString()}
                         </div>
                       </div>
-                      <div className="mb-4 p-3 bg-slate-50 rounded">
-                        <p className="text-sm font-medium text-slate-700 mb-1">Reason:</p>
-                        <p className="text-sm text-slate-700">{req.reason}</p>
+                      <div className="mb-3 p-2 bg-slate-50 rounded">
+                        <p className="text-xs font-medium text-slate-700 mb-1">Reason:</p>
+                        <p className="text-xs text-slate-700">{req.reason}</p>
                       </div>
                       {req.adminRemarks && (
-                        <div className="mb-4 p-3 bg-blue-50 rounded border border-blue-200">
-                          <p className="text-sm font-medium text-slate-700 mb-1">Admin Remarks:</p>
-                          <p className="text-sm text-slate-700">{req.adminRemarks}</p>
+                        <div className="mb-3 p-2 bg-blue-50 rounded border border-blue-200">
+                          <p className="text-xs font-medium text-slate-700 mb-1">Admin Remarks:</p>
+                          <p className="text-xs text-slate-700">{req.adminRemarks}</p>
                         </div>
                       )}
-                      <div className="text-xs text-slate-500 mb-3">Submitted: {new Date(req.createdAt).toLocaleString()}</div>
+                      <div className="text-xs text-slate-500 mb-2">Submitted: {new Date(req.createdAt).toLocaleString()}</div>
                       {req.status === 'pending' && (
-                        <div className="flex gap-3">
+                        <div className="flex gap-2">
                           <button
                             onClick={() => handleLeaveDecision(req._id, 'approve', '')}
                             disabled={!!processingLeaveIds[req._id]}
-                            className={`flex-1 px-4 py-2 rounded-lg transition-colors font-medium text-white ${
+                            className={`flex-1 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium text-white ${
                               processingLeaveIds[req._id]
                                 ? 'bg-green-400 cursor-not-allowed'
                                 : 'bg-green-600 hover:bg-green-700'
@@ -2515,7 +2740,7 @@ export default function AdminDashboard() {
                           <button
                             onClick={() => handleLeaveDecision(req._id, 'reject', '')}
                             disabled={!!processingLeaveIds[req._id]}
-                            className={`flex-1 px-4 py-2 rounded-lg transition-colors font-medium text-white ${
+                            className={`flex-1 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium text-white ${
                               processingLeaveIds[req._id]
                                 ? 'bg-red-400 cursor-not-allowed'
                                 : 'bg-red-600 hover:bg-red-700'

@@ -20,6 +20,16 @@ export default function Register({ onClose, onSwitchToLogin }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Auto-dismiss error after 5 seconds
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => {
+        setError('');
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -77,13 +87,17 @@ export default function Register({ onClose, onSwitchToLogin }) {
     try {
       const response = await authAPI.register(formData);
       
-      if (response.data.success) {
+      if (response.data.success && response.data.user) {
         // Cookie is set automatically by backend!
         // Just pass user data
-        login(response.data.user);
-        onClose();
+        const loginSuccess = login(response.data.user);
+        if (loginSuccess !== false) {
+          onClose(); // Only close on successful registration
+        }
       } else {
+        // Registration failed - keep form open and show error
         setError(response.data.message || 'Registration failed');
+        setLoading(false);
       }
     } catch (err) {
       console.error('Registration error:', err);
@@ -92,8 +106,7 @@ export default function Register({ onClose, onSwitchToLogin }) {
         err.message || 
         'Registration failed. Please try again.'
       );
-    } finally {
-      setLoading(false);
+      setLoading(false); // Ensure loading is set to false
     }
   };
 
@@ -134,8 +147,22 @@ export default function Register({ onClose, onSwitchToLogin }) {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
-                {error}
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm flex items-start gap-2 animate-shake">
+                <div className="flex-shrink-0">
+                  <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium">{error}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setError('')}
+                  className="flex-shrink-0 text-red-400 hover:text-red-600 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
             )}
 
@@ -143,8 +170,8 @@ export default function Register({ onClose, onSwitchToLogin }) {
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Register As
               </label>
-              <div className="grid grid-cols-3 gap-2">
-                {['student', 'teacher', 'admin'].map((role) => (
+              <div className="grid grid-cols-2 gap-2">
+                {['student', 'teacher'].map((role) => (
                   <button
                     key={role}
                     type="button"

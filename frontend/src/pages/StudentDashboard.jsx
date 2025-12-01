@@ -37,7 +37,8 @@ export default function StudentDashboard() {
   const [stats, setStats] = useState({
     totalCourses: 0,
     attendance: 0,
-    currentGrade: '-',
+    completedAssignments: 0,
+    totalAssignments: 0,
     pendingAssignments: 0
   });
   const [loading, setLoading] = useState(true);
