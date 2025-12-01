@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { X, Mail, Lock, User, Phone, Calendar } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { authAPI } from '../services/api';
+import { useDispatch, useSelector } from 'react-redux';
+import { registerUser, selectAuth } from '../store/slices/authSlice';
 
 export default function Register({ onClose, onSwitchToLogin }) {
   const { login } = useAuth();
+  const dispatch = useDispatch();
+  const { loading: authLoading, error: authError } = useSelector(selectAuth);
   const dialogRef = useRef(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -17,8 +20,15 @@ export default function Register({ onClose, onSwitchToLogin }) {
     grade: '',
     section: ''
   });
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const loading = authLoading;
+
+  // Sync Redux auth error to local error state
+  useEffect(() => {
+    if (authError) {
+      setError(authError);
+    }
+  }, [authError]);
 
   // Auto-dismiss error after 5 seconds
   useEffect(() => {
@@ -32,81 +42,69 @@ export default function Register({ onClose, onSwitchToLogin }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
     
     // Client-side validation
     if (!formData.name || formData.name.length < 2) {
       setError('Name must be at least 2 characters long');
-      setLoading(false);
       return;
     }
 
     if (!formData.email || !formData.email.includes('@')) {
       setError('Please enter a valid email address');
-      setLoading(false);
       return;
     }
 
     if (!formData.password || formData.password.length < 6) {
       setError('Password must be at least 6 characters long');
-      setLoading(false);
       return;
     }
     
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match!');
-      setLoading(false);
       return;
     }
 
     if (!formData.phone) {
       setError('Phone number is required');
-      setLoading(false);
       return;
     }
 
     if (!formData.dateOfBirth) {
       setError('Date of birth is required');
-      setLoading(false);
       return;
     }
 
     // Student-specific validation
     if (formData.role === 'student') {
       const validGrades = ['1','2','3','4','5','6','7','8','9','10','11','12'];
-      const validSections = ['A','B','C','D'];
       if (!formData.grade || !validGrades.includes(formData.grade)) {
         setError('Please select a valid grade (1-12)');
-        setLoading(false);
         return;
       }
-     
     }
 
     try {
-      const response = await authAPI.register(formData);
+      // Dispatch registerUser Redux thunk
+      const result = await dispatch(registerUser(formData)).unwrap();
       
-      if (response.data.success && response.data.user) {
+      if (result.success && result.user) {
         // Cookie is set automatically by backend!
-        // Just pass user data
-        const loginSuccess = login(response.data.user);
+        // Just pass user data to Context for navigation
+        const loginSuccess = login(result.user);
         if (loginSuccess !== false) {
           onClose(); // Only close on successful registration
         }
       } else {
         // Registration failed - keep form open and show error
-        setError(response.data.message || 'Registration failed');
-        setLoading(false);
+        setError(result.message || 'Registration failed');
       }
     } catch (err) {
       console.error('Registration error:', err);
       setError(
-        err.response?.data?.message || 
         err.message || 
         'Registration failed. Please try again.'
       );
-      setLoading(false); // Ensure loading is set to false
     }
   };
 
