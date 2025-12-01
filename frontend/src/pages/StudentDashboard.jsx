@@ -120,7 +120,16 @@ export default function StudentDashboard() {
       // Join room after socket connects if user present
       socket.on('connect', () => {
         if (user) {
-          try { socket.emit('join', { userId: user._id || user.id || user.studentId }); } catch (err) { console.error(err); }
+          try {
+            const joinId = user._id || user.id; // Prefer database _id for socket room
+            if (!joinId) {
+              console.warn('No MongoDB _id found on user for socket join');
+            } else {
+              socket.emit('join', { userId: joinId });
+            }
+          } catch (err) {
+            console.error('Socket join error', err);
+          }
         }
       });
     }
@@ -173,6 +182,21 @@ export default function StudentDashboard() {
         break;
     }
   }, [user, location.pathname]);
+
+  // Responsive: auto-collapse sidebar on narrower (half-screen) widths
+  useEffect(() => {
+    const handleResize = () => {
+      // Treat < 1100px as half / constrained view for side-by-side testing
+      if (window.innerWidth < 1100) {
+        setSidebarOpen(false);
+      } else {
+        setSidebarOpen(true);
+      }
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Realtime: Listen for attendance updates and refresh when relevant
   useEffect(() => {
@@ -688,9 +712,10 @@ export default function StudentDashboard() {
       {/* Notification Toast */}
       <NotificationToast notification={notification} onClose={hideNotification} />
 
-      <div className="flex">
+      <div className="flex relative">
         {/* Sidebar */}
-        <aside className={`${sidebarOpen ? 'w-64' : 'w-0'} transition-all duration-300 bg-white border-r border-slate-200 min-h-screen overflow-hidden`}>
+        <aside className={`${sidebarOpen ? 'w-64' : 'w-0'} md:${sidebarOpen ? 'w-60' : 'w-0'} transition-all duration-300 bg-white border-r border-slate-200 min-h-screen overflow-hidden
+          ${sidebarOpen ? 'shadow-lg' : ''} hidden md:block`}> {/* Hidden on small screens; toggle button opens drawer */}
           <nav className="p-4 space-y-1">
             {STUDENT_MODULES.map((module) => (
               <button
@@ -712,12 +737,12 @@ export default function StudentDashboard() {
         </aside>
 
         {/* Main Content Area */}
-        <main className="flex-1">
+        <main className="flex-1 min-w-0"> {/* min-w-0 prevents overflow when side-by-side */}
           {/* Toggle Sidebar Button */}
           <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+              className="p-2 hover:bg-slate-100 rounded-lg transition-colors md:hidden" /* Show toggle only on small / half width */
             >
               {sidebarOpen ? (
                 <X className="w-5 h-5 text-slate-600" />
@@ -733,7 +758,7 @@ export default function StudentDashboard() {
           </div>
 
           {/* Content */}
-          <div className="p-6">
+          <div className="p-4 md:p-6 space-y-4 md:space-y-6"> {/* Slightly tighter padding on constrained width */}
             {renderMainContent()}
           </div>
         </main>

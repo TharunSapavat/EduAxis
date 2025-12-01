@@ -74,7 +74,7 @@ export default function TeacherDashboard() {
 
   // Socket.io setup
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?._id && !user?.id) return;
 
     const socket = io(import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000', {
       withCredentials: true,
@@ -83,7 +83,8 @@ export default function TeacherDashboard() {
 
     socket.on('connect', () => {
       console.log('Teacher socket connected');
-      socket.emit('join', { userId: user.id });
+      const joinId = user._id || user.id;
+      socket.emit('join', { userId: joinId });
     });
 
     socket.on('message:received', (payload) => {

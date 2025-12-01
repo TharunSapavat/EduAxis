@@ -26,6 +26,21 @@ export default function TeacherInbox({ user, socket }) {
 
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  // Responsive list visibility
+  const [showList, setShowList] = useState(true);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 1100) {
+        setShowList(!selectedConversation);
+      } else {
+        setShowList(true);
+      }
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [selectedConversation]);
 
   const API_BASE =
     import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -350,14 +365,27 @@ export default function TeacherInbox({ user, socket }) {
       : '';
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[calc(100vh-250px)]">
+    <div className="flex gap-4 h-[calc(100vh-250px)] relative">
       {/* Conversations List */}
-      <div className="md:col-span-1 bg-white rounded-xl shadow-md border border-slate-100 overflow-hidden">
-        <div className="p-4 border-b border-slate-200 bg-gradient-to-r from-purple-600 to-purple-700 text-white">
+      <div
+        className={`bg-white rounded-xl shadow-md border border-slate-100 overflow-hidden flex flex-col w-full md:w-72 shrink-0
+          ${showList ? 'block' : 'hidden md:block'}
+          ${showList && window.innerWidth < 1100 ? 'absolute inset-0 z-30 md:static' : 'md:static'}`}
+      >
+        <div className="p-4 border-b border-slate-200 bg-linear-to-r from-purple-600 to-purple-700 text-white">
           <h2 className="text-lg font-bold flex items-center gap-2">
             <MessageSquare className="w-5 h-5" />
             Conversations
           </h2>
+          {window.innerWidth < 1100 && showList && (
+            <button
+              onClick={() => setShowList(false)}
+              className="absolute top-3 right-3 p-2 rounded-md bg-white/20 hover:bg-white/30"
+              title="Close list"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         {/* Search Bar */}
@@ -421,7 +449,7 @@ export default function TeacherInbox({ user, socket }) {
       </div>
 
       {/* Messages Panel */}
-      <div className="md:col-span-2 bg-white rounded-xl shadow-md border border-slate-100 flex flex-col overflow-hidden">
+      <div className="flex-1 bg-white rounded-xl shadow-md border border-slate-100 flex flex-col overflow-hidden">
         {!selectedConversation ? (
           <div className="flex-1 flex items-center justify-center text-slate-400">
             <div className="text-center">
@@ -435,7 +463,7 @@ export default function TeacherInbox({ user, socket }) {
         ) : (
           <>
             {/* Header */}
-            <div className="p-4 border-b border-slate-200 bg-gradient-to-r from-purple-600 to-purple-700 text-white flex items-center justify-between">
+            <div className="p-4 border-b border-slate-200 bg-linear-to-r from-purple-600 to-purple-700 text-white flex items-center justify-between relative">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
                   <User className="w-5 h-5" />
@@ -467,6 +495,15 @@ export default function TeacherInbox({ user, socket }) {
                   </div>
                 )}
               </div>
+              {window.innerWidth < 1100 && (
+                <button
+                  onClick={() => setShowList(prev => !prev)}
+                  className="absolute top-4 left-4 p-2 bg-white/10 hover:bg-white/20 rounded-lg"
+                  title={showList ? 'Hide conversation list' : 'Show conversation list'}
+                >
+                  <MessageSquare className="w-5 h-5" />
+                </button>
+              )}
             </div>
 
             {/* Messages */}
@@ -505,7 +542,7 @@ export default function TeacherInbox({ user, socket }) {
                               : 'bg-white text-slate-900 border border-slate-200'
                           }`}
                         >
-                          <p className="text-sm whitespace-pre-wrap break-words">
+                          <p className="text-sm whitespace-pre-wrap wrap-break-word">
                             {msg.text}
                           </p>
                           <div
@@ -549,9 +586,9 @@ export default function TeacherInbox({ user, socket }) {
             {/* Input */}
             <form
               onSubmit={sendMessage}
-              className="p-4 border-t border-slate-200 bg-white"
+              className="p-3 md:p-4 border-t border-slate-200 bg-white"
             >
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-end">
                 <input
                   type="text"
                   value={newMessage}
@@ -560,13 +597,13 @@ export default function TeacherInbox({ user, socket }) {
                     handleTyping();
                   }}
                   placeholder="Type a message..."
-                  className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="flex-1 px-3 md:px-4 py-2 md:py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm md:text-base"
                   disabled={sending}
                 />
                 <button
                   type="submit"
                   disabled={sending || !newMessage.trim()}
-                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="px-3 md:px-4 py-2 md:py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm md:text-base"
                 >
                   <Send className="w-4 h-4" />
                   Send
