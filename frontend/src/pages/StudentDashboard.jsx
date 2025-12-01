@@ -735,8 +735,9 @@ export default function StudentDashboard() {
 
       <div className="flex relative">
         {/* Sidebar */}
+        {/* Desktop sidebar */}
         <aside className={`${sidebarOpen ? 'w-64' : 'w-0'} md:${sidebarOpen ? 'w-60' : 'w-0'} transition-all duration-300 bg-white border-r border-slate-200 min-h-screen overflow-hidden
-          ${sidebarOpen ? 'shadow-lg' : ''} hidden md:block`}> {/* Hidden on small screens; toggle button opens drawer */}
+          ${sidebarOpen ? 'shadow-lg' : ''} hidden md:block`}>
           <nav className="p-4 space-y-1">
             {STUDENT_MODULES.map((module) => (
               <button
@@ -757,13 +758,52 @@ export default function StudentDashboard() {
           </nav>
         </aside>
 
+        {/* Mobile/half-screen overlay sidebar */}
+        {sidebarOpen && (
+          <>
+            <div
+              className="fixed inset-0 bg-slate-900/40 md:hidden"
+              onClick={() => setSidebarOpen(false)}
+            />
+            <aside className="fixed top-0 left-0 h-full w-64 bg-white border-r border-slate-200 shadow-2xl z-40 md:hidden">
+              <div className="p-4 flex items-center justify-between border-b border-slate-200">
+                <p className="text-sm font-medium text-slate-700">Menu</p>
+                <button
+                  onClick={() => setSidebarOpen(false)}
+                  className="p-2 hover:bg-slate-100 rounded-lg"
+                >
+                  <X className="w-5 h-5 text-slate-600" />
+                </button>
+              </div>
+              <nav className="p-4 space-y-1">
+                {STUDENT_MODULES.map((module) => (
+                  <button
+                    key={module.id}
+                    onClick={() => { navigate(`/student/${module.id}`); setSidebarOpen(false); }}
+                    className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
+                      location.pathname === `/student/${module.id}` || (module.id === 'home' && location.pathname === '/student')
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <module.icon className="w-5 h-5" />
+                    <div className="text-left flex-1">
+                      <p className="text-sm font-medium">{module.title}</p>
+                    </div>
+                  </button>
+                ))}
+              </nav>
+            </aside>
+          </>
+        )}
+
         {/* Main Content Area */}
         <main className="flex-1 min-w-0"> {/* min-w-0 prevents overflow when side-by-side */}
           {/* Toggle Sidebar Button */}
           <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-2 hover:bg-slate-100 rounded-lg transition-colors md:hidden" /* Show toggle only on small / half width */
+              className="p-2 hover:bg-slate-100 rounded-lg transition-colors" /* Always show toggle so burger is available */
             >
               {sidebarOpen ? (
                 <X className="w-5 h-5 text-slate-600" />
