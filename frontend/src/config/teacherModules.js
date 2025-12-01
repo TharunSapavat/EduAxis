@@ -21,6 +21,6 @@ export const TEACHER_MODULES = [
   { id: 'announcements', icon: Bell, title: 'Announcements', description: 'Post announcements' },
   { id: 'leave', icon: CalendarClock, title: 'Apply Leave', description: 'Request time off' },
   { id: 'materials', icon: Upload, title: 'Study Materials', description: 'Upload resources' },
-  { id: 'timetable', icon: Calendar, title: 'My Timetable', description: 'View schedule' },
+  { id: 'schedule', icon: Calendar, title: 'Schedule', description: 'Plan weekly classes' },
   { id: 'messages', icon: MessageSquare, title: 'Messages', description: 'Communicate with students' },
 ];
