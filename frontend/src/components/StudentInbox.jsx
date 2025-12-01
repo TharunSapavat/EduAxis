@@ -18,11 +18,30 @@ export default function StudentInbox({ user, socket }) {
   const [typingUsers, setTypingUsers] = useState(new Set());
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  // Responsive state: show/hide conversation list on narrow widths
+  const [showList, setShowList] = useState(true);
 
-  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 1100) {
+        // Start hidden when a conversation is already selected for tighter space
+        setShowList(!selectedConversation);
+      } else {
+        setShowList(true);
+      }
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [selectedConversation]);
+
+  // Auto-scroll to bottom within the messages container to avoid page jumps
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
   };
 
   useEffect(() => {
@@ -40,31 +59,42 @@ export default function StudentInbox({ user, socket }) {
     if (!socket) return;
 
     const handleNewMessage = (payload) => {
-      // If message is for current conversation, add it
-      if (selectedConversation && payload.sender._id === selectedConversation.userId) {
-        setMessages(prev => [...prev, payload]);
-        // Mark as read automatically
-        markConversationAsRead(payload.sender._id);
+      const senderId = payload?.sender?._id?.toString();
+      const recipientId = typeof payload.recipient === 'string' ? payload.recipient : payload.recipient?._id?.toString();
+      const currentPartnerId = selectedConversation?.userId?.toString();
+      const myId = (user.id || user._id)?.toString();
+
+      const belongsToOpenConversation = currentPartnerId && (
+        senderId === currentPartnerId || recipientId === currentPartnerId
+      );
+
+      if (belongsToOpenConversation) {
+        setMessages(prev => {
+          // Avoid duplicates by _id
+          if (payload._id && prev.some(m => m._id === payload._id)) return prev;
+          return [...prev, payload];
+        });
+        // If I am the recipient, mark as read
+        if (recipientId === myId && senderId !== myId) {
+          markConversationAsRead(senderId);
+        }
+      } else {
+        // Update sidebar unread counts
+        fetchConversations();
       }
-      // Refresh conversations to update unread counts
-      fetchConversations();
     };
 
     const handleMessageSent = (payload) => {
-      // Add sent message to current conversation if it matches
-      const recipientId = typeof payload.recipient === 'string' 
-        ? payload.recipient 
-        : payload.recipient?._id;
-      
-      if (selectedConversation && recipientId === selectedConversation.userId) {
-        setMessages((prev) => {
-          // Check if message already exists to avoid duplicates
-          const exists = prev.some(msg => msg._id === payload._id);
-          if (exists) return prev;
+      const recipientId = typeof payload.recipient === 'string'
+        ? payload.recipient
+        : payload.recipient?._id?.toString();
+      const currentPartnerId = selectedConversation?.userId?.toString();
+      if (currentPartnerId && recipientId === currentPartnerId) {
+        setMessages(prev => {
+          if (payload._id && prev.some(m => m._id === payload._id)) return prev;
           return [...prev, payload];
         });
       }
-      // Refresh conversations
       fetchConversations();
     };
 
@@ -211,6 +241,13 @@ export default function StudentInbox({ user, socket }) {
   const sendMessage = async (e) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedConversation) return;
+
+    // Prevent self-messaging from UI as extra safety
+    const currentUserId = user.id || user._id;
+    if (selectedConversation.userId?.toString() === currentUserId?.toString()) {
+      alert('You cannot send a message to yourself');
+      return;
+    }
 
     // Stop typing indicator
     if (isTyping && socket) {
@@ -373,10 +410,15 @@ export default function StudentInbox({ user, socket }) {
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[calc(100vh-250px)]">
+      <div className="flex gap-4 h-[calc(100vh-250px)] relative">
         {/* Conversations List */}
-        <div className="md:col-span-1 bg-white rounded-xl shadow-md border border-slate-100 overflow-hidden flex flex-col">
-          <div className="p-4 border-b border-slate-200 bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+        <div
+          className={`bg-white rounded-xl shadow-md border border-slate-100 flex flex-col w-full md:w-72 shrink-0
+            ${showList ? 'block' : 'hidden md:block'}
+            ${showList && window.innerWidth < 1100 ? 'absolute inset-0 z-30 md:static' : 'md:static'}
+          `}
+        >
+          <div className="p-4 border-b border-slate-200 bg-linear-to-r from-blue-600 to-blue-700 text-white">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-bold flex items-center gap-2">
                 <MessageSquare className="w-5 h-5" />
@@ -390,6 +432,16 @@ export default function StudentInbox({ user, socket }) {
                 <Plus className="w-5 h-5" />
               </button>
             </div>
+            {/* Hide list button on narrow view when list showing */}
+            {window.innerWidth < 1100 && showList && (
+              <button
+                onClick={() => setShowList(false)}
+                className="absolute top-3 right-3 p-2 rounded-md bg-white/20 hover:bg-white/30"
+                title="Close list"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
             {/* Search */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-200" />
@@ -429,7 +481,7 @@ export default function StudentInbox({ user, socket }) {
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
                         <User className="w-5 h-5 text-blue-600" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -441,7 +493,7 @@ export default function StudentInbox({ user, socket }) {
                         <p className="text-xs text-slate-600 truncate mt-1">{conv.lastMessage}</p>
                       </div>
                       {conv.unreadCount > 0 && (
-                        <span className="bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded-full flex-shrink-0">
+                        <span className="bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded-full shrink-0">
                           {conv.unreadCount}
                         </span>
                       )}
@@ -454,7 +506,7 @@ export default function StudentInbox({ user, socket }) {
         </div>
 
         {/* Messages Panel */}
-        <div className="md:col-span-2 bg-white rounded-xl shadow-md border border-slate-100 flex flex-col overflow-hidden">
+        <div className="flex-1 bg-white rounded-xl shadow-md border border-slate-100 flex flex-col overflow-hidden">
           {!selectedConversation ? (
             <div className="flex-1 flex items-center justify-center text-slate-400">
               <div className="text-center">
@@ -473,7 +525,7 @@ export default function StudentInbox({ user, socket }) {
           ) : (
             <>
               {/* Header */}
-              <div className="p-4 border-b border-slate-200 bg-gradient-to-r from-blue-600 to-blue-700 text-white flex items-center justify-between">
+              <div className="p-4 border-b border-slate-200 bg-linear-to-r from-blue-600 to-blue-700 text-white flex items-center justify-between relative">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
                     <User className="w-5 h-5" />
@@ -515,11 +567,21 @@ export default function StudentInbox({ user, socket }) {
                   >
                     <X className="w-5 h-5" />
                   </button>
+                  {/* Toggle conversation list on narrow view */}
+                  {window.innerWidth < 1100 && (
+                    <button
+                      onClick={() => setShowList(prev => !prev)}
+                      className="p-2 bg-white/10 hover:bg-white/20 rounded-lg"
+                      title={showList ? 'Hide conversation list' : 'Show conversation list'}
+                    >
+                      <MessageSquare className="w-5 h-5" />
+                    </button>
+                  )}
                 </div>
               </div>
 
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
+              <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
                 {loading ? (
                   <div className="text-center py-8">
                     <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -544,7 +606,7 @@ export default function StudentInbox({ user, socket }) {
                                 : 'bg-white text-slate-900 border border-slate-200'
                             }`}
                           >
-                            <p className="text-sm whitespace-pre-wrap break-words">{msg.text}</p>
+                            <p className="text-sm whitespace-pre-wrap wrap-break-word">{msg.text}</p>
                             <div className={`flex items-center gap-1 mt-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
                               <p className={`text-xs ${isOwn ? 'text-blue-100' : 'text-slate-500'}`}>
                                 {formatTime(msg.createdAt)}
@@ -570,8 +632,8 @@ export default function StudentInbox({ user, socket }) {
               </div>
 
               {/* Input */}
-              <form onSubmit={sendMessage} className="p-4 border-t border-slate-200 bg-white">
-                <div className="flex gap-2">
+              <form onSubmit={sendMessage} className="p-3 md:p-4 border-t border-slate-200 bg-white">
+                <div className="flex gap-2 items-end">
                   <input
                     type="text"
                     value={newMessage}
@@ -580,13 +642,13 @@ export default function StudentInbox({ user, socket }) {
                       handleTyping();
                     }}
                     placeholder="Type a message..."
-                    className="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 px-3 md:px-4 py-2 md:py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm md:text-base"
                     disabled={sending}
                   />
                   <button
                     type="submit"
                     disabled={sending || !newMessage.trim()}
-                    className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    className="px-3 md:px-4 py-2 md:py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm md:text-base"
                   >
                     <Send className="w-4 h-4" />
                     Send

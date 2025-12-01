@@ -11,6 +11,11 @@ export const sendMessage = async (req, res) => {
       return res.status(400).json({ success: false, message: 'recipientId and text required' });
     }
 
+    // Prevent sending messages to self
+    if (recipientId && senderId && senderId.toString() === recipientId.toString()) {
+      return res.status(400).json({ success: false, message: 'You cannot send a message to yourself' });
+    }
+
     // Ensure recipient exists
     const recipient = await User.findById(recipientId).select('-password');
     if (!recipient) {
@@ -58,6 +63,11 @@ export const getConversationWithUser = async (req, res) => {
     const userId = req.userId;
     const otherUserId = req.params.userId;
 
+    // Prevent fetching a self conversation
+    if (otherUserId && userId && userId.toString() === otherUserId.toString()) {
+      return res.status(400).json({ success: false, message: 'Cannot open conversation with yourself' });
+    }
+
     // Validate other user exists
     const otherUser = await User.findById(otherUserId).select('-password');
     if (!otherUser) {
@@ -98,8 +108,12 @@ export const getConversations = async (req, res) => {
     const conversationMap = new Map();
     
     messages.forEach(msg => {
-      const partnerId = msg.sender._id.toString() === userId ? msg.recipient._id.toString() : msg.sender._id.toString();
-      const partner = msg.sender._id.toString() === userId ? msg.recipient : msg.sender;
+      const isSender = msg.sender._id.toString() === userId.toString();
+      const partnerId = isSender ? msg.recipient._id.toString() : msg.sender._id.toString();
+      const partner = isSender ? msg.recipient : msg.sender;
+
+      // Skip any self-conversation entries if they exist
+      if (partnerId === userId.toString()) return;
       
       if (!conversationMap.has(partnerId)) {
         conversationMap.set(partnerId, {
@@ -113,7 +127,7 @@ export const getConversations = async (req, res) => {
       }
       
       // Count unread messages (messages where current user is recipient and status is not 'read')
-      if (msg.recipient._id.toString() === userId && msg.status !== 'read') {
+      if (msg.recipient._id.toString() === userId.toString() && msg.status !== 'read') {
         conversationMap.get(partnerId).unreadCount++;
       }
     });
@@ -181,7 +195,7 @@ export const deleteMessage = async (req, res) => {
     }
 
     // Only sender can delete their own messages
-    if (message.sender.toString() !== userId) {
+    if (message.sender.toString() !== userId.toString()) {
       return res.status(403).json({ success: false, message: 'Not authorized to delete this message' });
     }
 
@@ -191,7 +205,9 @@ export const deleteMessage = async (req, res) => {
     try {
       const io = req.app.get('io');
       if (io) {
+        // Emit to recipient and sender rooms for consistency
         io.to(`user:${message.recipient}`).emit('message:deleted', { messageId });
+        io.to(`user:${message.sender}`).emit('message:deleted', { messageId });
       }
     } catch (socketErr) {
       console.error('Socket emit failed', socketErr);

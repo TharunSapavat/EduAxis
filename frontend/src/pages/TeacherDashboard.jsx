@@ -39,6 +39,7 @@ export default function TeacherDashboard() {
   const [coursesLoading, setCoursesLoading] = useState(false);
   const [statsLoading, setStatsLoading] = useState(false);
   const socketRef = useRef(null);
+  const joinedRef = useRef(null);
   
   // Custom hooks
   const { notification, showNotification, hideNotification } = useNotification();
@@ -124,10 +125,48 @@ export default function TeacherDashboard() {
     });
 
     socketRef.current = socket;
+    // Initialize once
+    if (!socketRef.current) {
+      const socket = io(import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000', {
+        withCredentials: true,
+        transports: ['websocket', 'polling']
+      });
 
-    return () => {
-      socket.disconnect();
-    };
+      socket.on('connect', () => {
+        console.log('Teacher socket connected');
+        const joinId = user?._id || user?.id;
+        if (joinId) {
+          socket.emit('join', { userId: joinId });
+          joinedRef.current = joinId;
+        }
+      });
+
+      socket.on('message:received', (payload) => {
+        console.log('New message received', payload);
+        if (Notification.permission === 'granted') {
+          new Notification('New Message', {
+            body: `${payload.sender.name}: ${payload.text.substring(0, 50)}...`
+          });
+        }
+      });
+
+      socketRef.current = socket;
+
+      return () => {
+        socket.disconnect();
+        joinedRef.current = null;
+      };
+    }
+  }, []);
+
+  // Ensure join when user becomes available after connect
+  useEffect(() => {
+    const socket = socketRef.current;
+    const joinId = user?._id || user?.id;
+    if (socket && socket.connected && joinId && joinedRef.current !== joinId) {
+      socket.emit('join', { userId: joinId });
+      joinedRef.current = joinId;
+    }
   }, [user]);
 
   // Request notification permission

@@ -34,10 +34,17 @@ api.interceptors.response.use(
       
       switch (status) {
         case 401:
-          // Unauthorized - clear user session (cookie is cleared by backend)
-          console.error('Unauthorized access - logging out');
-          localStorage.removeItem('user');
-          window.location.href = '/';
+          // Unauthorized - Only redirect if it's NOT a login/register request
+          const isAuthRequest = error.config.url.includes('/auth/login') || 
+                                error.config.url.includes('/auth/register');
+          
+          if (!isAuthRequest) {
+            // User is not authenticated for a protected route - clear session
+            console.error('Unauthorized access - logging out');
+            localStorage.removeItem('user');
+            window.location.href = '/';
+          }
+          // For auth requests (login/register), let the component handle the error
           break;
         case 403:
           console.error('Forbidden:', data.message);
