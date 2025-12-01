@@ -8,6 +8,7 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import DashboardHeader from '../components/DashboardHeader';
 import DashboardFooter from '../components/DashboardFooter';
+import NotificationToast from '../components/NotificationToast';
 import ClassManagement from '../components/ClassManagement.jsx';
 import AdminLibraryManagement from '../components/adminComp/AdminLibraryManagement.jsx';
 import AdminTimetableManagement from '../components/adminComp/AdminTimetableManagement.jsx';
@@ -95,6 +96,7 @@ const courseSchema = yup.object({
     .required('Course name is required')
     .min(2, 'Course name must be at least 2 characters')
     .max(100, 'Course name must not exceed 100 characters')
+    .matches(/^(?=.*[a-zA-Z])[a-zA-Z0-9\s\-&().,]+$/, 'Course name must contain at least one letter and only valid characters')
     .trim(),
   code: yup
     .string()
@@ -2868,8 +2870,7 @@ export default function AdminDashboard() {
       {/* Toast Notification */}
       {notification && (
         <NotificationToast
-          message={notification.message}
-          type={notification.type}
+          notification={notification}
           onClose={() => setNotification(null)}
         />
       )}
