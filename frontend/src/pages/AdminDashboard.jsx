@@ -8,7 +8,6 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import DashboardHeader from '../components/DashboardHeader';
 import DashboardFooter from '../components/DashboardFooter';
-import NotificationToast from '../components/NotificationToast';
 import ClassManagement from '../components/ClassManagement.jsx';
 import AdminLibraryManagement from '../components/adminComp/AdminLibraryManagement.jsx';
 import AdminTimetableManagement from '../components/adminComp/AdminTimetableManagement.jsx';
@@ -70,23 +69,10 @@ const userSchema = yup.object({
     .required('Role is required'),
   password: yup
     .string()
-    .test('password-required', 'Password is required', function(value) {
-      // Password is required only when creating a new user (not in edit mode)
-      // In edit mode, empty password means "don't change"
-      return true; // We'll handle this in the form logic
-    })
-    .test('password-min', 'Password must be at least 6 characters long', function(value) {
-      if (!value || value.length === 0) return true; // Skip if empty (edit mode)
-      return value.length >= 6;
-    })
-    .test('password-max', 'Password must not exceed 50 characters', function(value) {
-      if (!value || value.length === 0) return true; // Skip if empty (edit mode)
-      return value.length <= 50;
-    })
-    .test('password-format', 'Password must contain at least one letter and one number', function(value) {
-      if (!value || value.length === 0) return true; // Skip if empty (edit mode)
-      return /^(?=.*[a-zA-Z])(?=.*\d)/.test(value);
-    }),
+    .required('Password is required')
+    .min(6, 'Password must be at least 6 characters long')
+    .max(50, 'Password must not exceed 50 characters')
+    .matches(/^(?=.*[a-zA-Z])(?=.*\d)/, 'Password must contain at least one letter and one number'),
   grade: yup
     .string()
     .when('role', {
@@ -209,9 +195,8 @@ export default function AdminDashboard() {
   const [showUserForm, setShowUserForm] = useState(false);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersError, setUsersError] = useState('');
-  const [showDeleteUserModal, setShowDeleteUserModal] = useState(false);
-  const [userToDelete, setUserToDelete] = useState(null);
-  const [isEditUserMode, setIsEditUserMode] = useState(false);
+  const [currentUserPage, setCurrentUserPage] = useState(1);
+  const usersPerPage = 10;
 
   // User form with React Hook Form
   const {
@@ -264,10 +249,8 @@ export default function AdminDashboard() {
   const [coursesLoading, setCoursesLoading] = useState(false);
   const [coursesError, setCoursesError] = useState('');
   const [isEditMode, setIsEditMode] = useState(false);
-  const [showDeleteCourseModal, setShowDeleteCourseModal] = useState(false);
-  const [courseToDelete, setCourseToDelete] = useState(null);
-  const [showDeleteFeeModal, setShowDeleteFeeModal] = useState(false);
-  const [feeToDelete, setFeeToDelete] = useState(null);
+  const [currentCoursePage, setCurrentCoursePage] = useState(1);
+  const coursesPerPage = 9;
 
   // Leave Request States
   const [leaveRequests, setLeaveRequests] = useState([]);
@@ -512,34 +495,29 @@ export default function AdminDashboard() {
         setShowFeeForm(false);
         resetFeeForm();
         fetchFees();
-        showNotification('Fee created successfully!', 'success');
+        alert('Fee created successfully!');
       }
     } catch (err) {
       console.error('Failed to create fee:', err);
-      showNotification(err.response?.data?.message || 'Failed to create fee', 'error');
+      alert(err.response?.data?.message || 'Failed to create fee');
     }
   };
 
-  const handleDeleteFee = async () => {
-    if (!feeToDelete) return;
+  const handleDeleteFee = async (feeId) => {
+    if (!window.confirm('Are you sure you want to delete this fee? This action cannot be undone.')) {
+      return;
+    }
 
     try {
-      const res = await adminAPI.deleteFee(feeToDelete);
+      const res = await adminAPI.deleteFee(feeId);
       if (res.data.success) {
-        setShowDeleteFeeModal(false);
-        setFeeToDelete(null);
         fetchFees();
-        showNotification('Fee deleted successfully!', 'success');
+        alert('Fee deleted successfully!');
       }
     } catch (err) {
       console.error('Failed to delete fee:', err);
-      showNotification(err.response?.data?.message || 'Failed to delete fee', 'error');
+      alert(err.response?.data?.message || 'Failed to delete fee');
     }
-  };
-
-  const confirmDeleteFee = (feeId) => {
-    setFeeToDelete(feeId);
-    setShowDeleteFeeModal(true);
   };
 
   // Filter and search users
@@ -569,52 +547,9 @@ export default function AdminDashboard() {
     setShowUserDetails(true);
   };
 
-  const handleEditUser = (user) => {
-    setSelectedUser(user);
-    setIsEditUserMode(true);
-    
-    // Populate form with user data
-    setUserValue('name', user.name);
-    setUserValue('email', user.email);
-    setUserValue('role', user.role);
-    setUserValue('phone', user.phone);
-    
-    // Convert date format if needed
-    if (user.dateOfBirth && user.dateOfBirth !== '—') {
-      // If date is in ISO format, convert to DD-MM-YYYY
-      const date = new Date(user.dateOfBirth);
-      if (!isNaN(date.getTime())) {
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const year = date.getFullYear();
-        setUserValue('dateOfBirth', `${day}-${month}-${year}`);
-      } else {
-        setUserValue('dateOfBirth', user.dateOfBirth);
-      }
-    }
-    
-    if (user.role === 'student') {
-      setUserValue('grade', user.grade || '');
-      setUserValue('section', user.section || '');
-    }
-    
-    // Don't populate password for security
-    setUserValue('password', '');
-    
-    setShowUserDetails(false);
-    setShowUserForm(true);
-  };
-
   const handleCreateUser = async (data) => {
     try {
       setUsersLoading(true);
-      
-      // Validate password is provided for new users
-      if (!data.password || data.password.trim() === '') {
-        showNotification('Password is required for new users', 'error');
-        setUsersLoading(false);
-        return;
-      }
       
       console.log('Form data received:', JSON.stringify(data, null, 2)); // Debug log
       
@@ -647,91 +582,37 @@ export default function AdminDashboard() {
         setShowUserForm(false);
         resetUserForm();
         fetchUsers();
-        showNotification('User created successfully!', 'success');
+        alert('User created successfully!');
       }
     } catch (err) {
       console.error('Failed to create user:', err);
-      showNotification(err.response?.data?.message || 'Failed to create user', 'error');
+      alert(err.response?.data?.message || 'Failed to create user');
     } finally {
       setUsersLoading(false);
     }
   };
 
-  const handleUpdateUser = async (data) => {
-    if (!selectedUser) return;
-
-    try {
-      setUsersLoading(true);
-      
-      // Convert DD-MM-YYYY to YYYY-MM-DD for backend
-      const dateOfBirthFormatted = data.dateOfBirth
-        ? data.dateOfBirth.split('-').reverse().join('-')
-        : undefined;
-      
-      // Build user data based on role
-      const userData = {
-        name: data.name,
-        email: data.email,
-        role: data.role,
-        phone: data.phone,
-        dateOfBirth: dateOfBirthFormatted
-      };
-      
-      // Only include password if it was changed
-      if (data.password && data.password.trim() !== '') {
-        userData.password = data.password;
-      }
-      
-      // Only include grade and section for students
-      if (data.role === 'student') {
-        userData.grade = data.grade || undefined;
-        userData.section = data.section || undefined;
-      }
-      
-      const response = await adminAPI.updateUser(selectedUser.id, userData);
-      
-      if (response.data.success) {
-        setShowUserForm(false);
-        setIsEditUserMode(false);
-        setSelectedUser(null);
-        resetUserForm();
-        fetchUsers();
-        showNotification('User updated successfully!', 'success');
-      }
-    } catch (err) {
-      console.error('Failed to update user:', err);
-      showNotification(err.response?.data?.message || 'Failed to update user', 'error');
-    } finally {
-      setUsersLoading(false);
+  const handleDeleteUser = async (userId) => {
+    if (!window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+      return;
     }
-  };
-
-  const handleDeleteUser = async () => {
-    if (!userToDelete) return;
 
     try {
       setUsersLoading(true);
-      const response = await adminAPI.deleteUser(userToDelete);
+      const response = await adminAPI.deleteUser(userId);
       
       if (response.data.success) {
         setShowUserDetails(false);
         setSelectedUser(null);
-        setShowDeleteUserModal(false);
-        setUserToDelete(null);
         fetchUsers();
-        showNotification('User deleted successfully!', 'success');
+        alert('User deleted successfully!');
       }
     } catch (err) {
       console.error('Failed to delete user:', err);
-      showNotification(err.response?.data?.message || 'Failed to delete user', 'error');
+      alert(err.response?.data?.message || 'Failed to delete user');
     } finally {
       setUsersLoading(false);
     }
-  };
-
-  const confirmDeleteUser = (userId) => {
-    setUserToDelete(userId);
-    setShowDeleteUserModal(true);
   };
 
   // Course Management Functions
@@ -768,11 +649,11 @@ export default function AdminDashboard() {
         setIsEditMode(false);
         resetCourseForm();
         fetchCourses();
-        showNotification('Course created successfully!', 'success');
+        alert('Course created successfully!');
       }
     } catch (err) {
       console.error('Failed to create course:', err);
-      showNotification(err.response?.data?.message || 'Failed to create course', 'error');
+      alert(err.response?.data?.message || 'Failed to create course');
     } finally {
       setCoursesLoading(false);
     }
@@ -795,42 +676,37 @@ export default function AdminDashboard() {
         setSelectedCourse(null);
         resetCourseForm();
         fetchCourses();
-        showNotification('Course updated successfully!', 'success');
+        alert('Course updated successfully!');
       }
     } catch (err) {
       console.error('Failed to update course:', err);
-      showNotification(err.response?.data?.message || 'Failed to update course', 'error');
+      alert(err.response?.data?.message || 'Failed to update course');
     } finally {
       setCoursesLoading(false);
     }
   };
 
-  const handleDeleteCourse = async () => {
-    if (!courseToDelete) return;
+  const handleDeleteCourse = async (courseId) => {
+    if (!window.confirm('Are you sure you want to delete this course? This action cannot be undone.')) {
+      return;
+    }
 
     try {
       setCoursesLoading(true);
-      const response = await adminAPI.deleteCourse(courseToDelete);
+      const response = await adminAPI.deleteCourse(courseId);
       
       if (response.data.success) {
         setShowCourseDetails(false);
         setSelectedCourse(null);
-        setShowDeleteCourseModal(false);
-        setCourseToDelete(null);
         fetchCourses();
-        showNotification('Course deleted successfully!', 'success');
+        alert('Course deleted successfully!');
       }
     } catch (err) {
       console.error('Failed to delete course:', err);
-      showNotification(err.response?.data?.message || 'Failed to delete course', 'error');
+      alert(err.response?.data?.message || 'Failed to delete course');
     } finally {
       setCoursesLoading(false);
     }
-  };
-
-  const confirmDeleteCourse = (courseId) => {
-    setCourseToDelete(courseId);
-    setShowDeleteCourseModal(true);
   };
 
   const handleEditCourse = (course) => {
@@ -982,12 +858,7 @@ export default function AdminDashboard() {
                   <p className="text-slate-600 mt-1">Manage students, teachers, and staff members</p>
                 </div>
                 <button 
-                  onClick={() => {
-                    setIsEditUserMode(false);
-                    setSelectedUser(null);
-                    resetUserForm();
-                    setShowUserForm(true);
-                  }}
+                  onClick={() => setShowUserForm(true)}
                   className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
                 >
                   <UserPlus className="w-4 h-4" />
@@ -1125,42 +996,10 @@ export default function AdminDashboard() {
                                   <span>Delete</span>
                                 </button>
                               </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <p className="text-sm text-slate-900">{user.email}</p>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              user.role === 'student' 
-                                ? 'bg-blue-100 text-blue-800' 
-                                : user.role === 'teacher'
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-purple-100 text-purple-800'
-                            }`}>
-                              {user.role ? (user.role.charAt(0).toUpperCase() + user.role.slice(1)) : '—'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            <div className="flex items-center space-x-3">
-                              <button
-                                onClick={() => handleViewDetails(user)}
-                                className="text-purple-600 hover:text-purple-900 font-medium flex items-center space-x-1"
-                              >
-                                <Eye className="w-4 h-4" />
-                                <span>View</span>
-                              </button>
-                              <button
-                                onClick={() => confirmDeleteUser(user.id)}
-                                className="text-red-600 hover:text-red-900 font-medium flex items-center space-x-1"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                                <span>Delete</span>
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
+                            </td>
+                          </tr>
+                        ));
+                      })()
                     ) : (
                       <tr>
                         <td colSpan="4" className="px-6 py-12 text-center">
@@ -1330,15 +1169,15 @@ export default function AdminDashboard() {
 
                       {/* Action Buttons */}
                       <div className="flex space-x-3 pt-6 border-t border-slate-200">
-                        <button 
-                          onClick={() => handleEditUser(selectedUser)}
-                          className="flex-1 bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 transition-colors font-medium"
-                        >
+                        <button className="flex-1 bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 transition-colors font-medium">
                           Edit User
                         </button>
+                        <button className="flex-1 bg-slate-100 text-slate-700 py-2 rounded-lg hover:bg-slate-200 transition-colors font-medium">
+                          View History
+                        </button>
                         <button 
-                          onClick={() => confirmDeleteUser(selectedUser.id)}
-                          className="flex-1 bg-red-100 text-red-700 py-2 rounded-lg hover:bg-red-200 transition-colors font-medium flex items-center justify-center space-x-1"
+                          onClick={() => handleDeleteUser(selectedUser.id)}
+                          className="px-4 bg-red-100 text-red-700 py-2 rounded-lg hover:bg-red-200 transition-colors font-medium flex items-center space-x-1"
                         >
                           <Trash2 className="w-4 h-4" />
                           <span>Delete</span>
@@ -1357,8 +1196,6 @@ export default function AdminDashboard() {
                   <button
                     onClick={() => {
                       setShowUserForm(false);
-                      setIsEditUserMode(false);
-                      setSelectedUser(null);
                       resetUserForm();
                     }}
                     className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors z-10"
@@ -1371,15 +1208,15 @@ export default function AdminDashboard() {
                       <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
                         <UserPlus className="w-8 h-8 text-purple-600" />
                       </div>
-                      <h2 className="text-3xl font-bold text-slate-900">{isEditUserMode ? 'Edit User' : 'Add New User'}</h2>
-                      <p className="text-slate-600 mt-2">{isEditUserMode ? 'Update user information' : 'Create a new account for student, teacher, or admin'}</p>
+                      <h2 className="text-3xl font-bold text-slate-900">Add New User</h2>
+                      <p className="text-slate-600 mt-2">Create a new account for student, teacher, or admin</p>
                     </div>
 
-                    <form onSubmit={handleUserFormSubmit(isEditUserMode ? handleUpdateUser : handleCreateUser)} className="space-y-5">
+                    <form onSubmit={handleUserFormSubmit(handleCreateUser)} className="space-y-5">
                       {/* Role Selection */}
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">
-                          User Role <span className="text-red-500">*</span>
+                          User Role
                         </label>
                         <div className="grid grid-cols-3 gap-2">
                           {['student', 'teacher', 'admin'].map((role) => (
@@ -1404,15 +1241,14 @@ export default function AdminDashboard() {
 
                       {/* Full Name */}
                       <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                          Full Name <span className="text-red-500">*</span>
-                        </label>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Full Name</label>
                         <input
                           type="text"
                           {...registerUser('name')}
                           className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all ${
                             userErrors.name ? 'border-red-500' : 'border-slate-300'
                           }`}
+                          placeholder="John Doe"
                         />
                         {userErrors.name && (
                           <p className="mt-1 text-sm text-red-600">{userErrors.name.message}</p>
@@ -1421,15 +1257,14 @@ export default function AdminDashboard() {
 
                       {/* Email */}
                       <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                          Email Address <span className="text-red-500">*</span>
-                        </label>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Email Address</label>
                         <input
                           type="text"
                           {...registerUser('email')}
                           className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all ${
                             userErrors.email ? 'border-red-500' : 'border-slate-300'
                           }`}
+                          placeholder="user@example.com"
                           autoComplete="email"
                         />
                         {userErrors.email && (
@@ -1440,15 +1275,14 @@ export default function AdminDashboard() {
                       {/* Phone and DOB in Grid */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-2">
-                            Phone Number <span className="text-red-500">*</span>
-                          </label>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">Phone Number</label>
                           <input
                             type="text"
                             {...registerUser('phone')}
                             className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all ${
                               userErrors.phone ? 'border-red-500' : 'border-slate-300'
                             }`}
+                            placeholder="1234567890"
                             maxLength={10}
                           />
                           {userErrors.phone && (
@@ -1457,15 +1291,14 @@ export default function AdminDashboard() {
                         </div>
 
                         <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-2">
-                            Date of Birth (DD-MM-YYYY) <span className="text-red-500">*</span>
-                          </label>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">Date of Birth (DD-MM-YYYY)</label>
                           <input
                             type="text"
                             {...registerUser('dateOfBirth')}
                             className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all ${
                               userErrors.dateOfBirth ? 'border-red-500' : 'border-slate-300'
                             }`}
+                            placeholder="DD-MM-YYYY"
                             maxLength={10}
                           />
                           {userErrors.dateOfBirth && (
@@ -1478,9 +1311,7 @@ export default function AdminDashboard() {
                       {currentUserRole === 'student' && (
                         <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">
-                              Grade <span className="text-red-500">*</span>
-                            </label>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Grade</label>
                             <select
                               {...registerUser('grade')}
                               className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all bg-white ${
@@ -1514,19 +1345,15 @@ export default function AdminDashboard() {
 
                       {/* Password */}
                       <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                          Password {!isEditUserMode && <span className="text-red-500">*</span>}
-                        </label>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Password</label>
                         <input
                           type="password"
                           {...registerUser('password')}
                           className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all ${
                             userErrors.password ? 'border-red-500' : 'border-slate-300'
                           }`}
+                          placeholder="Create a strong password"
                         />
-                        {isEditUserMode && (
-                          <p className="mt-1 text-xs text-slate-500">Leave blank to keep current password</p>
-                        )}
                         {userErrors.password && (
                           <p className="mt-1 text-sm text-red-600">{userErrors.password.message}</p>
                         )}
@@ -1538,8 +1365,6 @@ export default function AdminDashboard() {
                           type="button"
                           onClick={() => {
                             setShowUserForm(false);
-                            setIsEditUserMode(false);
-                            setSelectedUser(null);
                             resetUserForm();
                           }}
                           className="flex-1 px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium"
@@ -1551,7 +1376,7 @@ export default function AdminDashboard() {
                           disabled={usersLoading}
                           className="flex-1 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {usersLoading ? (isEditUserMode ? 'Updating User...' : 'Creating User...') : (isEditUserMode ? 'Update User' : 'Create User')}
+                          {usersLoading ? 'Creating User...' : 'Create User'}
                         </button>
                       </div>
                     </form>
@@ -1604,24 +1429,40 @@ export default function AdminDashboard() {
               {feesLoading ? (
                 <p className="text-slate-500 text-center py-8">Loading fees...</p>
               ) : fees.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {fees.map((fee) => (
-                    <div key={fee._id} className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                      <div className="flex items-start justify-between mb-2">
-                        <h4 className="font-semibold text-slate-900 flex-1">{fee.title}</h4>
-                        <div className="flex items-center gap-2">
-                          <span className={`px-2 py-1 text-xs rounded-full ${
-                            fee.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'
-                          }`}>
-                            {fee.status}
-                          </span>
-                          <button
-                            onClick={() => confirmDeleteFee(fee._id)}
-                            className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                            title="Delete fee"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {(() => {
+                      const indexOfLastFee = currentFeePage * feesPerPage;
+                      const indexOfFirstFee = indexOfLastFee - feesPerPage;
+                      const currentFees = fees.slice(indexOfFirstFee, indexOfLastFee);
+                      return currentFees.map((fee) => (
+                        <div key={fee._id} className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                          <div className="flex items-start justify-between mb-2">
+                            <h4 className="font-semibold text-slate-900 flex-1">{fee.title}</h4>
+                            <div className="flex items-center gap-2">
+                              <span className={`px-2 py-1 text-xs rounded-full ${
+                                fee.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'
+                              }`}>
+                                {fee.status}
+                              </span>
+                              <button
+                                onClick={() => handleDeleteFee(fee._id)}
+                                className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                title="Delete fee"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                          <p className="text-2xl font-bold text-purple-600 mb-2">₹{fee.amount}</p>
+                          <p className="text-sm text-slate-600 mb-2">{fee.description}</p>
+                          <div className="text-xs text-slate-500 space-y-1">
+                            <p>Due: {new Date(fee.dueDate).toLocaleDateString()}</p>
+                            <p>Semester: {fee.semester}</p>
+                            <p>
+                              Scope: {fee.appliesTo === 'all' ? 'All students' : `Grades: ${(fee.grades || []).join(', ')}`}
+                            </p>
+                          </div>
                         </div>
                       ));
                     })()}
@@ -2533,7 +2374,7 @@ export default function AdminDashboard() {
                         <button
                           onClick={() => {
                             setShowCourseDetails(false);
-                            confirmDeleteCourse(selectedCourse._id);
+                            handleDeleteCourse(selectedCourse._id);
                           }}
                           className="px-4 bg-red-100 text-red-700 py-2 rounded-lg hover:bg-red-200 transition-colors font-medium flex items-center space-x-1"
                         >
@@ -2830,10 +2671,13 @@ export default function AdminDashboard() {
       <DashboardHeader title="Admin Portal" userRole="admin" />
 
       {/* Notification Toast */}
-      <NotificationToast 
-        notification={notification} 
-        onClose={() => setNotification(null)} 
-      />
+      {notification && (
+        <div className={`fixed top-20 right-6 z-50 px-6 py-3 rounded-lg shadow-lg ${
+          notification.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+        } text-white`}>
+          {notification.message}
+        </div>
+      )}
 
       <div className="flex">
         {/* Sidebar */}
@@ -2888,143 +2732,6 @@ export default function AdminDashboard() {
 
       {/* Footer */}
       <DashboardFooter />
-
-      {/* Delete User Confirmation Modal */}
-      {showDeleteUserModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md relative">
-            <button
-              onClick={() => {
-                setShowDeleteUserModal(false);
-                setUserToDelete(null);
-              }}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors"
-            >
-              <X className="w-6 h-6" />
-            </button>
-
-            <div className="p-8">
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Trash2 className="w-8 h-8 text-red-600" />
-                </div>
-                <h2 className="text-2xl font-bold text-slate-900 mb-2">Delete User</h2>
-                <p className="text-slate-600">Are you sure you want to delete this user? This action cannot be undone.</p>
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowDeleteUserModal(false);
-                    setUserToDelete(null);
-                  }}
-                  className="flex-1 px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleDeleteUser}
-                  disabled={usersLoading}
-                  className="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {usersLoading ? 'Deleting...' : 'Delete'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Course Confirmation Modal */}
-      {showDeleteCourseModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md relative">
-            <button
-              onClick={() => {
-                setShowDeleteCourseModal(false);
-                setCourseToDelete(null);
-              }}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors"
-            >
-              <X className="w-6 h-6" />
-            </button>
-
-            <div className="p-8">
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Trash2 className="w-8 h-8 text-red-600" />
-                </div>
-                <h2 className="text-2xl font-bold text-slate-900 mb-2">Delete Course</h2>
-                <p className="text-slate-600">Are you sure you want to delete this course? This action cannot be undone.</p>
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowDeleteCourseModal(false);
-                    setCourseToDelete(null);
-                  }}
-                  className="flex-1 px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleDeleteCourse}
-                  disabled={coursesLoading}
-                  className="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {coursesLoading ? 'Deleting...' : 'Delete'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Fee Confirmation Modal */}
-      {showDeleteFeeModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md relative">
-            <button
-              onClick={() => {
-                setShowDeleteFeeModal(false);
-                setFeeToDelete(null);
-              }}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors"
-            >
-              <X className="w-6 h-6" />
-            </button>
-
-            <div className="p-8">
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Trash2 className="w-8 h-8 text-red-600" />
-                </div>
-                <h2 className="text-2xl font-bold text-slate-900 mb-2">Delete Fee</h2>
-                <p className="text-slate-600">Are you sure you want to delete this fee? This action cannot be undone.</p>
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowDeleteFeeModal(false);
-                    setFeeToDelete(null);
-                  }}
-                  className="flex-1 px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleDeleteFee}
-                  className="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
