@@ -76,7 +76,7 @@ export default function CreateAssignmentForm({ courses, onCreated }) {
       </div>
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-1">Title</label>
-        <input name="title" value={form.title} onChange={handleChange} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none" placeholder="e.g., Unit 1 Worksheet" />
+        <input name="title" value={form.title} onChange={handleChange} maxLength={15} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none" placeholder="e.g., Unit 1 Worksheet" />
       </div>
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>

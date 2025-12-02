@@ -18,7 +18,7 @@ const userSchema = yup.object({
     .string()
     .required('Name is required')
     .min(2, 'Name must be at least 2 characters long')
-    .max(50, 'Name must not exceed 50 characters')
+    .max(15, 'Name must not exceed 15 characters')
     .matches(/^[a-zA-Z\s]+$/, 'Name must contain only letters and spaces')
     .test('no-leading-trailing-spaces', 'Name cannot start or end with spaces', 
       value => value ? value.trim() === value : true),
@@ -94,7 +94,7 @@ const courseSchema = yup.object({
     .string()
     .required('Course name is required')
     .min(2, 'Course name must be at least 2 characters')
-    .max(100, 'Course name must not exceed 100 characters')
+    .max(15, 'Course name must not exceed 15 characters')
     .matches(/^(?=.*[a-zA-Z])[a-zA-Z0-9\s\-&().,]+$/, 'Course name must contain at least one letter and only valid characters')
     .trim(),
   code: yup
@@ -111,7 +111,7 @@ const courseSchema = yup.object({
     .notRequired(),
   teacher: yup
     .string()
-    .max(100, 'Teacher name must not exceed 100 characters')
+    .max(15, 'Teacher name must not exceed 15 characters')
     .notRequired(),
   credits: yup
     .number()
@@ -137,7 +137,7 @@ const feeSchema = yup.object({
     .string()
     .required('Fee title is required')
     .min(3, 'Title must be at least 3 characters')
-    .max(100, 'Title must not exceed 100 characters')
+    .max(15, 'Title must not exceed 15 characters')
     .matches(/^[a-zA-Z0-9\s\-_.,]+$/, 'Title can only contain letters, numbers, spaces, and basic punctuation')
     .test('no-leading-trailing-spaces', 'Title cannot start or end with spaces', 
       value => value ? value.trim() === value : true),

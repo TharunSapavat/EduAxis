@@ -63,7 +63,7 @@ export default function CreateAnnouncementForm({ courses }) {
       </div>
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-1">Title</label>
-        <input name="title" value={form.title} onChange={handleChange} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none" placeholder="e.g., Important Notice" required />
+        <input name="title" value={form.title} onChange={handleChange} maxLength={15} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none" placeholder="e.g., Important Notice" required />
       </div>
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-1">Content <span className="text-slate-500 text-xs">(minimum 10 characters)</span></label>
