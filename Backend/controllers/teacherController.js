@@ -436,6 +436,46 @@ export const getMySchedule = async (req, res) => {
   }
 };
 
+// Delete a class schedule entry (teacher can delete only own entries)
+export const deleteScheduleEntry = async (req, res) => {
+  try {
+    const teacherId = req.user?._id || req.user?.id;
+    const { id } = req.params;
+    if (!teacherId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    if (!id) return res.status(400).json({ success: false, message: 'Schedule entry id is required' });
+
+    const entry = await Schedule.findById(id).populate('courseId', 'name code grade');
+    if (!entry) return res.status(404).json({ success: false, message: 'Schedule entry not found' });
+
+    if (String(entry.teacherId) !== String(teacherId)) {
+      return res.status(403).json({ success: false, message: 'You can only delete your own scheduled classes' });
+    }
+
+    await Schedule.deleteOne({ _id: id });
+
+    // Emit realtime update to all clients to refresh
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        io.emit('scheduleUpdated', {
+          action: 'deleted',
+          entryId: String(id),
+          courseId: String(entry.courseId?._id || entry.courseId),
+          grade: String(entry.grade),
+          dayOfWeek: entry.dayOfWeek,
+          startTime: entry.startTime,
+          endTime: entry.endTime
+        });
+      }
+    } catch (_) {}
+
+    return res.json({ success: true, message: 'Schedule entry deleted' });
+  } catch (error) {
+    console.error('Delete schedule entry error:', error);
+    return res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
 // Get assignments (real data)
 export const getAssignments = async (req, res) => {
   try {

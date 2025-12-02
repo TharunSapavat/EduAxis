@@ -138,6 +138,7 @@ export const teacherAPI = {
   // Weekly schedule
   getSchedule: (params) => api.get('/teacher/schedule', { params }),
   createSchedule: (data) => api.post('/teacher/schedule', data),
+  deleteSchedule: (id) => api.delete(`/teacher/schedule/${id}`),
   // Leave Requests
   applyLeave: (data) => api.post('/teacher/leave-requests', data),
   getLeaveRequests: () => api.get('/teacher/leave-requests'),

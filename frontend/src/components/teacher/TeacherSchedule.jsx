@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { teacherAPI } from '../../services/api';
 import { useSocket } from '../../context/SocketContext';
+import { useAuth } from '../../context/AuthContext';
 
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
 export default function TeacherSchedule({ teacherCourses = [] }) {
+  const { user } = useAuth();
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ courseId: '', dayOfWeek: 'Monday', startTime: '09:00', endTime: '10:00', room: '' });
@@ -38,6 +40,24 @@ export default function TeacherSchedule({ teacherCourses = [] }) {
     return map;
   }, [entries]);
 
+  // Compute dates for current week (Mon-Sat)
+  const weekDates = useMemo(() => {
+    const today = new Date();
+    // get Monday of current week
+    const day = today.getDay(); // 0=Sun,1=Mon
+    const diffToMonday = (day === 0 ? -6 : 1 - day); // if Sunday, go back 6
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + diffToMonday);
+    const options = { month: 'short', day: 'numeric' };
+    const out = {};
+    DAYS.forEach((d, idx) => {
+      const dt = new Date(monday);
+      dt.setDate(monday.getDate() + idx);
+      out[d] = dt.toLocaleDateString(undefined, options);
+    });
+    return out;
+  }, []);
+
   const onSubmit = async (e) => {
     e.preventDefault();
     setError(''); setSuccess('');
@@ -58,6 +78,20 @@ export default function TeacherSchedule({ teacherCourses = [] }) {
       setSuccess('Class scheduled');
     } catch (e) {
       console.error('Schedule create failed', e);
+      setError(e.response?.data?.message || e.message);
+    }
+  };
+
+  const onDelete = async (id) => {
+    if (!id) return;
+    const ok = window.confirm('Remove this scheduled class?');
+    if (!ok) return;
+    try {
+      await teacherAPI.deleteSchedule(id);
+      setEntries(prev => prev.filter(x => x._id !== id));
+      setSuccess('Class removed');
+    } catch (e) {
+      console.error('Delete schedule failed', e);
       setError(e.response?.data?.message || e.message);
     }
   };
@@ -100,32 +134,40 @@ export default function TeacherSchedule({ teacherCourses = [] }) {
             <table className="w-full border border-slate-200 rounded-xl overflow-hidden">
               <thead className="bg-slate-50">
                 <tr>
-                  <th className="p-3 text-left text-xs font-semibold text-slate-700">Day</th>
+                  <th className="p-3 text-left text-xs font-semibold text-slate-700">Day (Date)</th>
                   <th className="p-3 text-left text-xs font-semibold text-slate-700">Time</th>
                   <th className="p-3 text-left text-xs font-semibold text-slate-700">Course</th>
                   <th className="p-3 text-left text-xs font-semibold text-slate-700">Teacher</th>
                   <th className="p-3 text-left text-xs font-semibold text-slate-700">Grade</th>
                   <th className="p-3 text-left text-xs font-semibold text-slate-700">Room</th>
+                  <th className="p-3 text-left text-xs font-semibold text-slate-700">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {DAYS.map(day => (
                   byDay[day].length === 0 ? (
                     <tr key={day} className="border-t border-slate-200">
-                      <td className="p-3 text-sm font-medium text-slate-900 w-32">{day}</td>
-                      <td className="p-3 text-slate-500" colSpan={4}>—</td>
+                      <td className="p-3 text-sm font-medium text-slate-900 w-40">{day} <span className="text-slate-500">({weekDates[day]})</span></td>
+                      <td className="p-3 text-slate-500" colSpan={6}>—</td>
                     </tr>
                   ) : (
                     byDay[day].map((e, idx) => (
                       <tr key={e._id} className="border-t border-slate-200">
                         {idx === 0 ? (
-                          <td className="p-3 text-sm font-medium text-slate-900 w-32" rowSpan={byDay[day].length}>{day}</td>
+                          <td className="p-3 text-sm font-medium text-slate-900 w-40" rowSpan={byDay[day].length}>{day} <span className="text-slate-500">({weekDates[day]})</span></td>
                         ) : null}
                         <td className="p-3 text-sm text-slate-900 whitespace-nowrap">{e.startTime} – {e.endTime}</td>
                         <td className="p-3 text-sm text-slate-700">{e.courseId?.name || e.subject}</td>
                         <td className="p-3 text-sm text-slate-700">{e.teacherId?.name || e.courseId?.teacherId?.name || '—'}</td>
                         <td className="p-3 text-sm text-slate-700">{e.grade}</td>
                         <td className="p-3 text-sm text-slate-700">{e.room ? `Room ${e.room}` : '—'}</td>
+                        <td className="p-3 text-sm text-slate-700">
+                          {String(e.teacherId?._id || e.teacherId) === String(user?.id || user?._id) ? (
+                            <button onClick={() => onDelete(e._id)} className="px-2 py-1 text-red-600 hover:bg-red-50 rounded">Delete</button>
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </td>
                       </tr>
                     ))
                   )
