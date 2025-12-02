@@ -9,6 +9,7 @@ export default function StudentAssignments({
 }) {
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [activeAssignment, setActiveAssignment] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitContent, setSubmitContent] = useState('');
@@ -133,6 +134,11 @@ export default function StudentAssignments({
       const msg = err.response?.data?.message || 'No submission found yet';
       showNotification(msg, 'info');
     }
+  };
+
+  const openViewDetails = (assignment) => {
+    setActiveAssignment(assignment);
+    setShowDetailsModal(true);
   };
 
   return (
@@ -292,7 +298,7 @@ export default function StudentAssignments({
                     </button>
                   )}
                   <button
-                    onClick={() => openViewSubmission(assignment)}
+                    onClick={() => openViewDetails(assignment)}
                     className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors text-sm font-medium"
                   >
                     View Details
@@ -377,7 +383,7 @@ export default function StudentAssignments({
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowViewModal(false)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between p-5 border-b border-slate-200">
-              <h3 className="text-lg font-bold text-slate-900">Submission Details</h3>
+              <h3 className="text-lg font-bold text-slate-900">My Submission</h3>
               <button onClick={() => setShowViewModal(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-5 space-y-4">
@@ -398,13 +404,22 @@ export default function StudentAssignments({
                   )}
                   {submissionDetails.content && (
                     <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-800 whitespace-pre-wrap">
+                      <p className="font-semibold text-slate-800 mb-2">My Answer:</p>
                       {submissionDetails.content}
+                    </div>
+                  )}
+                  {submissionDetails.link && (
+                    <div className="mt-2">
+                      <p className="text-sm font-semibold text-slate-800">Link:</p>
+                      <a href={submissionDetails.link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm break-all">
+                        {submissionDetails.link}
+                      </a>
                     </div>
                   )}
                   {submissionDetails.attachments?.length > 0 && (
                     <div className="mt-2">
-                      <p className="text-sm font-semibold text-slate-800">Attachments:</p>
-                      <ul className="list-disc ml-6 text-sm">
+                      <p className="text-sm font-semibold text-slate-800">My Attachments:</p>
+                      <ul className="list-disc ml-6 text-sm space-y-1">
                         {submissionDetails.attachments.map((att, idx) => (
                           <li key={idx}>
                             {att.url ? (
@@ -421,6 +436,146 @@ export default function StudentAssignments({
               )}
               <div className="flex justify-end pt-2">
                 <button onClick={() => setShowViewModal(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg">Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Assignment Details Modal */}
+      {showDetailsModal && activeAssignment && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowDetailsModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-5 border-b border-slate-200 sticky top-0 bg-white z-10">
+              <h3 className="text-lg font-bold text-slate-900">Assignment Details</h3>
+              <button onClick={() => setShowDetailsModal(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900 mb-2">{activeAssignment.title}</h2>
+                <div className="flex items-center gap-3 text-sm text-slate-600">
+                  <span className="font-medium">{activeAssignment.courseId?.name || activeAssignment.subject}</span>
+                  <span>•</span>
+                  <span>Due: {new Date(activeAssignment.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                  {activeAssignment.totalMarks && (
+                    <>
+                      <span>•</span>
+                      <span>{activeAssignment.totalMarks} marks</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {activeAssignment.teacherId?.name && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-sm text-blue-900">
+                    <span className="font-semibold">Instructor:</span> {activeAssignment.teacherId.name}
+                  </p>
+                </div>
+              )}
+
+              {activeAssignment.description && (
+                <div>
+                  <h4 className="font-semibold text-slate-900 mb-2">Description</h4>
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                    <p className="text-slate-700 whitespace-pre-wrap">{activeAssignment.description}</p>
+                  </div>
+                </div>
+              )}
+
+              {activeAssignment.instructions && (
+                <div>
+                  <h4 className="font-semibold text-slate-900 mb-2">Instructions</h4>
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                    <p className="text-slate-700 whitespace-pre-wrap">{activeAssignment.instructions}</p>
+                  </div>
+                </div>
+              )}
+
+              {activeAssignment.attachments?.length > 0 && (
+                <div>
+                  <h4 className="font-semibold text-slate-900 mb-2">📎 Assignment Materials</h4>
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                    <ul className="space-y-2">
+                      {activeAssignment.attachments.map((att, idx) => {
+                        const fileUrl = att.path 
+                          ? `http://localhost:5000${att.path}` 
+                          : att.url;
+                        const fileName = att.name || `Attachment ${idx + 1}`;
+                        const fileSize = att.size ? ` (${(att.size / 1024).toFixed(1)} KB)` : '';
+                        
+                        return (
+                          <li key={idx} className="flex items-center gap-2">
+                            <FileText className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                            <a
+                              href={fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              download
+                              className="text-blue-600 hover:text-blue-800 hover:underline flex-1"
+                            >
+                              {fileName}{fileSize}
+                            </a>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-4 border-t border-slate-200">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-slate-600">Created</p>
+                    <p className="font-medium text-slate-900">
+                      {new Date(activeAssignment.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-slate-600">Status</p>
+                    <p className={`font-medium ${
+                      (activeAssignment.submissionStatus === 'graded' || recentlySubmitted[activeAssignment._id])
+                        ? 'text-green-600'
+                        : new Date(activeAssignment.dueDate) < new Date() && activeAssignment.submissionStatus !== 'submitted'
+                        ? 'text-red-600'
+                        : 'text-orange-600'
+                    }`}>
+                      {activeAssignment.submissionStatus === 'graded' 
+                        ? 'Graded' 
+                        : activeAssignment.submissionStatus === 'submitted' || recentlySubmitted[activeAssignment._id]
+                        ? 'Submitted'
+                        : new Date(activeAssignment.dueDate) < new Date()
+                        ? 'Overdue'
+                        : 'Pending'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <button 
+                  onClick={() => setShowDetailsModal(false)} 
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"
+                >
+                  Close
+                </button>
+                {!(activeAssignment.submissionStatus === 'submitted' || activeAssignment.submissionStatus === 'graded' || recentlySubmitted[activeAssignment._id]) && (
+                  <button 
+                    onClick={() => {
+                      setShowDetailsModal(false);
+                      openSubmit(activeAssignment);
+                    }}
+                    disabled={new Date(activeAssignment.dueDate) < new Date()}
+                    className={`px-4 py-2 rounded-lg transition-colors text-white ${
+                      new Date(activeAssignment.dueDate) < new Date()
+                        ? 'bg-slate-400 cursor-not-allowed'
+                        : 'bg-blue-600 hover:bg-blue-700'
+                    }`}
+                  >
+                    {new Date(activeAssignment.dueDate) < new Date() ? 'Closed' : 'Submit Assignment'}
+                  </button>
+                )}
               </div>
             </div>
           </div>
