@@ -8,6 +8,8 @@ export default function TeacherMaterials() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [notification, setNotification] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [materialToDelete, setMaterialToDelete] = useState(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -113,11 +115,17 @@ export default function TeacherMaterials() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this material?')) return;
+  const confirmDelete = (id) => {
+    setMaterialToDelete(id);
+    setShowDeleteModal(true);
+  };
+
+  const handleDelete = async () => {
+    if (!materialToDelete) return;
 
     try {
-      const response = await teacherAPI.deleteStudyMaterial(id);
+      setShowDeleteModal(false);
+      const response = await teacherAPI.deleteStudyMaterial(materialToDelete);
       if (response.data.success) {
         showNotification('Material deleted successfully', 'success');
         fetchMaterials();
@@ -125,6 +133,8 @@ export default function TeacherMaterials() {
     } catch (error) {
       console.error('Error deleting material:', error);
       showNotification('Failed to delete material', 'error');
+    } finally {
+      setMaterialToDelete(null);
     }
   };
 
@@ -336,7 +346,7 @@ export default function TeacherMaterials() {
                       )}
                     </div>
                     <button
-                      onClick={() => handleDelete(material._id)}
+                      onClick={() => confirmDelete(material._id)}
                       className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                       title="Delete"
                     >
@@ -358,6 +368,40 @@ export default function TeacherMaterials() {
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex items-center justify-center mb-4">
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                <Trash2 className="w-6 h-6 text-red-600" />
+              </div>
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 text-center mb-2">Delete Study Material?</h3>
+            <p className="text-sm text-slate-600 text-center mb-6">
+              Are you sure you want to delete this study material? This action cannot be undone and students will no longer have access to it.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setMaterialToDelete(null);
+                }}
+                className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

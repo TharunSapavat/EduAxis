@@ -18,6 +18,7 @@ export const getDashboard = async (req, res) => {
     
     // Find courses assigned to this teacher
     const teacherCourses = await Course.find({ teacherId });
+    const courseIds = teacherCourses.map(c => c._id);
     
     // Calculate total students across all teacher's courses
     const uniqueGrades = [...new Set(teacherCourses.map(c => c.grade))];
@@ -26,12 +27,31 @@ export const getDashboard = async (req, res) => {
       grade: { $in: uniqueGrades }
     });
     
+    // Calculate pending grading (submissions not yet graded)
+    const pendingGrading = await Submission.countDocuments({
+      assignmentId: { 
+        $in: await Assignment.find({ 
+          courseId: { $in: courseIds } 
+        }).distinct('_id') 
+      },
+      grade: null
+    });
+    
+    // Calculate classes today from schedule
+    const today = new Date();
+    const dayOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][today.getDay()];
+    
+    const classesToday = await Schedule.countDocuments({
+      teacherId,
+      dayOfWeek
+    });
+    
     res.json({
       stats: {
         totalCourses: teacherCourses.length,
         totalStudents,
-        pendingGrading: 23,
-        classesToday: 4
+        pendingGrading,
+        classesToday
       }
     });
   } catch (error) {
