@@ -29,6 +29,7 @@ export default function StudentCourses({
                   <p className="text-sm text-slate-600">
                     {course.teacherId?.name || 'Instructor TBA'}
                   </p>
+                  <p className="text-sm text-slate-600">Semester: {course.semester || '—'}</p>
                 </div>
                 <span className={`px-3 py-1 text-xs font-medium rounded-full ${
                   course.status === 'active' 

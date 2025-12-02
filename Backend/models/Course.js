@@ -39,6 +39,11 @@ const courseSchema = new mongoose.Schema({
     max: [6, 'Credits cannot exceed 6'],
     default: 3
   },
+  semester: {
+    type: String,
+    enum: ['Annual', 'Fall', 'Spring', 'Summer'],
+    default: 'Annual'
+  },
   grade: {
     type: Number,
     required: [true, 'Grade is required'],

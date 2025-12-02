@@ -375,7 +375,7 @@ export const getCourses = async (req, res) => {
 
 export const createCourse = async (req, res) => {
   try {
-    const { name, code, description, teacher, teacherId: providedTeacherId, credits, grade } = req.body;
+    const { name, code, description, teacher, teacherId: providedTeacherId, credits, grade, semester } = req.body;
 
     // Prefer explicit teacherId if provided, otherwise resolve by name
     let teacherId = providedTeacherId || null;
@@ -391,7 +391,8 @@ export const createCourse = async (req, res) => {
       teacher: teacher || 'TBD',
       description,
       credits,
-      grade
+      grade,
+      semester: semester || 'Annual'
     });
 
     res.json({

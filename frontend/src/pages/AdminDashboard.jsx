@@ -102,7 +102,8 @@ const courseSchema = yup.object({
     .required('Course code is required')
     .min(3, 'Course code must be at least 3 characters')
     .max(10, 'Course code must not exceed 10 characters')
-    .matches(/^[A-Z0-9-]+$/, 'Course code must be uppercase letters, numbers, or hyphens')
+    .matches(/^[A-Za-z0-9-]+$/, 'Course code must contain only letters, numbers, or hyphens')
+    .transform(value => value ? value.toUpperCase() : value)
     .trim(),
   description: yup
     .string()
@@ -328,11 +329,15 @@ export default function AdminDashboard() {
       description: '',
       teacher: '',
       teacherId: '',
+      semester: 'Annual',
       credits: 3,
       grade: 1,
       status: 'active'
     }
   });
+
+  const [teacherQuery, setTeacherQuery] = useState('');
+  const [showTeacherDropdown, setShowTeacherDropdown] = useState(false);
 
   // Fetch users function (defined here so handleCreateUser can use it)
   const fetchUsers = async () => {
@@ -751,8 +756,10 @@ export default function AdminDashboard() {
     setCourseValue('description', course.description || '');
   setCourseValue('teacher', course.teacher || '');
   setCourseValue('teacherId', course.teacherId || '');
+  setTeacherQuery(course.teacher || '');
     setCourseValue('credits', course.credits);
     setCourseValue('grade', course.grade);
+    setCourseValue('semester', course.semester || 'Annual');
     setCourseValue('status', course.status);
     setShowCourseForm(true);
   };
@@ -2224,21 +2231,53 @@ export default function AdminDashboard() {
                         <label className="block text-sm font-medium text-slate-700 mb-2">
                           Assign Teacher
                         </label>
-                        <select
-                          {...registerCourse('teacherId')}
-                          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all bg-white ${
-                            courseErrors.teacher ? 'border-red-500' : 'border-slate-300'
-                          }`}
-                        >
-                          <option value="">Select a teacher (optional)</option>
-                          {users
-                            .filter(u => u.role === 'teacher')
-                            .map(teacher => (
-                              <option key={teacher.id} value={teacher.id}>
-                                {teacher.name} - {teacher.email}
-                              </option>
-                            ))}
-                        </select>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={teacherQuery}
+                            onChange={(e) => { setTeacherQuery(e.target.value); setShowTeacherDropdown(true); }}
+                            onFocus={() => setShowTeacherDropdown(true)}
+                            placeholder="Search teacher by name or email"
+                            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all ${
+                              courseErrors.teacher ? 'border-red-500' : 'border-slate-300'
+                            }`}
+                          />
+                          {/* Hidden fields to store selected teacher id and name for form submit */}
+                          <input type="hidden" {...registerCourse('teacherId')} />
+                          <input type="hidden" {...registerCourse('teacher')} />
+
+                          {showTeacherDropdown && (
+                            <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-md shadow max-h-44 overflow-auto z-50">
+                              {users.filter(u => u.role === 'teacher' && (
+                                u.name.toLowerCase().includes(teacherQuery.toLowerCase()) ||
+                                u.email.toLowerCase().includes(teacherQuery.toLowerCase())
+                              )).length > 0 ? (
+                                users
+                                  .filter(u => u.role === 'teacher' && (
+                                    u.name.toLowerCase().includes(teacherQuery.toLowerCase()) ||
+                                    u.email.toLowerCase().includes(teacherQuery.toLowerCase())
+                                  ))
+                                  .map(teacher => (
+                                    <div
+                                      key={teacher.id}
+                                      className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-sm"
+                                      onMouseDown={() => {
+                                        setCourseValue('teacherId', teacher.id);
+                                        setCourseValue('teacher', teacher.name);
+                                        setTeacherQuery(`${teacher.name} - ${teacher.email}`);
+                                        setShowTeacherDropdown(false);
+                                      }}
+                                    >
+                                      <div className="font-medium">{teacher.name}</div>
+                                      <div className="text-xs text-slate-500">{teacher.email}</div>
+                                    </div>
+                                  ))
+                              ) : (
+                                <div className="px-3 py-2 text-sm text-slate-500">No teachers found</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                         {courseErrors.teacher && (
                           <p className="mt-1 text-sm text-red-600">{courseErrors.teacher.message}</p>
                         )}
@@ -2247,8 +2286,8 @@ export default function AdminDashboard() {
                         )}
                       </div>
 
-                      {/* Credits, Semester, Status */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Credits, Grade, Semester, Status */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>
                           <label className="block text-sm font-medium text-slate-700 mb-2">
                             Credits <span className="text-red-500">*</span>
@@ -2284,6 +2323,28 @@ export default function AdminDashboard() {
                           </select>
                           {courseErrors.grade && (
                             <p className="mt-1 text-sm text-red-600">{courseErrors.grade.message}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">
+                            Semester <span className="text-red-500">*</span>
+                          </label>
+                          <select
+                            {...registerCourse('semester')}
+                            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all bg-white ${
+                              courseErrors.semester ? 'border-red-500' : 'border-slate-300'
+                            }`}
+                          >
+                            <option value="Annual">Annual</option>
+                            <option value="Fall">Fall</option>
+                            <option value="Spring">Spring</option>
+                            <option value="Summer">Summer</option>
+                          </select>
+                          {courseErrors.semester && (
+                            <p className="mt-1 text-sm text-red-600">{courseErrors.semester.message}</p>
                           )}
                         </div>
 
