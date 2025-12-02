@@ -11,6 +11,9 @@ import {
   getTimetable,
   getSchedule,
   getAnnouncements,
+  markAnnouncementAsRead,
+  hideAnnouncement,
+  clearAllAnnouncements,
   getFees,
   makePayment,
   downloadReceipt,
@@ -55,6 +58,9 @@ router.get('/schedule', getSchedule);
 
 // Announcements
 router.get('/announcements', getAnnouncements);
+router.patch('/announcements/:id/read', markAnnouncementAsRead);
+router.delete('/announcements/:id', hideAnnouncement);
+router.delete('/announcements', clearAllAnnouncements);
 
 // Fees & Payments
 router.get('/fees', getFees);

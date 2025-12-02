@@ -468,6 +468,7 @@ export const getAnnouncements = async (req, res) => {
     
     const announcements = await Announcement.find({
       isActive: true,
+      hiddenBy: { $ne: student._id }, // Exclude hidden announcements
       $or: [
         { targetAudience: 'all' },
         { targetAudience: 'students' }
@@ -978,6 +979,133 @@ export const getStudyMaterials = async (req, res) => {
     });
   } catch (error) {
     console.error('Get study materials error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
+    });
+  }
+};
+
+// Mark announcement as read
+export const markAnnouncementAsRead = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const studentId = req.user._id;
+
+    const announcement = await Announcement.findById(id);
+    
+    if (!announcement) {
+      return res.status(404).json({
+        success: false,
+        message: 'Announcement not found'
+      });
+    }
+
+    // Add student to readBy array if not already there
+    if (!announcement.readBy.includes(studentId)) {
+      announcement.readBy.push(studentId);
+      await announcement.save();
+    }
+
+    res.json({
+      success: true,
+      message: 'Announcement marked as read'
+    });
+  } catch (error) {
+    console.error('Mark announcement as read error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
+    });
+  }
+};
+
+// Hide/Delete announcement for student
+export const hideAnnouncement = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const studentId = req.user._id;
+
+    const announcement = await Announcement.findById(id);
+    
+    if (!announcement) {
+      return res.status(404).json({
+        success: false,
+        message: 'Announcement not found'
+      });
+    }
+
+    // Add student to hiddenBy array if not already there
+    if (!announcement.hiddenBy.includes(studentId)) {
+      announcement.hiddenBy.push(studentId);
+      await announcement.save();
+    }
+
+    res.json({
+      success: true,
+      message: 'Announcement deleted'
+    });
+  } catch (error) {
+    console.error('Hide announcement error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
+    });
+  }
+};
+
+// Clear all announcements for student
+export const clearAllAnnouncements = async (req, res) => {
+  try {
+    const studentId = req.user._id;
+    const student = req.user;
+
+    // Find all announcements visible to this student
+    const announcements = await Announcement.find({
+      isActive: true,
+      hiddenBy: { $ne: studentId },
+      $or: [
+        { targetAudience: 'all' },
+        { targetAudience: 'students' }
+      ],
+      $and: [
+        {
+          $or: [
+            { grade: { $exists: false } },
+            { grade: null },
+            { grade: String(student.grade) }
+          ]
+        },
+        {
+          $or: [
+            { expiresAt: null },
+            { expiresAt: { $gt: new Date() } }
+          ]
+        }
+      ]
+    });
+
+    // Add student to hiddenBy array for all announcements
+    const updatePromises = announcements.map(announcement => {
+      if (!announcement.hiddenBy.includes(studentId)) {
+        announcement.hiddenBy.push(studentId);
+        return announcement.save();
+      }
+      return Promise.resolve();
+    });
+
+    await Promise.all(updatePromises);
+
+    res.json({
+      success: true,
+      message: `${announcements.length} announcements cleared`,
+      count: announcements.length
+    });
+  } catch (error) {
+    console.error('Clear all announcements error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error',

@@ -663,6 +663,8 @@ export default function StudentDashboard() {
         return <StudentAnnouncements 
           announcements={announcements}
           announcementsLoading={announcementsLoading}
+          onAnnouncementsUpdate={fetchAnnouncements}
+          showNotification={showNotification}
         />;
 
       case '/student/messages':
