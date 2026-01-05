@@ -208,6 +208,7 @@ export default function StudentDashboard() {
       // Treat < 1100px as half / constrained view for side-by-side testing
       if (window.innerWidth < 1100) {
         setSidebarOpen(false);
+        
       } else {
         setSidebarOpen(true);
       }

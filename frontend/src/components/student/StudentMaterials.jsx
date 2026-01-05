@@ -128,7 +128,7 @@ export default function StudentMaterials() {
               />
             </div>
           </div>
-        </div>
+        </div>  
       </div>
 
       {/* Materials Grid */}
