@@ -13,6 +13,7 @@ import teacherRoutes from './routes/teacherRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import messageRoutes from './routes/messageRoutes.js';
 import { Server as SocketIOServer } from 'socket.io';
+import morgan from 'morgan';
 
 dotenv.config();
 
@@ -45,6 +46,7 @@ const io = new SocketIOServer(server, {
     credentials: true
   }
 });
+app.use(morgan('tiny'));
 
 io.on('connection', (socket) => {
   console.log('🔌 Socket connected:', socket.id);
