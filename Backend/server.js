@@ -14,6 +14,7 @@ import adminRoutes from './routes/adminRoutes.js';
 import messageRoutes from './routes/messageRoutes.js';
 import { Server as SocketIOServer } from 'socket.io';
 import morgan from 'morgan';
+import helmet from 'helmet';
 
 dotenv.config();
 
@@ -47,6 +48,7 @@ const io = new SocketIOServer(server, {
   }
 });
 app.use(morgan('tiny'));
+app.use(helmet());
 
 io.on('connection', (socket) => {
   console.log('🔌 Socket connected:', socket.id);
