@@ -1,8 +1,8 @@
-# EduAxis 🎓
+# EduAxis 
 
 A comprehensive School Management System built with **Node.js**, **Express**, **MongoDB**, and **React** that streamlines educational administration, teaching, and learning processes.
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Features](#features)
 - [Tech Stack](#tech-stack)
@@ -13,9 +13,9 @@ A comprehensive School Management System built with **Node.js**, **Express**, **
 - [Contributing](#contributing)
 - [License](#license)
 
-## ✨ Features
+## Features
 
-### 👨‍🎓 Student Dashboard
+### Student Dashboard
 - **Academic Overview**: View courses, grades, and attendance statistics
 - **Assignment Management**: Submit assignments with file attachments and track submissions
 - **Timetable**: Access class schedules and daily routines
@@ -23,19 +23,19 @@ A comprehensive School Management System built with **Node.js**, **Express**, **
 - **Library Access**: Browse available resources and manage borrowed books
 - **Announcements**: Stay updated with school-wide notifications
 
-### 👨‍🏫 Teacher Portal
+### Teacher Portal
 - **Course Management**: Create and manage courses
 - **Assignment & Grading**: Create assignments, review submissions, and provide feedback
 - **Attendance Tracking**: Mark and manage student attendance
 - **Student Progress**: Monitor individual and class performance
 
-### 👨‍💼 Admin Panel
+### Admin Panel
 - **User Management**: Manage students, teachers, and staff accounts
 - **Fee Structure**: Configure fee categories and payment tracking
 - **Announcements**: Broadcast important messages to different user groups
 - **System Configuration**: Manage academic years, semesters, and school settings
 
-## 🛠 Tech Stack
+## Tech Stack
 
 ### Backend
 - **Runtime**: Node.js
@@ -52,7 +52,7 @@ A comprehensive School Management System built with **Node.js**, **Express**, **
 - **Styling**: CSS/SCSS
 - **Linting**: ESLint
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 EduAxis/
@@ -83,7 +83,7 @@ EduAxis/
     └── package.json
 ```
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -137,7 +137,7 @@ EduAxis/
    - Frontend: `http://localhost:5173`
    - Backend API: `http://localhost:5000`
 
-## 📚 API Documentation
+## API Documentation
 
 ### Base URL
 ```
@@ -181,7 +181,7 @@ All student routes require authentication and student role. See [STUDENT_API_ROU
 - Announcement broadcasting
 - System settings
 
-## 🔐 Authentication
+## Authentication
 
 EduAxis uses **JWT (JSON Web Tokens)** for authentication.
 
@@ -200,14 +200,14 @@ Authorization: Bearer <your_jwt_token>
 **password** zxcvbnm
 
 
-## 📖 Additional Documentation
+## Additional Documentation
 
 - [Student API Routes](Backend/STUDENT_API_ROUTES.md) - Detailed student endpoint documentation
 - [Testing Guide](Backend/TESTING_GUIDE.md) - API testing instructions
 - [Implementation Summary](Backend/IMPLEMENTATION_SUMMARY.md) - Development overview
 - [Redux Integration](frontend/REDUX_INTEGRATION.md) - State management guide
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please follow these steps:
 
@@ -217,7 +217,7 @@ Contributions are welcome! Please follow these steps:
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## 📝 Future Enhancements
+## Future Enhancements
 
 - [ ] Library resource management system with book borrowing
 - [ ] Email notifications for assignments and payments
@@ -227,11 +227,11 @@ Contributions are welcome! Please follow these steps:
 - [ ] Mobile application (React Native)
 - [ ] Advanced analytics and reporting
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Built for educational institutions
 - Inspired by modern school management needs
