@@ -17,7 +17,7 @@ export const sendMessage = async (req, res) => {
     }
 
     // Ensure recipient exists
-    const recipient = await User.findById(recipientId).select('-password');
+    const recipient = await User.findById(recipientId).sōōelect('-password');
     if (!recipient) {
       return res.status(404).json({ success: false, message: 'Recipient not found' });
     }
