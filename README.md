@@ -44,12 +44,19 @@ A comprehensive School Management System built with **Node.js**, **Express**, **
 - **Authentication**: JWT (JSON Web Tokens)
 - **File Upload**: Multer
 - **Environment Variables**: dotenv
+- **Security & Logging**: helmet, morgan
+- **Auth Utilities**: bcryptjs, cookie-parser
+- **Networking**: cors, socket.io
 
 ### Frontend
 - **Framework**: React 18
 - **Build Tool**: Vite
 - **State Management**: Redux Toolkit
-- **Styling**: CSS/SCSS
+- **Styling**: Tailwind CSS
+- **Forms & Validation**: React Hook Form + Yup
+- **Routing**: React Router
+- **HTTP Client**: Axios
+- **Real-time**: socket.io-client
 - **Linting**: ESLint
 
 ## Project Structure
@@ -152,7 +159,7 @@ http://localhost:5000/api
 ### Student Routes
 All student routes require authentication and student role. See [STUDENT_API_ROUTES.md](Backend/STUDENT_API_ROUTES.md) for detailed documentation.
 
-**Base URL**: `/api/students`
+**Base URL**: `/api/student`
 
 - `GET /dashboard` - Student dashboard statistics
 - `GET /courses` - Get enrolled courses
@@ -166,7 +173,7 @@ All student routes require authentication and student role. See [STUDENT_API_ROU
 - `GET /library` - Library resources and borrowed books
 
 ### Teacher Routes
-**Base URL**: `/api/teachers`
+**Base URL**: `/api/teacher`
 
 - Course management endpoints
 - Assignment creation and grading
