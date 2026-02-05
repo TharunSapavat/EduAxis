@@ -11,10 +11,46 @@ const api = axios.create({
   withCredentials: true, // Send cookies with requests
 });
 
-// Request interceptor - Cookies are sent automatically
+// Store CSRF token
+let csrfToken = null;
+
+// Function to fetch CSRF token
+const fetchCsrfToken = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/csrf-token`, {
+      withCredentials: true,
+    });
+    csrfToken = response.data.csrfToken;
+    return csrfToken;
+  } catch (error) {
+    console.error('Failed to fetch CSRF token:', error);
+    return null;
+  }
+};
+
+// Initialize CSRF token on app load
+fetchCsrfToken();
+
+// Request interceptor - Add CSRF token to state-changing requests
 api.interceptors.request.use(
-  (config) => {
-    // No need to manually add token - cookies are sent automatically!
+  async (config) => {
+    // Skip CSRF for auth endpoints (login, register, logout)
+    const isAuthEndpoint = config.url.includes('/auth/login') || 
+                           config.url.includes('/auth/register') || 
+                           config.url.includes('/auth/logout');
+    
+    // Add CSRF token to non-GET requests (except auth endpoints)
+    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(config.method.toUpperCase()) && !isAuthEndpoint) {
+      // If no CSRF token, fetch it first
+      if (!csrfToken) {
+        await fetchCsrfToken();
+      }
+      
+      if (csrfToken) {
+        config.headers['X-CSRF-Token'] = csrfToken;
+      }
+    }
+    
     return config;
   },
   (error) => {
@@ -27,7 +63,9 @@ api.interceptors.response.use(
   (response) => {
     return response;
   },
-  (error) => {
+  async (error) => {
+    const originalRequest = error.config;
+    
     if (error.response) {
       // Server responded with error status
       const { status, data } = error.response;
@@ -46,24 +84,41 @@ api.interceptors.response.use(
           }
           // For auth requests (login/register), let the component handle the error
           break;
+          
         case 403:
+          // Forbidden - Could be invalid CSRF token
+          if (data.message && data.message.includes('CSRF')) {
+            console.warn('Invalid CSRF token, fetching new one...');
+            // Fetch new CSRF token and retry the request
+            if (!originalRequest._retry) {
+              originalRequest._retry = true;
+              await fetchCsrfToken();
+              return api(originalRequest);
+            }
+          }
           console.error('Forbidden:', data.message);
           break;
+          
         case 404:
           console.error('Resource not found:', data.message);
           break;
+          
+        case 429:
+          console.error('Too many requests:', data.message);
+          break;
+          
         case 500:
           console.error('Server error:', data.message);
           break;
+          
         default:
           console.error('API error:', data.message);
       }
     } else if (error.request) {
-      // Request made but no response received
-      console.error('Network error - server not responding');
-      error.message = 'Cannot connect to server. Please check your connection.';
+      // Request made but no response
+      console.error('No response from server. Please check your connection.');
     } else {
-      // Error in request setup
+      // Something else happened
       console.error('Request error:', error.message);
     }
     
