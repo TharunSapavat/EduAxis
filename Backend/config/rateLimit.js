@@ -15,6 +15,10 @@ export const apiLimiter = rateLimit({
   },
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  skip: (req) => {
+    // Don't count CSRF token requests or health checks against rate limit
+    return req.path === '/csrf-token' || req.path === '/health';
+  },
 });
 
 // Strict rate limiter for authentication endpoints

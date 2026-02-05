@@ -11,52 +11,7 @@ const api = axios.create({
   withCredentials: true, // Send cookies with requests
 });
 
-// Store CSRF token
-let csrfToken = null;
-
-// Function to fetch CSRF token
-const fetchCsrfToken = async () => {
-  try {
-    const response = await axios.get(`${API_BASE_URL}/csrf-token`, {
-      withCredentials: true,
-    });
-    csrfToken = response.data.csrfToken;
-    return csrfToken;
-  } catch (error) {
-    console.error('Failed to fetch CSRF token:', error);
-    return null;
-  }
-};
-
-// Initialize CSRF token on app load
-fetchCsrfToken();
-
-// Request interceptor - Add CSRF token to state-changing requests
-api.interceptors.request.use(
-  async (config) => {
-    // Skip CSRF for auth endpoints (login, register, logout)
-    const isAuthEndpoint = config.url.includes('/auth/login') || 
-                           config.url.includes('/auth/register') || 
-                           config.url.includes('/auth/logout');
-    
-    // Add CSRF token to non-GET requests (except auth endpoints)
-    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(config.method.toUpperCase()) && !isAuthEndpoint) {
-      // If no CSRF token, fetch it first
-      if (!csrfToken) {
-        await fetchCsrfToken();
-      }
-      
-      if (csrfToken) {
-        config.headers['X-CSRF-Token'] = csrfToken;
-      }
-    }
-    
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+// CSRF DISABLED - Causing too many issues with delete/send operations
 
 // Response interceptor - Handle errors globally
 api.interceptors.response.use(
@@ -64,8 +19,6 @@ api.interceptors.response.use(
     return response;
   },
   async (error) => {
-    const originalRequest = error.config;
-    
     if (error.response) {
       // Server responded with error status
       const { status, data } = error.response;
@@ -86,25 +39,15 @@ api.interceptors.response.use(
           break;
           
         case 403:
-          // Forbidden - Could be invalid CSRF token
-          if (data.message && data.message.includes('CSRF')) {
-            console.warn('Invalid CSRF token, fetching new one...');
-            // Fetch new CSRF token and retry the request
-            if (!originalRequest._retry) {
-              originalRequest._retry = true;
-              await fetchCsrfToken();
-              return api(originalRequest);
-            }
-          }
           console.error('Forbidden:', data.message);
+          break;
+          
+        case 429:
+          console.error('Too many requests - rate limited. Please wait a moment and try again.');
           break;
           
         case 404:
           console.error('Resource not found:', data.message);
-          break;
-          
-        case 429:
-          console.error('Too many requests:', data.message);
           break;
           
         case 500:

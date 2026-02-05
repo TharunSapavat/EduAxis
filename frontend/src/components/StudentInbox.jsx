@@ -151,7 +151,12 @@ export default function StudentInbox({ user, socket }) {
         withCredentials: true
       });
       if (res.data.success) {
-        setConversations(res.data.data || []);
+        const convs = res.data.data || [];
+        // Deduplicate conversations by userId to prevent React key warnings
+        const uniqueConvs = Array.from(
+          new Map(convs.map(conv => [conv.userId, conv])).values()
+        );
+        setConversations(uniqueConvs);
       }
     } catch (err) {
       console.error('Failed to fetch conversations', err);
@@ -240,7 +245,7 @@ export default function StudentInbox({ user, socket }) {
 
   const sendMessage = async (e) => {
     e.preventDefault();
-    if (!newMessage.trim() || !selectedConversation) return;
+    if (!newMessage.trim() || !selectedConversation || sending) return;
 
     // Prevent self-messaging from UI as extra safety
     const currentUserId = user.id || user._id;
@@ -260,30 +265,27 @@ export default function StudentInbox({ user, socket }) {
 
     try {
       setSending(true);
+      const messageText = newMessage; // Store before clearing
+      setNewMessage(''); // Clear input immediately for better UX
+      
       const res = await axios.post(
         `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/messages`,
         {
           recipientId: selectedConversation.userId,
-          text: newMessage
+          text: messageText
         },
         { withCredentials: true }
       );
 
       if (res.data.success) {
-        const sentMsg = res.data.data;
-        const currentUserId = user.id || user._id;
-        // Ensure sender info is properly set
-        if (!sentMsg.sender || typeof sentMsg.sender === 'string') {
-          sentMsg.sender = { _id: currentUserId, name: user.name, role: user.role };
-        }
-        setMessages(prev => [...prev, sentMsg]);
-        setNewMessage('');
-        // Refresh conversations to update last message
+        // Socket will handle adding the message via 'message:sent' event
+        // No need to manually add it here to avoid duplicates
         fetchConversations();
       }
     } catch (err) {
       console.error('Failed to send message', err);
       alert('Failed to send message');
+      setNewMessage(messageText); // Restore message on error
     } finally {
       setSending(false);
     }

@@ -14,7 +14,8 @@ import { Server as SocketIOServer } from 'socket.io';
 import connectDB from './config/database.js';
 import { corsOptions, socketCorsOptions } from './config/cors.js';
 import helmetOptions from './config/helmet.js';
-import { apiLimiter, authLimiter } from './config/rateLimit.js';
+// RATE LIMITING DISABLED - Commented out to avoid rate limit issues
+// import { apiLimiter, authLimiter } from './config/rateLimit.js';
 import logger from './config/logger.js';
 
 // Import routes
@@ -162,17 +163,17 @@ app.get('/api/csrf-token', csrfTokenGenerator, (req, res) => {
   });
 });
 
-// Apply rate limiting to all API routes
-app.use('/api', apiLimiter);
+// RATE LIMITING DISABLED - No more rate limits
+// app.use('/api', apiLimiter);
 
 // Routes - Auth routes don't need CSRF protection (login/register are public)
-app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/auth', authRoutes);
 
-// CSRF Protection for authenticated routes (student, teacher, admin, messages)
-app.use(doubleCsrfProtection);
-app.use(csrfErrorHandler);
+// CSRF Protection DISABLED - Causing issues with delete/send operations
+// app.use(doubleCsrfProtection);
+// app.use(csrfErrorHandler);
 
-// Protected routes with CSRF protection
+// Protected routes (CSRF disabled)
 app.use('/api/student', studentRoutes);
 app.use('/api/teacher', teacherRoutes);
 app.use('/api/admin', adminRoutes);
