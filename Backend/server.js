@@ -33,7 +33,7 @@ dotenv.config();
 
 // Handle uncaught exceptions (must be at the top)
 process.on('uncaughtException', (err) => {
-  console.error('UNCAUGHT EXCEPTION! 💥 Shutting down...', err);
+  console.error('UNCAUGHT EXCEPTION! 💥', err);
   process.exit(1);
 });
 
@@ -54,22 +54,24 @@ app.use(cors(corsOptions)); // CORS configuration
 // Trust proxy (if behind reverse proxy like nginx)
 app.set('trust proxy', 1);
 
-// Morgan stream to Winston logger
+// Morgan stream to Winston logger (logs to file only, no console spam)
 const morganStream = {
   write: (message) => {
     logger.info(message.trim());
   }
 };
 
-// Request logging with Morgan + Winston (both console and file)
-if (process.env.NODE_ENV === 'development') {
-  // Development: console (colorized) + file
-  app.use(morgan('dev')); // Console output
-  app.use(morgan('combined', { stream: morganStream })); // File output
-} else {
-  // Production: file only
-  app.use(morgan('combined', { stream: morganStream }));
-}
+// Custom Morgan token for device type
+morgan.token('device', (req) => {
+  const ua = req.headers['user-agent'] || '';
+  const isMobile = /mobile|android|iphone|ipad|phone/i.test(ua);
+  return isMobile ? 'Mobile' : 'Desktop';
+});
+
+// Request logging - same compact format to both console and file
+const logFormat = ':method :url :status :res[content-length] - :response-time ms - :device';
+app.use(morgan(logFormat)); // Console
+app.use(morgan(logFormat, { stream: morganStream })); // File
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -85,17 +87,15 @@ const io = new SocketIOServer(server, {
 });
 
 io.on('connection', (socket) => {
-  console.log('🔌 Socket connected:', socket.id);
   // Allow clients to join a room for their user id so server can send direct messages
   socket.on('join', (payload) => {
     try {
       const userId = payload?.userId;
       if (userId) {
         socket.join(`user:${userId}`);
-        console.log(`🔌 Socket ${socket.id} joined user:${userId}`);
       }
     } catch (err) {
-      console.error('join error', err);
+      console.error('Socket join error:', err);
     }
   });
 
@@ -107,7 +107,7 @@ io.on('connection', (socket) => {
         io.to(`user:${recipientId}`).emit('typing:start', { senderId, senderName });
       }
     } catch (err) {
-      console.error('typing:start error', err);
+      console.error('Socket typing:start error:', err);
     }
   });
 
@@ -118,12 +118,12 @@ io.on('connection', (socket) => {
         io.to(`user:${recipientId}`).emit('typing:stop', { senderId });
       }
     } catch (err) {
-      console.error('typing:stop error', err);
+      console.error('Socket typing:stop error:', err);
     }
   });
 
   socket.on('disconnect', () => {
-    console.log('🔌 Socket disconnected:', socket.id);
+    // Silent disconnect
   });
 
   // Optional: allow socket-created messages (prototype). Server will persist and emit.
@@ -137,7 +137,7 @@ io.on('connection', (socket) => {
       await message.populate('sender', 'name email');
       io.to(`user:${recipientId}`).emit('message:received', message);
     } catch (err) {
-      console.error('message:create failed', err);
+      console.error('Socket message:create failed:', err);
     }
   });
 });
