@@ -1,10 +1,19 @@
 import Message from '../models/Message.js';
-import User from '../models/User.js';
+import { assertSameSchoolUser } from '../middleware/tenantGuards.js';
+
+const handleControllerError = (res, error, context) => {
+  console.error(`${context} error`, error);
+  if (error.statusCode) {
+    return res.status(error.statusCode).json({ success: false, message: error.message });
+  }
+  return res.status(500).json({ success: false, message: 'Server error' });
+};
 
 // Send a message and notify recipient via socket.io
 export const sendMessage = async (req, res) => {
   try {
     const senderId = req.userId;
+    const schoolId = req.schoolId;
     const { recipientId, text, attachments } = req.body;
 
     if (!recipientId || !text) {
@@ -17,12 +26,13 @@ export const sendMessage = async (req, res) => {
     }
 
     // Ensure recipient exists
-    const recipient = await User.findById(recipientId).select('-password');
-    if (!recipient) {
-      return res.status(404).json({ success: false, message: 'Recipient not found' });
-    }
+    await assertSameSchoolUser(recipientId, schoolId, {
+      notFoundMessage: 'Recipient not found',
+      forbiddenMessage: 'Recipient is not in your school'
+    });
 
     const message = await Message.create({
+      schoolId,
       sender: senderId,
       recipient: recipientId,
       text,
@@ -52,8 +62,7 @@ export const sendMessage = async (req, res) => {
 
     return res.json({ success: true, data: message });
   } catch (error) {
-    console.error('sendMessage error', error);
-    return res.status(500).json({ success: false, message: 'Server error' });
+    return handleControllerError(res, error, 'sendMessage');
   }
 };
 
@@ -61,6 +70,7 @@ export const sendMessage = async (req, res) => {
 export const getConversationWithUser = async (req, res) => {
   try {
     const userId = req.userId;
+    const schoolId = req.schoolId;
     const otherUserId = req.params.userId;
 
     // Prevent fetching a self conversation
@@ -69,13 +79,14 @@ export const getConversationWithUser = async (req, res) => {
     }
 
     // Validate other user exists
-    const otherUser = await User.findById(otherUserId).select('-password');
-    if (!otherUser) {
-      return res.status(404).json({ success: false, message: 'User not found' });
-    }
+    await assertSameSchoolUser(otherUserId, schoolId, {
+      notFoundMessage: 'User not found',
+      forbiddenMessage: 'User is not in your school'
+    });
 
     // Find messages where sender==userId and recipient==otherUserId OR vice versa
     const messages = await Message.find({
+      schoolId,
       $or: [
         { sender: userId, recipient: otherUserId },
         { sender: otherUserId, recipient: userId }
@@ -86,8 +97,7 @@ export const getConversationWithUser = async (req, res) => {
 
     return res.json({ success: true, data: messages });
   } catch (error) {
-    console.error('getConversationWithUser error', error);
-    return res.status(500).json({ success: false, message: 'Server error' });
+    return handleControllerError(res, error, 'getConversationWithUser');
   }
 };
 
@@ -95,9 +105,11 @@ export const getConversationWithUser = async (req, res) => {
 export const getConversations = async (req, res) => {
   try {
     const userId = req.userId;
+    const schoolId = req.schoolId;
 
     // Find all messages where user is sender or recipient
     const messages = await Message.find({
+      schoolId,
       $or: [{ sender: userId }, { recipient: userId }]
     })
       .populate('sender', 'name role')
@@ -135,8 +147,7 @@ export const getConversations = async (req, res) => {
     const conversations = Array.from(conversationMap.values());
     return res.json({ success: true, data: conversations });
   } catch (error) {
-    console.error('getConversations error', error);
-    return res.status(500).json({ success: false, message: 'Server error' });
+    return handleControllerError(res, error, 'getConversations');
   }
 };
 
@@ -144,15 +155,22 @@ export const getConversations = async (req, res) => {
 export const markAsRead = async (req, res) => {
   try {
     const userId = req.userId;
+    const schoolId = req.schoolId;
     const { senderId } = req.body;
 
     if (!senderId) {
       return res.status(400).json({ success: false, message: 'senderId required' });
     }
 
+    await assertSameSchoolUser(senderId, schoolId, {
+      notFoundMessage: 'Sender not found',
+      forbiddenMessage: 'Sender is not in your school'
+    });
+
     // Update all unread messages from this sender to current user
     const result = await Message.updateMany(
       {
+        schoolId,
         sender: senderId,
         recipient: userId,
         status: { $ne: 'read' }
@@ -178,8 +196,7 @@ export const markAsRead = async (req, res) => {
 
     return res.json({ success: true, data: { updated: result.modifiedCount } });
   } catch (error) {
-    console.error('markAsRead error', error);
-    return res.status(500).json({ success: false, message: 'Server error' });
+    return handleControllerError(res, error, 'markAsRead');
   }
 };
 
@@ -187,9 +204,10 @@ export const markAsRead = async (req, res) => {
 export const deleteMessage = async (req, res) => {
   try {
     const userId = req.userId;
+    const schoolId = req.schoolId;
     const { messageId } = req.params;
 
-    const message = await Message.findById(messageId);
+    const message = await Message.findOne({ _id: messageId, schoolId });
     if (!message) {
       return res.status(404).json({ success: false, message: 'Message not found' });
     }
@@ -199,7 +217,7 @@ export const deleteMessage = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Not authorized to delete this message' });
     }
 
-    await Message.findByIdAndDelete(messageId);
+    await Message.findOneAndDelete({ _id: messageId, schoolId });
 
     // Notify recipient via socket
     try {
@@ -215,8 +233,7 @@ export const deleteMessage = async (req, res) => {
 
     return res.json({ success: true, message: 'Message deleted' });
   } catch (error) {
-    console.error('deleteMessage error', error);
-    return res.status(500).json({ success: false, message: 'Server error' });
+    return handleControllerError(res, error, 'deleteMessage');
   }
 };
 
@@ -224,16 +241,18 @@ export const deleteMessage = async (req, res) => {
 export const deleteConversation = async (req, res) => {
   try {
     const userId = req.userId;
+    const schoolId = req.schoolId;
     const { otherUserId } = req.params;
 
     // Validate other user exists
-    const otherUser = await User.findById(otherUserId).select('-password');
-    if (!otherUser) {
-      return res.status(404).json({ success: false, message: 'User not found' });
-    }
+    await assertSameSchoolUser(otherUserId, schoolId, {
+      notFoundMessage: 'User not found',
+      forbiddenMessage: 'User is not in your school'
+    });
 
     // Delete all messages between these two users
     const result = await Message.deleteMany({
+      schoolId,
       $or: [
         { sender: userId, recipient: otherUserId },
         { sender: otherUserId, recipient: userId }
@@ -256,7 +275,6 @@ export const deleteConversation = async (req, res) => {
       deletedCount: result.deletedCount
     });
   } catch (error) {
-    console.error('deleteConversation error', error);
-    return res.status(500).json({ success: false, message: 'Server error' });
+    return handleControllerError(res, error, 'deleteConversation');
   }
 };

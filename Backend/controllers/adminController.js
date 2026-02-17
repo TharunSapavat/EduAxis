@@ -9,6 +9,7 @@ import Remark from '../models/Remark.js';
 import LeaveRequest from '../models/LeaveRequest.js';
 import LibraryResource from '../models/LibraryResource.js';
 import Timetable from '../models/Timetable.js';
+import { assertSameSchoolStudent } from '../middleware/tenantGuards.js';
 
 // Library resource admin management
 export const adminCreateLibraryResource = async (req, res) => {
@@ -86,9 +87,10 @@ export const adminCreateOrUpdateTimetable = async (req, res) => {
 
     // Upsert timetable with file
     const doc = await Timetable.findOneAndUpdate(
-      { grade: String(grade), section: sectionValue, academicYear: String(academicYear), semester: String(semester) },
+      { schoolId: req.schoolId, grade: String(grade), section: sectionValue, academicYear: String(academicYear), semester: String(semester) },
       {
         $set: {
+          schoolId: req.schoolId,
           file: {
             path: `/uploads/timetables/${req.file.filename}`,
             filename: req.file.filename,
@@ -119,7 +121,7 @@ export const adminUpdateTimetable = async (req, res) => {
     if (effectiveTo) updates.effectiveTo = new Date(effectiveTo);
     if (typeof isActive !== 'undefined') updates.isActive = !!isActive;
 
-    const doc = await Timetable.findByIdAndUpdate(id, { $set: updates }, { new: true });
+    const doc = await Timetable.findOneAndUpdate({ _id: id, schoolId: req.schoolId }, { $set: updates }, { new: true });
     if (!doc) return res.status(404).json({ success: false, message: 'Timetable not found' });
     res.json({ success: true, message: 'Timetable updated', timetable: doc });
   } catch (error) {
@@ -131,7 +133,7 @@ export const adminUpdateTimetable = async (req, res) => {
 export const adminDeleteTimetable = async (req, res) => {
   try {
     const { id } = req.params;
-    await Timetable.findByIdAndDelete(id);
+    await Timetable.findOneAndDelete({ _id: id, schoolId: req.schoolId });
     res.json({ success: true, message: 'Timetable deleted' });
   } catch (error) {
     console.error('Admin delete timetable error:', error);
@@ -142,7 +144,7 @@ export const adminDeleteTimetable = async (req, res) => {
 export const adminDeleteLibraryResource = async (req, res) => {
   try {
     const { id } = req.params;
-    await LibraryResource.findByIdAndDelete(id);
+    await LibraryResource.findOneAndDelete({ _id: id, schoolId: req.schoolId });
     res.json({ success: true, message: 'Resource deleted' });
   } catch (error) {
     console.error('Admin delete library resource error:', error);
@@ -254,6 +256,9 @@ export const createUser = async (req, res) => {
       user: newUser.toJSON()
     });
   } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ success: false, message: error.message });
+    }
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map(e => e.message).join(', ');
       return res.status(400).json({ success: false, message: messages });
@@ -272,7 +277,11 @@ export const updateUser = async (req, res) => {
     if (updates.role) updates.role = updates.role.toLowerCase();
     if (updates.dateOfBirth) updates.dateOfBirth = new Date(updates.dateOfBirth);
 
-    const updatedUser = await User.findByIdAndUpdate(id, updates, { new: true, runValidators: true }).select('-password');
+    const updatedUser = await User.findOneAndUpdate(
+      { _id: id, schoolId: req.schoolId },
+      updates,
+      { new: true, runValidators: true }
+    ).select('-password');
 
     if (!updatedUser) {
       return res.status(404).json({ success: false, message: 'User not found' });
@@ -296,7 +305,7 @@ export const updateUser = async (req, res) => {
 export const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = await User.findByIdAndDelete(id);
+    const deleted = await User.findOneAndDelete({ _id: id, schoolId: req.schoolId });
 
     if (!deleted) {
       return res.status(404).json({ success: false, message: 'User not found' });
@@ -316,7 +325,7 @@ export const deleteUser = async (req, res) => {
 export const getLeaveRequests = async (req, res) => {
   try {
     const { status = 'pending' } = req.query;
-    const filter = {};
+    const filter = { schoolId: req.schoolId };
     if (status !== 'all') filter.status = status;
     const requests = await LeaveRequest.find(filter)
       .populate('requesterId', 'name email role grade section')
@@ -338,7 +347,7 @@ export const decideLeaveRequest = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid action' });
     }
 
-    const lr = await LeaveRequest.findById(id);
+    const lr = await LeaveRequest.findOne({ _id: id, schoolId: req.schoolId });
     if (!lr) return res.status(404).json({ success: false, message: 'Leave request not found' });
 
     lr.status = action === 'approve' ? 'approved' : 'rejected';
@@ -368,7 +377,7 @@ export const decideLeaveRequest = async (req, res) => {
 // Get all courses
 export const getCourses = async (req, res) => {
   try {
-    const courses = await Course.find({}).sort({ createdAt: -1 });
+    const courses = await Course.find({ schoolId: req.schoolId }).sort({ createdAt: -1 });
     res.json({ courses });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -382,11 +391,12 @@ export const createCourse = async (req, res) => {
     // Prefer explicit teacherId if provided, otherwise resolve by name
     let teacherId = providedTeacherId || null;
     if (!teacherId && teacher && teacher !== 'TBD' && teacher.trim() !== '') {
-      const teacherUser = await User.findOne({ name: teacher, role: 'teacher' });
+      const teacherUser = await User.findOne({ name: teacher, role: 'teacher', schoolId: req.schoolId });
       if (teacherUser) teacherId = teacherUser._id;
     }
 
     const newCourse = await Course.create({
+      schoolId: req.schoolId,
       name,
       code,
       teacherId,
@@ -424,13 +434,17 @@ export const updateCourse = async (req, res) => {
     if (updates.teacherId) {
       // keep provided teacherId
     } else if (updates.teacher && updates.teacher !== 'TBD' && updates.teacher.trim() !== '') {
-      const teacherUser = await User.findOne({ name: updates.teacher, role: 'teacher' });
+      const teacherUser = await User.findOne({ name: updates.teacher, role: 'teacher', schoolId: req.schoolId });
       if (teacherUser) {
         updates.teacherId = teacherUser._id;
       }
     }
 
-    const course = await Course.findByIdAndUpdate(id, updates, { new: true, runValidators: true });
+    const course = await Course.findOneAndUpdate(
+      { _id: id, schoolId: req.schoolId },
+      updates,
+      { new: true, runValidators: true }
+    );
     
     if (!course) {
       return res.status(404).json({ success: false, message: 'Course not found' });
@@ -457,7 +471,7 @@ export const updateCourse = async (req, res) => {
 export const deleteCourse = async (req, res) => {
   try {
     const { id } = req.params;
-    const course = await Course.findByIdAndDelete(id);
+    const course = await Course.findOneAndDelete({ _id: id, schoolId: req.schoolId });
     
     if (!course) {
       return res.status(404).json({ success: false, message: 'Course not found' });
@@ -499,7 +513,7 @@ export const getReports = async (req, res) => {
 // Get all fees
 export const getFees = async (req, res) => {
   try {
-    const fees = await Fee.find({}).sort({ createdAt: -1 });
+    const fees = await Fee.find({ schoolId: req.schoolId }).sort({ createdAt: -1 });
     res.json({ success: true, fees });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
@@ -516,6 +530,7 @@ export const createFee = async (req, res) => {
     }
 
     const newFee = await Fee.create({
+      schoolId: req.schoolId,
       title,
       amount,
       description,
@@ -544,7 +559,11 @@ export const updateFee = async (req, res) => {
 
     if (updates.dueDate) updates.dueDate = new Date(updates.dueDate);
 
-    const updatedFee = await Fee.findByIdAndUpdate(id, updates, { new: true, runValidators: true });
+    const updatedFee = await Fee.findOneAndUpdate(
+      { _id: id, schoolId: req.schoolId },
+      updates,
+      { new: true, runValidators: true }
+    );
 
     if (!updatedFee) {
       return res.status(404).json({ success: false, message: 'Fee not found' });
@@ -566,13 +585,14 @@ export const deleteFee = async (req, res) => {
     const { id } = req.params;
     
     // Check if fee exists
-    const fee = await Fee.findById(id);
+    const fee = await Fee.findOne({ _id: id, schoolId: req.schoolId });
     if (!fee) {
       return res.status(404).json({ success: false, message: 'Fee not found' });
     }
 
     // Check if there are any completed payments for this fee
     const completedPayments = await Payment.countDocuments({ 
+      schoolId: req.schoolId,
       feeId: id, 
       status: 'completed' 
     });
@@ -586,10 +606,10 @@ export const deleteFee = async (req, res) => {
     }
 
     // Delete the fee
-    await Fee.findByIdAndDelete(id);
+    await Fee.findOneAndDelete({ _id: id, schoolId: req.schoolId });
 
     // Also delete any pending/failed payments for this fee
-    await Payment.deleteMany({ feeId: id, status: { $in: ['pending', 'failed'] } });
+    await Payment.deleteMany({ schoolId: req.schoolId, feeId: id, status: { $in: ['pending', 'failed'] } });
 
     res.json({ 
       success: true, 
@@ -607,7 +627,7 @@ export const deleteFee = async (req, res) => {
 export const getPayments = async (req, res) => {
   try {
     const { studentName, paymentMethod, status, startDate, endDate } = req.query;
-    const query = {};
+    const query = { schoolId: req.schoolId };
 
     // Filter by student name
     if (studentName && studentName.trim()) {
@@ -670,8 +690,11 @@ export const createPayment = async (req, res) => {
     }
 
     // Get student and fee details
-    const student = await User.findById(studentId);
-    const fee = await Fee.findById(feeId);
+    const student = await assertSameSchoolStudent(studentId, req.schoolId, {
+      notFoundMessage: 'Student not found',
+      forbiddenMessage: 'Student is not in your school'
+    });
+    const fee = await Fee.findOne({ _id: feeId, schoolId: req.schoolId });
 
     if (!student) {
       return res.status(404).json({ success: false, message: 'Student not found' });
@@ -682,6 +705,7 @@ export const createPayment = async (req, res) => {
     }
 
     const newPayment = await Payment.create({
+      schoolId: req.schoolId,
       studentId,
       studentName: student.name,
       studentEmail: student.email,
@@ -707,14 +731,14 @@ export const createPayment = async (req, res) => {
 // Get payment statistics
 export const getPaymentStats = async (req, res) => {
   try {
-    const totalPayments = await Payment.countDocuments({ status: 'completed' });
+    const totalPayments = await Payment.countDocuments({ schoolId: req.schoolId, status: 'completed' });
     const totalAmount = await Payment.aggregate([
-      { $match: { status: 'completed' } },
+      { $match: { schoolId: req.schoolId, status: 'completed' } },
       { $group: { _id: null, total: { $sum: '$amount' } } }
     ]);
 
     const paymentsByMethod = await Payment.aggregate([
-      { $match: { status: 'completed' } },
+      { $match: { schoolId: req.schoolId, status: 'completed' } },
       { $group: { _id: '$paymentMethod', count: { $sum: 1 }, total: { $sum: '$amount' } } }
     ]);
 
@@ -735,7 +759,7 @@ export const getPaymentStats = async (req, res) => {
 export const exportPayments = async (req, res) => {
   try {
     const { studentName, paymentMethod, status, startDate, endDate } = req.query;
-    const query = {};
+    const query = { schoolId: req.schoolId };
 
     if (studentName && studentName.trim()) {
       query.$or = [
@@ -797,14 +821,15 @@ export const sendFeeReminders = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Fee ID is required' });
     }
 
-    const fee = await Fee.findById(feeId);
+    const fee = await Fee.findOne({ _id: feeId, schoolId: req.schoolId });
     if (!fee) {
       return res.status(404).json({ success: false, message: 'Fee not found' });
     }
 
     // Get all students who haven't paid
-    const allStudents = await User.find({ role: 'student', status: 'active' });
+    const allStudents = await User.find({ schoolId: req.schoolId, role: 'student', status: 'active' });
     const paidStudentIds = await Payment.find({ 
+      schoolId: req.schoolId,
       feeId, 
       status: 'completed' 
     }).distinct('studentId');
@@ -840,7 +865,7 @@ export const sendFeeReminders = async (req, res) => {
 // Get class overview with statistics
 export const getClassOverview = async (req, res) => {
   try {
-    const students = await User.find({ role: 'student', status: 'active' })
+    const students = await User.find({ schoolId: req.schoolId, role: 'student', status: 'active' })
       .select('name email grade studentId createdAt');
 
     // Calculate grade-wise statistics
@@ -883,7 +908,7 @@ export const getStudentAnalytics = async (req, res) => {
     const { grade, search, performanceLevel, attendanceRange } = req.query;
     
     // Build query
-    let query = { role: 'student', status: 'active' };
+    let query = { schoolId: req.schoolId, role: 'student', status: 'active' };
     
     if (grade && grade !== 'all') {
       query.grade = grade;
@@ -904,7 +929,7 @@ export const getStudentAnalytics = async (req, res) => {
     // Get payment, attendance, and grade data for each student
     const studentsWithAnalytics = await Promise.all(students.map(async (student) => {
       // Get payment statistics
-      const payments = await Payment.find({ studentId: student._id });
+      const payments = await Payment.find({ schoolId: req.schoolId, studentId: student._id });
       const totalPaid = payments.reduce((sum, p) => sum + (p.status === 'completed' ? p.amount : 0), 0);
       const pendingPayments = payments.filter(p => p.status === 'pending').length;
 
@@ -913,6 +938,7 @@ export const getStudentAnalytics = async (req, res) => {
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       
       const attendanceRecords = await Attendance.find({
+        schoolId: req.schoolId,
         studentId: student._id,
         date: { $gte: thirtyDaysAgo }
       });
@@ -922,7 +948,7 @@ export const getStudentAnalytics = async (req, res) => {
       const attendance = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
 
       // Calculate real average score from grades
-      const grades = await Grade.find({ studentId: student._id });
+      const grades = await Grade.find({ schoolId: req.schoolId, studentId: student._id });
       const averageScore = grades.length > 0 
         ? Math.round(grades.reduce((sum, g) => sum + (g.score / g.maxScore * 100), 0) / grades.length)
         : 0;
@@ -980,7 +1006,7 @@ export const getStudentAnalytics = async (req, res) => {
 // Get at-risk students
 export const getAtRiskStudents = async (req, res) => {
   try {
-    const students = await User.find({ role: 'student', status: 'active' })
+    const students = await User.find({ schoolId: req.schoolId, role: 'student', status: 'active' })
       .select('name email grade studentId')
       .sort({ grade: 1, name: 1 });
 
@@ -990,6 +1016,7 @@ export const getAtRiskStudents = async (req, res) => {
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       
       const attendanceRecords = await Attendance.find({
+        schoolId: req.schoolId,
         studentId: student._id,
         date: { $gte: thirtyDaysAgo }
       });
@@ -999,7 +1026,7 @@ export const getAtRiskStudents = async (req, res) => {
       const attendance = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
 
       // Calculate real average score
-      const grades = await Grade.find({ studentId: student._id });
+      const grades = await Grade.find({ schoolId: req.schoolId, studentId: student._id });
       const averageScore = grades.length > 0 
         ? Math.round(grades.reduce((sum, g) => sum + (g.score / g.maxScore * 100), 0) / grades.length)
         : 0;
@@ -1044,7 +1071,7 @@ export const getStudentDetails = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const student = await User.findOne({ _id: id, role: 'student' })
+    const student = await User.findOne({ _id: id, schoolId: req.schoolId, role: 'student' })
       .select('-password');
 
     if (!student) {
@@ -1052,12 +1079,13 @@ export const getStudentDetails = async (req, res) => {
     }
 
     // Get payment history
-    const payments = await Payment.find({ studentId: id })
+    const payments = await Payment.find({ schoolId: req.schoolId, studentId: id })
       .populate('feeId', 'title amount dueDate semester')
       .sort({ createdAt: -1 });
 
     // Get fee obligations
     const allFees = await Fee.find({
+      schoolId: req.schoolId,
       $or: [
         { appliesTo: 'all' },
         { appliesTo: 'grade-specific', grades: student.grade }
@@ -1080,7 +1108,7 @@ export const getStudentDetails = async (req, res) => {
     });
 
     // Get real grades data
-    const grades = await Grade.find({ studentId: id }).sort({ date: -1 });
+    const grades = await Grade.find({ schoolId: req.schoolId, studentId: id }).sort({ date: -1 });
     
     // Calculate average score
     const averageScore = grades.length > 0 
@@ -1126,7 +1154,7 @@ export const getStudentDetails = async (req, res) => {
     }));
 
     // Get real attendance data
-    const allAttendance = await Attendance.find({ studentId: id }).sort({ date: -1 });
+    const allAttendance = await Attendance.find({ schoolId: req.schoolId, studentId: id }).sort({ date: -1 });
     
     // Overall attendance
     const totalDays = allAttendance.length;
@@ -1184,7 +1212,7 @@ export const getStudentDetails = async (req, res) => {
     }
 
     // Get remarks
-    const remarks = await Remark.find({ studentId: id })
+    const remarks = await Remark.find({ schoolId: req.schoolId, studentId: id })
       .populate('teacherId', 'name')
       .populate('adminId', 'name')
       .sort({ date: -1 })

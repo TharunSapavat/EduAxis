@@ -99,9 +99,15 @@ const SuperAdminDashboard = () => {
   };
 
   const handleUpdateSchoolStatus = async (schoolId, status) => {
+    const id = schoolId || selectedSchool?._id || selectedSchool?.id;
+    if (!id) {
+      console.error('Cannot update school status: missing school id');
+      return;
+    }
+
     try {
-      await api.patch(`/superadmin/schools/${schoolId}/status`, { status });
-      fetchDashboardData();
+      await api.patch(`/superadmin/schools/${id}/status`, { status });
+      await fetchDashboardData();
     } catch (error) {
       console.error('Error updating school status:', error);
     }
@@ -319,8 +325,10 @@ const SuperAdminDashboard = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-slate-200">
-                  {filteredSchools.map((school) => (
-                    <tr key={school._id} className="hover:bg-slate-50 transition-colors">
+                  {filteredSchools.map((school) => {
+                    const schoolId = school._id || school.id;
+                    return (
+                    <tr key={schoolId} className="hover:bg-slate-50 transition-colors">
                       <td className="px-6 py-4">
                         <div>
                           <div className="text-sm font-medium text-slate-900">{school.name}</div>
@@ -351,7 +359,7 @@ const SuperAdminDashboard = () => {
                           <Eye className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => handleUpdateSchoolStatus(school._id, school.status === 'active' ? 'suspended' : 'active')}
+                          onClick={() => handleUpdateSchoolStatus(schoolId, school.status === 'active' ? 'suspended' : 'active')}
                           className="text-orange-600 hover:text-orange-900"
                           title={school.status === 'active' ? 'Suspend' : 'Activate'}
                         >
@@ -359,7 +367,7 @@ const SuperAdminDashboard = () => {
                         </button>
                       </td>
                     </tr>
-                  ))}
+                  )})}
                 </tbody>
               </table>
             </div>

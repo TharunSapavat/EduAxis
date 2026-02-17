@@ -11,24 +11,19 @@ import LeaveRequest from '../models/LeaveRequest.js';
 import StudyMaterial from '../models/StudyMaterial.js';
 import Schedule from '../models/Schedule.js';
 import Grade from '../models/Grade.js';
+import { assertSameSchoolStudent } from '../middleware/tenantGuards.js';
 
 // Get student dashboard data
 export const getDashboard = async (req, res) => {
   try {
-    const studentId = req.query.studentId;
-    
-    if (!studentId) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'Student ID is required' 
-      });
-    }
+    const studentId = req.user?._id;
+    const schoolId = req.schoolId;
 
     // Find student
     const student = await User.findOne({ 
-      $or: [{ _id: studentId }, { studentId: studentId }],
+      _id: studentId,
       role: 'student',
-      schoolId: req.schoolId
+      schoolId
     });
 
     if (!student) {
@@ -40,20 +35,21 @@ export const getDashboard = async (req, res) => {
 
     // Get pending assignments count
     const pendingAssignments = await Assignment.countDocuments({
-      studentId: student._id,
-      status: 'pending'
+      schoolId,
+      grade: String(student.grade),
+      status: 'active'
     });
 
     // Get total courses matching student's grade (enrolled courses)
     const totalCourses = await Course.countDocuments({ 
-      schoolId: req.schoolId,
+      schoolId,
       status: 'active',
       grade: Number(student.grade)
     });
 
     // Get attendance stats
     const attendanceRecords = await Attendance.find({ 
-      schoolId: req.schoolId,
+      schoolId,
       studentId: student._id 
     });
     const totalAttendance = attendanceRecords.length;
@@ -64,14 +60,14 @@ export const getDashboard = async (req, res) => {
     
     // Get completed assignments count
     const completedAssignments = await Submission.countDocuments({
-      schoolId: req.schoolId,
+      schoolId,
       studentId: student._id,
       status: { $in: ['submitted', 'graded'] }
     });
     
     // Get total assignments count for the student's grade (all active assignments for their grade)
     const totalAssignments = await Assignment.countDocuments({
-      schoolId: req.schoolId,
+      schoolId,
       grade: String(student.grade),
       status: 'active'
     });
@@ -99,20 +95,21 @@ export const getDashboard = async (req, res) => {
 // Get student courses
 export const getCourses = async (req, res) => {
   try {
-    // Determine student from auth or query
-    const studentId = req.query.studentId || req.user?._id;
+    // Determine student from auth context only
+    const studentId = req.user?._id;
+    const schoolId = req.schoolId;
     if (!studentId) {
       return res.status(400).json({ success: false, message: 'Student ID is required' });
     }
 
-    const student = await User.findById(studentId);
+    const student = await User.findOne({ _id: studentId, schoolId, role: 'student' });
     if (!student || student.role !== 'student') {
       return res.status(404).json({ success: false, message: 'Student not found' });
     }
 
     // Filter courses by matching grade and active status
     const courses = await Course.find({ 
-      schoolId: req.schoolId,
+      schoolId,
       status: 'active', 
       grade: Number(student.grade) 
     })
@@ -128,8 +125,8 @@ export const getCourses = async (req, res) => {
 // Get student grades
 export const getGrades = async (req, res) => {
   try {
-    // Prefer explicit query param; fall back to auth user
-    const studentId = req.query.studentId || req.user?._id;
+    const studentId = req.user?._id;
+    const schoolId = req.schoolId;
 
     if (!studentId) {
       return res.status(400).json({ 
@@ -140,6 +137,7 @@ export const getGrades = async (req, res) => {
 
     // Pull graded submissions for this student and join assignment/course where available
     const gradedSubmissions = await Submission.find({
+      schoolId,
       studentId,
       status: 'graded'
     })
@@ -202,7 +200,8 @@ function calculateGrade(marks, total) {
 // Get student attendance
 export const getAttendance = async (req, res) => {
   try {
-    const studentId = req.query.studentId;
+    const studentId = req.user?._id;
+    const schoolId = req.schoolId;
 
     if (!studentId) {
       return res.status(400).json({ 
@@ -211,7 +210,7 @@ export const getAttendance = async (req, res) => {
       });
     }
 
-    const attendanceRecords = await Attendance.find({ studentId })
+    const attendanceRecords = await Attendance.find({ schoolId, studentId })
       .populate('courseId', 'name code')
       .sort({ date: -1 });
 
@@ -246,7 +245,8 @@ export const getAttendance = async (req, res) => {
 // Get student assignments
 export const getAssignments = async (req, res) => {
   try {
-    const studentId = req.query.studentId || req.user?._id;
+    const studentId = req.user?._id;
+    const schoolId = req.schoolId;
 
     if (!studentId) {
       return res.status(400).json({ 
@@ -256,13 +256,14 @@ export const getAssignments = async (req, res) => {
     }
 
     // Load student to determine grade
-    const student = await User.findById(studentId);
+    const student = await User.findOne({ _id: studentId, schoolId, role: 'student' });
     if (!student || student.role !== 'student') {
       return res.status(404).json({ success: false, message: 'Student not found' });
     }
 
     // Assignments targeted to student's grade (and active)
     const assignments = await Assignment.find({ 
+        schoolId,
         grade: String(student.grade),
         status: 'active'
       })
@@ -272,6 +273,7 @@ export const getAssignments = async (req, res) => {
     
     // Get all submissions for this student
     const submissions = await Submission.find({ 
+      schoolId,
       studentId: student._id 
     }).select('assignmentId status marks submittedAt gradedAt');
 
@@ -321,6 +323,7 @@ export const getAssignments = async (req, res) => {
 export const getTimetable = async (req, res) => {
   try {
     const student = req.user; // User is already loaded by auth middleware
+    const schoolId = req.schoolId;
 
     // Find active timetable for student's grade and section (or grade-wide 'All')
     const now = new Date();
@@ -328,6 +331,7 @@ export const getTimetable = async (req, res) => {
 
     // Prefer section-specific if available
     let timetableDoc = await Timetable.findOne({
+      schoolId,
       grade: student.grade,
       section: sectionValue,
       isActive: true,
@@ -341,6 +345,7 @@ export const getTimetable = async (req, res) => {
     // Fallback to 'All' if no section-specific timetable
     if (!timetableDoc && sectionValue !== 'All') {
       timetableDoc = await Timetable.findOne({
+        schoolId,
         grade: student.grade,
         section: 'All',
         isActive: true,
@@ -386,13 +391,14 @@ export const getTimetable = async (req, res) => {
 export const getSchedule = async (req, res) => {
   try {
     const student = req.user;
+    const schoolId = req.schoolId;
     if (!student) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
     // Find active courses for the student's grade
-    const courses = await Course.find({ status: 'active', grade: Number(student.grade) }).select('_id name grade');
+    const courses = await Course.find({ schoolId, status: 'active', grade: Number(student.grade) }).select('_id name grade');
     const courseIds = courses.map(c => c._id);
 
-    const entries = await Schedule.find({ courseId: { $in: courseIds } })
+    const entries = await Schedule.find({ schoolId, courseId: { $in: courseIds } })
       .populate('courseId', 'name code grade')
       .sort({ dayOfWeek: 1, startTime: 1 });
 
@@ -430,6 +436,7 @@ export const createLeaveRequest = async (req, res) => {
     }
 
     const lr = await LeaveRequest.create({
+      schoolId: req.schoolId,
       requesterId: student._id,
       requesterRole: 'student',
       startDate: new Date(startDate),
@@ -463,7 +470,7 @@ export const createLeaveRequest = async (req, res) => {
 export const getMyLeaveRequests = async (req, res) => {
   try {
     const studentId = req.user._id;
-    const items = await LeaveRequest.find({ requesterId: studentId, requesterRole: 'student' })
+    const items = await LeaveRequest.find({ schoolId: req.schoolId, requesterId: studentId, requesterRole: 'student' })
       .sort({ createdAt: -1 });
     res.json({ success: true, leaveRequests: items });
   } catch (error) {
@@ -478,6 +485,7 @@ export const getAnnouncements = async (req, res) => {
     const student = req.user; // Loaded by auth middleware
     
     const announcements = await Announcement.find({
+      schoolId: req.schoolId,
       isActive: true,
       hiddenBy: { $ne: student._id }, // Exclude hidden announcements
       $or: [
@@ -528,6 +536,7 @@ export const getFees = async (req, res) => {
     // Get fees that apply to this student's grade
     // Either fees for all students OR fees for this specific grade
     const activeFees = await Fee.find({ 
+      schoolId: req.schoolId,
       status: 'active',
       $or: [
         { appliesTo: 'all' },
@@ -536,7 +545,7 @@ export const getFees = async (req, res) => {
     }).sort({ dueDate: 1 });
 
     // Get student's payment history
-    const payments = await Payment.find({ studentId }).sort({ paymentDate: -1 });
+    const payments = await Payment.find({ schoolId: req.schoolId, studentId }).sort({ paymentDate: -1 });
 
     // Calculate totals
     const totalFeeAmount = activeFees.reduce((sum, fee) => sum + fee.amount, 0);
@@ -591,7 +600,7 @@ export const makePayment = async (req, res) => {
         message: 'Student ID, Fee ID, amount, and payment method are required' 
       });
     }
-    const fee = await Fee.findById(feeId);
+    const fee = await Fee.findOne({ _id: feeId, schoolId: req.schoolId });
 
     if (!fee) {
       return res.status(404).json({ success: false, message: 'Fee not found' });
@@ -599,6 +608,7 @@ export const makePayment = async (req, res) => {
 
     // Check if already paid
     const existingPayment = await Payment.findOne({ 
+      schoolId: req.schoolId,
       studentId, 
       feeId, 
       status: 'completed' 
@@ -624,6 +634,7 @@ export const makePayment = async (req, res) => {
     const totalAmount = parseFloat(amount) + lateFee;
 
     const payment = await Payment.create({
+      schoolId: req.schoolId,
       studentId,
       studentName: student.name,
       studentEmail: student.email,
@@ -655,7 +666,7 @@ export const downloadReceipt = async (req, res) => {
   try {
     const { paymentId } = req.params;
 
-    const payment = await Payment.findById(paymentId)
+    const payment = await Payment.findOne({ _id: paymentId, schoolId: req.schoolId, studentId: req.user._id })
       .populate('studentId', 'name email phone studentId')
       .populate('feeId', 'title amount description');
 
@@ -697,8 +708,10 @@ export const downloadReceipt = async (req, res) => {
 export const getCourseDetails = async (req, res) => {
   try {
     const { id } = req.params;
+    const schoolId = req.schoolId;
+    const student = req.user;
 
-    const course = await Course.findById(id)
+    const course = await Course.findOne({ _id: id, schoolId, status: 'active', grade: Number(student.grade) })
       .populate('teacherId', 'name email');
 
     if (!course) {
@@ -710,12 +723,14 @@ export const getCourseDetails = async (req, res) => {
 
     // Get assignments for this course
     const assignments = await Assignment.find({ 
+      schoolId,
       courseId: id,
       status: 'active'
     }).sort({ dueDate: -1 }).limit(5);
 
     // Get announcements for this course
     const announcements = await Announcement.find({
+      schoolId,
       courseId: id,
       isActive: true
     }).sort({ createdAt: -1 }).limit(5);
@@ -742,6 +757,7 @@ export const getCourseDetails = async (req, res) => {
 export const submitAssignment = async (req, res) => {
   try {
     const studentId = req.user._id;
+    const schoolId = req.schoolId;
     const { assignmentId, content, comments } = req.body; // Added 'comments'
 
     if (!assignmentId) {
@@ -752,7 +768,7 @@ export const submitAssignment = async (req, res) => {
     }
 
     // Check if assignment exists
-    const assignment = await Assignment.findById(assignmentId);
+    const assignment = await Assignment.findOne({ _id: assignmentId, schoolId, grade: String(req.user.grade), status: 'active' });
     if (!assignment) {
       return res.status(404).json({ 
         success: false, 
@@ -762,6 +778,7 @@ export const submitAssignment = async (req, res) => {
 
     // Check if already submitted
     const existingSubmission = await Submission.findOne({ 
+      schoolId,
       assignmentId, 
       studentId 
     });
@@ -814,6 +831,7 @@ export const submitAssignment = async (req, res) => {
 
     // 5. Create submission
     const submission = await Submission.create({
+      schoolId,
       assignmentId,
       studentId,
       content: content || '',
@@ -848,9 +866,11 @@ export const submitAssignment = async (req, res) => {
 export const getSubmissionDetails = async (req, res) => {
   try {
     const studentId = req.user._id;
+    const schoolId = req.schoolId;
     const { assignmentId } = req.params;
 
     const submission = await Submission.findOne({ 
+      schoolId,
       assignmentId, 
       studentId 
     })
@@ -887,7 +907,7 @@ export const getLibraryResources = async (req, res) => {
 
     const LibraryResource = (await import('../models/LibraryResource.js')).default;
 
-    const query = { isActive: true, $and: [] };
+    const query = { schoolId: req.schoolId, isActive: true, $and: [] };
     query.$and.push({ $or: [ { grade: 'All' }, { grade: studentGrade } ] });
     if (category) query.$and.push({ category });
     if (tag) query.$and.push({ tags: tag });
@@ -926,16 +946,18 @@ export const getLibraryResources = async (req, res) => {
 // Get teachers for messaging
 export const getTeachers = async (req, res) => {
   try {
-    const studentId = req.userId;
+    const studentId = req.user._id;
+    const schoolId = req.schoolId;
     
     // Find student to get their grade
-    const student = await User.findById(studentId);
-    if (!student) {
-      return res.status(404).json({ success: false, message: 'Student not found' });
-    }
+    const student = await assertSameSchoolStudent(studentId, schoolId, {
+      notFoundMessage: 'Student not found',
+      forbiddenMessage: 'Student is not in your school'
+    });
 
     // Find teachers who teach courses for this student's grade
     const courses = await Course.find({ 
+      schoolId,
       grade: Number(student.grade),
       status: 'active'
     }).populate('teacherId', 'name email');
@@ -958,25 +980,27 @@ export const getTeachers = async (req, res) => {
     return res.json({ success: true, data: teachers });
   } catch (error) {
     console.error('Get teachers error:', error);
-    return res.status(500).json({ success: false, message: 'Server error' });
+    const status = error.statusCode || 500;
+    return res.status(status).json({ success: false, message: status === 500 ? 'Server error' : error.message });
   }
 };
 
 // Get study materials for student's grade
 export const getStudyMaterials = async (req, res) => {
   try {
-    const student = await User.findById(req.user.id);
-    
-    if (!student) {
-      return res.status(404).json({ success: false, message: 'Student not found' });
-    }
+    const schoolId = req.schoolId;
+    const student = await assertSameSchoolStudent(req.user.id, schoolId, {
+      notFoundMessage: 'Student not found',
+      forbiddenMessage: 'Student is not in your school'
+    });
 
     // Find all courses for the student's grade
-    const courses = await Course.find({ grade: student.grade });
+    const courses = await Course.find({ schoolId, grade: student.grade });
     const courseIds = courses.map(c => c._id);
 
     // Get materials for those courses
     const materials = await StudyMaterial.find({ 
+      schoolId,
       grade: student.grade,
       courseId: { $in: courseIds }
     })
@@ -990,9 +1014,10 @@ export const getStudyMaterials = async (req, res) => {
     });
   } catch (error) {
     console.error('Get study materials error:', error);
-    res.status(500).json({
+    const status = error.statusCode || 500;
+    res.status(status).json({
       success: false,
-      message: 'Server error',
+      message: status === 500 ? 'Server error' : error.message,
       error: error.message
     });
   }
@@ -1004,7 +1029,7 @@ export const markAnnouncementAsRead = async (req, res) => {
     const { id } = req.params;
     const studentId = req.user._id;
 
-    const announcement = await Announcement.findById(id);
+    const announcement = await Announcement.findOne({ _id: id, schoolId: req.schoolId });
     
     if (!announcement) {
       return res.status(404).json({
@@ -1039,7 +1064,7 @@ export const hideAnnouncement = async (req, res) => {
     const { id } = req.params;
     const studentId = req.user._id;
 
-    const announcement = await Announcement.findById(id);
+    const announcement = await Announcement.findOne({ _id: id, schoolId: req.schoolId });
     
     if (!announcement) {
       return res.status(404).json({
@@ -1076,6 +1101,7 @@ export const clearAllAnnouncements = async (req, res) => {
 
     // Find all announcements visible to this student
     const announcements = await Announcement.find({
+      schoolId: req.schoolId,
       isActive: true,
       hiddenBy: { $ne: studentId },
       $or: [

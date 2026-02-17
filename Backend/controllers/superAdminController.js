@@ -366,13 +366,41 @@ export const updateSchoolStatus = catchAsync(async (req, res) => {
   school.status = status;
   await school.save();
   
-  // If suspending, also suspend all users
+  // Keep user account statuses in sync with school status changes
   if (status === 'suspended') {
     await User.updateMany(
       { schoolId: school._id },
       { status: 'suspended' }
     );
   }
+
+  // When re-activating a school, bring back users who were suspended by school suspension
+  if (status === 'active') {
+    await User.updateMany(
+      { schoolId: school._id, status: 'suspended' },
+      { status: 'active' }
+    );
+  }
+
+  // Optional: when school is marked inactive, set currently active users to inactive
+  if (status === 'inactive') {
+    await User.updateMany(
+      { schoolId: school._id, status: 'active' },
+      { status: 'inactive' }
+    );
+  }
+
+  // Recalculate school active-user stats after bulk status updates
+  const [activeStudents, activeTeachers, activeAdmins] = await Promise.all([
+    User.countDocuments({ schoolId: school._id, role: 'student', status: 'active' }),
+    User.countDocuments({ schoolId: school._id, role: 'teacher', status: 'active' }),
+    User.countDocuments({ schoolId: school._id, role: 'admin', status: 'active' })
+  ]);
+
+  school.stats.totalStudents = activeStudents;
+  school.stats.totalTeachers = activeTeachers;
+  school.stats.totalAdmins = activeAdmins;
+  await school.save();
   
   res.json({
     success: true,
