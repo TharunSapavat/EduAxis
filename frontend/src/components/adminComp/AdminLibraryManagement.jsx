@@ -221,7 +221,7 @@ export default function AdminLibraryManagement({ showNotification }) {
 
       {/* Add Resource Modal */}
       {showForm && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[60] p-4" onClick={() => setShowForm(false)}>
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-60 p-4" onClick={() => setShowForm(false)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between p-5 border-b border-slate-200 sticky top-0 bg-white">
               <h3 className="text-lg font-bold text-slate-900">Add Library Resource</h3>
@@ -366,7 +366,7 @@ export default function AdminLibraryManagement({ showNotification }) {
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-[60]">
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-60">
           <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
             <h3 className="text-lg font-semibold text-slate-900 mb-2">Delete Resource</h3>
             <p className="text-slate-600 mb-6">Are you sure you want to delete this resource? This action cannot be undone.</p>
