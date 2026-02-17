@@ -5,9 +5,11 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import LandingPage from './pages/LandingPage'
 import Login from './components/Login'
 import Register from './components/Register'
+import SuperAdminLogin from './components/SuperAdminLogin'
 import StudentDashboard from './pages/StudentDashboard'
 import TeacherDashboard from './pages/TeacherDashboard'
 import AdminDashboard from './pages/AdminDashboard'
+import SuperAdminDashboard from './pages/SuperAdminDashboard'
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -45,6 +47,18 @@ function AppContent() {
 
   return (
     <Routes>
+      {/* Secret Super Admin Login Route */}
+      <Route 
+        path="/system-access" 
+        element={
+          user?.role === 'superadmin' ? (
+            <Navigate to="/superadmin/home" replace />
+          ) : (
+            <SuperAdminLogin />
+          )
+        } 
+      />
+      
       {/* Landing Page Route - only accessible when not logged in */}
       <Route 
         path="/" 
@@ -104,6 +118,18 @@ function AppContent() {
         element={
           user?.role === 'admin' ? (
             <AdminDashboard />
+          ) : (
+            <Navigate to="/" replace />
+          )
+        } 
+      />
+      
+      {/* Super Admin Routes */}
+      <Route 
+        path="/superadmin/*" 
+        element={
+          user?.role === 'superadmin' ? (
+            <SuperAdminDashboard />
           ) : (
             <Navigate to="/" replace />
           )

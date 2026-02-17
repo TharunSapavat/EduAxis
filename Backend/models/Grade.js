@@ -1,6 +1,12 @@
 import mongoose from 'mongoose';
 
 const gradeSchema = new mongoose.Schema({
+  schoolId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'School',
+    required: [true, 'School ID is required'],
+    index: true
+  },
   studentId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

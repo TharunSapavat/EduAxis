@@ -1,6 +1,12 @@
 import mongoose from 'mongoose';
 
 const courseSchema = new mongoose.Schema({
+  schoolId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'School',
+    required: [true, 'School ID is required'],
+    index: true
+  },
   name: {
     type: String,
     required: [true, 'Course name is required'],
@@ -62,6 +68,46 @@ const courseSchema = new mongoose.Schema({
 // Index for faster queries
 courseSchema.index({ teacherId: 1 });
 // Note: code field already has unique: true which creates an index automatically
+
+// Post-save hook to update school stats
+courseSchema.post('save', async function(doc) {
+  if (doc.schoolId) {
+    try {
+      const School = mongoose.model('School');
+      const school = await School.findById(doc.schoolId);
+      
+      if (school) {
+        const Course = mongoose.model('Course');
+        const totalCourses = await Course.countDocuments({ schoolId: doc.schoolId, status: 'active' });
+        
+        school.stats.totalCourses = totalCourses;
+        await school.save();
+      }
+    } catch (error) {
+      console.error('Error updating school stats:', error);
+    }
+  }
+});
+
+// Post-remove hook to update school stats when course is deleted
+courseSchema.post('findOneAndDelete', async function(doc) {
+  if (doc && doc.schoolId) {
+    try {
+      const School = mongoose.model('School');
+      const school = await School.findById(doc.schoolId);
+      
+      if (school) {
+        const Course = mongoose.model('Course');
+        const totalCourses = await Course.countDocuments({ schoolId: doc.schoolId, status: 'active' });
+        
+        school.stats.totalCourses = totalCourses;
+        await school.save();
+      }
+    } catch (error) {
+      console.error('Error updating school stats:', error);
+    }
+  }
+});
 
 const Course = mongoose.model('Course', courseSchema);
 

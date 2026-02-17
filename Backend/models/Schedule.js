@@ -1,6 +1,12 @@
 import mongoose from 'mongoose';
 
 const scheduleSchema = new mongoose.Schema({
+  schoolId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'School',
+    required: [true, 'School ID is required'],
+    index: true
+  },
   teacherId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   courseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', required: true },
   grade: { type: String, required: true },

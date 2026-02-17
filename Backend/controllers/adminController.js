@@ -18,6 +18,7 @@ export const adminCreateLibraryResource = async (req, res) => {
     if (!title) return res.status(400).json({ success: false, message: 'Title is required' });
 
     const resource = new LibraryResource({
+      schoolId: req.schoolId,
       title,
       description: description || '',
       author: author || '',
@@ -50,7 +51,7 @@ export const adminCreateLibraryResource = async (req, res) => {
 
 export const adminListLibraryResources = async (req, res) => {
   try {
-    const resources = await LibraryResource.find({}).sort({ createdAt: -1 });
+    const resources = await LibraryResource.find({ schoolId: req.schoolId }).sort({ createdAt: -1 });
     res.json({ success: true, resources });
   } catch (error) {
     console.error('Admin list library resources error:', error);
@@ -62,7 +63,7 @@ export const adminListLibraryResources = async (req, res) => {
 export const adminListTimetables = async (req, res) => {
   try {
     const { grade, section, academicYear, semester, isActive } = req.query;
-    const query = {};
+    const query = { schoolId: req.schoolId };
     if (grade) query.grade = String(grade);
     if (section) query.section = String(section);
     if (academicYear) query.academicYear = String(academicYear);
@@ -153,9 +154,9 @@ export const adminDeleteLibraryResource = async (req, res) => {
 export const getDashboard = async (req, res) => {
   try {
     const [totalStudents, totalTeachers, totalCourses] = await Promise.all([
-      User.countDocuments({ role: 'student' }),
-      User.countDocuments({ role: 'teacher' }),
-      Course.countDocuments({})
+      User.countDocuments({ role: 'student', schoolId: req.schoolId }),
+      User.countDocuments({ role: 'teacher', schoolId: req.schoolId }),
+      Course.countDocuments({ schoolId: req.schoolId })
     ]);
 
     res.json({
@@ -176,9 +177,9 @@ export const getDashboard = async (req, res) => {
 export const getStats = async (req, res) => {
   try {
     const [students, teachers, courses] = await Promise.all([
-      User.countDocuments({ role: 'student' }),
-      User.countDocuments({ role: 'teacher' }),
-      Course.countDocuments({})
+      User.countDocuments({ role: 'student', schoolId: req.schoolId }),
+      User.countDocuments({ role: 'teacher', schoolId: req.schoolId }),
+      Course.countDocuments({ schoolId: req.schoolId })
     ]);
 
     res.json({
@@ -200,7 +201,7 @@ export const getStats = async (req, res) => {
 export const getUsers = async (req, res) => {
   try {
     const { role, q } = req.query;
-    const filter = {};
+    const filter = { schoolId: req.schoolId };
     if (role && role !== 'all') filter.role = role;
     if (q && q.trim()) {
       filter.$or = [
@@ -234,8 +235,9 @@ export const createUser = async (req, res) => {
     const userData = {
       name,
       email,
-      password, // TODO: hash in production
+      password, // Will be hashed by pre-save hook
       role: (role || 'student').toLowerCase(),
+      schoolId: req.schoolId, // Add school context from auth middleware
       phone,
       dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
     };

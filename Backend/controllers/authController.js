@@ -1,9 +1,40 @@
 import User from '../models/User.js';
+import School from '../models/School.js';
+
+// Helper function to extract domain from email
+const extractDomain = (email) => {
+  const parts = email.toLowerCase().split('@');
+  return parts.length === 2 ? parts[1] : null;
+};
+
+// Helper function to find school by code or email domain
+const findSchoolForUser = async (email, schoolCode) => {
+  // First try to find by school code if provided
+  if (schoolCode) {
+    const school = await School.findOne({ 
+      code: schoolCode.toUpperCase(),
+      status: 'active'
+    });
+    if (school) return school;
+  }
+
+  // Then try to find by email domain
+  const domain = extractDomain(email);
+  if (domain) {
+    const school = await School.findOne({ 
+      allowedEmailDomains: domain,
+      status: 'active'
+    });
+    if (school) return school;
+  }
+
+  return null;
+};
 
 // Register new user
 export const register = async (req, res) => {
   try {
-    const { name, email, password, role, phone, dateOfBirth, grade, section, subject, gradesTeaching } = req.body;
+    const { name, email, password, role, phone, dateOfBirth, grade, section, subject, gradesTeaching, schoolId, schoolCode } = req.body;
 
     // Validate required fields
     if (!name || !email || !password) {
@@ -30,8 +61,42 @@ export const register = async (req, res) => {
       });
     }
 
-    // If student, require grade; section is optional (admin can assign later)
+    // Public registration is only for students and teachers
+    // Admins must be created by super admin or existing school admin
     const effectiveRole = role || 'student';
+    
+    if (effectiveRole === 'admin' || effectiveRole === 'superadmin') {
+      return res.status(403).json({ 
+        success: false,
+        message: 'Admin accounts cannot be created through public registration. Please contact your school administrator.' 
+      });
+    }
+    
+    // Determine schoolId for non-superadmin roles
+    let finalSchoolId = schoolId;
+    
+    if (effectiveRole !== 'superadmin') {
+      // Try to find school by code or email domain
+      const school = await findSchoolForUser(email, schoolCode);
+      
+      if (!school && !schoolId) {
+        return res.status(400).json({ 
+          success: false,
+          message: 'Could not identify your school. Please provide a valid school code or use your school email domain.' 
+        });
+      }
+      
+      // Use found school or provided schoolId
+      finalSchoolId = school ? school._id : schoolId;
+      
+      // Verify school is active
+      if (school && school.status !== 'active') {
+        return res.status(403).json({ 
+          success: false,
+          message: `School is currently ${school.status}. Please contact your administrator.` 
+        });
+      }
+    }
 
     if (effectiveRole === 'student') {
       const validGrades = ['1','2','3','4','5','6','7','8','9','10','11','12'];
@@ -53,6 +118,11 @@ export const register = async (req, res) => {
       phone,
       dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
     };
+    
+    // Add schoolId for non-superadmin
+    if (effectiveRole !== 'superadmin') {
+      payload.schoolId = finalSchoolId;
+    }
 
     if (effectiveRole === 'student') {
       payload.grade = String(grade);
@@ -104,7 +174,7 @@ export const register = async (req, res) => {
 // Login user
 export const login = async (req, res) => {
   try {
-    const { email, password, role } = req.body;
+    const { email, password, role, schoolCode } = req.body;
 
     // Validate input
     if (!email || !password) {
@@ -122,6 +192,41 @@ export const login = async (req, res) => {
         success: false,
         message: 'Invalid email or password' 
       });
+    }
+
+    // For non-superadmin users, verify school context
+    if (user.role !== 'superadmin') {
+      // If school code provided, verify it matches user's school
+      if (schoolCode) {
+        const school = await School.findOne({ 
+          _id: user.schoolId,
+          code: schoolCode.toUpperCase()
+        });
+        
+        if (!school) {
+          return res.status(401).json({ 
+            success: false,
+            message: 'Invalid school code for this account' 
+          });
+        }
+        
+        // Check school status
+        if (school.status !== 'active') {
+          return res.status(403).json({ 
+            success: false,
+            message: `School is currently ${school.status}. Please contact your administrator.` 
+          });
+        }
+      } else {
+        // No school code provided - verify by email domain
+        const school = await School.findById(user.schoolId);
+        if (!school || school.status !== 'active') {
+          return res.status(403).json({ 
+            success: false,
+            message: 'Your school account is not active. Please contact administrator.' 
+          });
+        }
+      }
     }
 
     // Check role matches if provided

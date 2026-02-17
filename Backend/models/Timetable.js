@@ -1,6 +1,12 @@
 import mongoose from 'mongoose';
 
 const timetableSchema = new mongoose.Schema({
+  schoolId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'School',
+    required: [true, 'School ID is required'],
+    index: true
+  },
   // Target audience
   grade: {
     type: String,

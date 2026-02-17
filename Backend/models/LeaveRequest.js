@@ -1,6 +1,12 @@
 import mongoose from 'mongoose';
 
 const leaveRequestSchema = new mongoose.Schema({
+  schoolId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'School',
+    required: [true, 'School ID is required'],
+    index: true
+  },
   requesterId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

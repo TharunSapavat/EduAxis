@@ -11,6 +11,8 @@ const api = axios.create({
   withCredentials: true, // Send cookies with requests
 });
 
+let isRedirectingUnauthorized = false;
+
 // CSRF DISABLED - Causing too many issues with delete/send operations
 
 // Response interceptor - Handle errors globally
@@ -29,10 +31,12 @@ api.interceptors.response.use(
           const isAuthRequest = error.config.url.includes('/auth/login') || 
                                 error.config.url.includes('/auth/register');
           
-          if (!isAuthRequest) {
+          if (!isAuthRequest && !isRedirectingUnauthorized) {
+            isRedirectingUnauthorized = true;
             // User is not authenticated for a protected route - clear session
             console.error('Unauthorized access - logging out');
             localStorage.removeItem('user');
+            localStorage.removeItem('persist:root');
             window.location.href = '/';
           }
           // For auth requests (login/register), let the component handle the error
@@ -196,6 +200,26 @@ export const adminAPI = {
   saveTimetable: (data) => api.post('/admin/timetables', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
   updateTimetable: (id, updates) => api.patch(`/admin/timetables/${id}`, updates),
   deleteTimetable: (id) => api.delete(`/admin/timetables/${id}`)
+};
+
+// Super Admin APIs
+export const superAdminAPI = {
+  getDashboard: () => api.get('/superadmin/dashboard'),
+  getStatistics: () => api.get('/superadmin/statistics'),
+  
+  // School Management
+  getAllSchools: (params) => api.get('/superadmin/schools', { params }),
+  getSchoolById: (id) => api.get(`/superadmin/schools/${id}`),
+  createSchool: (schoolData) => api.post('/superadmin/schools', schoolData),
+  updateSchool: (id, schoolData) => api.put(`/superadmin/schools/${id}`, schoolData),
+  deleteSchool: (id) => api.delete(`/superadmin/schools/${id}`),
+  
+  // School Status Management
+  updateSchoolStatus: (id, status) => api.patch(`/superadmin/schools/${id}/status`, { status }),
+  
+  // Subscription Management
+  updateSchoolSubscription: (id, subscriptionData) => 
+    api.patch(`/superadmin/schools/${id}/subscription`, subscriptionData),
 };
 
 export default api;

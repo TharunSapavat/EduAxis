@@ -25,8 +25,14 @@ const userSchema = new mongoose.Schema({
   role: {
     type: String,
     required: true,
-    enum: ['student', 'teacher', 'admin'],
+    enum: ['student', 'teacher', 'admin', 'superadmin'],
     default: 'student'
+  },
+  schoolId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'School',
+    required: function() { return this.role !== 'superadmin'; },
+    index: true
   },
   phone: {
     type: String,
@@ -89,6 +95,58 @@ userSchema.pre('save', async function(next) {
   next();
 });
 
+// Post-save hook to update school stats
+userSchema.post('save', async function(doc) {
+  if (doc.schoolId && doc.role !== 'superadmin') {
+    try {
+      const School = mongoose.model('School');
+      const school = await School.findById(doc.schoolId);
+      
+      if (school) {
+        // Count users by role for this school
+        const User = mongoose.model('User');
+        const students = await User.countDocuments({ schoolId: doc.schoolId, role: 'student', status: 'active' });
+        const teachers = await User.countDocuments({ schoolId: doc.schoolId, role: 'teacher', status: 'active' });
+        const admins = await User.countDocuments({ schoolId: doc.schoolId, role: 'admin', status: 'active' });
+        
+        school.stats.totalStudents = students;
+        school.stats.totalTeachers = teachers;
+        school.stats.totalAdmins = admins;
+        
+        await school.save();
+      }
+    } catch (error) {
+      console.error('Error updating school stats:', error);
+    }
+  }
+});
+
+// Post-remove hook to update school stats when user is deleted
+userSchema.post('findOneAndDelete', async function(doc) {
+  if (doc && doc.schoolId && doc.role !== 'superadmin') {
+    try {
+      const School = mongoose.model('School');
+      const school = await School.findById(doc.schoolId);
+      
+      if (school) {
+        // Count users by role for this school
+        const User = mongoose.model('User');
+        const students = await User.countDocuments({ schoolId: doc.schoolId, role: 'student', status: 'active' });
+        const teachers = await User.countDocuments({ schoolId: doc.schoolId, role: 'teacher', status: 'active' });
+        const admins = await User.countDocuments({ schoolId: doc.schoolId, role: 'admin', status: 'active' });
+        
+        school.stats.totalStudents = students;
+        school.stats.totalTeachers = teachers;
+        school.stats.totalAdmins = admins;
+        
+        await school.save();
+      }
+    } catch (error) {
+      console.error('Error updating school stats:', error);
+    }
+  }
+});
+
 // Method to compare password
 userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
@@ -96,15 +154,18 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
 
 // Method to generate JWT token
 userSchema.methods.generateAuthToken = function() {
-  const token = jwt.sign(
-    { 
-      _id: this._id,
-      email: this.email,
-      role: this.role 
-    },
-    process.env.JWT_SECRET,
-    { expiresIn: '7d' }
-  );
+  const payload = { 
+    _id: this._id,
+    email: this.email,
+    role: this.role
+  };
+  
+  // Add schoolId for non-superadmin users
+  if (this.role !== 'superadmin' && this.schoolId) {
+    payload.schoolId = this.schoolId;
+  }
+  
+  const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
   return token;
 };
 

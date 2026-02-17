@@ -1,6 +1,12 @@
 import mongoose from 'mongoose';
 // Remarkind the schema for student remarks made by teachers or admins
 const remarkSchema = new mongoose.Schema({
+  schoolId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'School',
+    required: [true, 'School ID is required'],
+    index: true
+  },
   studentId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

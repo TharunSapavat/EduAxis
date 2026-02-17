@@ -27,7 +27,8 @@ export const getDashboard = async (req, res) => {
     // Find student
     const student = await User.findOne({ 
       $or: [{ _id: studentId }, { studentId: studentId }],
-      role: 'student'
+      role: 'student',
+      schoolId: req.schoolId
     });
 
     if (!student) {
@@ -45,12 +46,16 @@ export const getDashboard = async (req, res) => {
 
     // Get total courses matching student's grade (enrolled courses)
     const totalCourses = await Course.countDocuments({ 
+      schoolId: req.schoolId,
       status: 'active',
       grade: Number(student.grade)
     });
 
     // Get attendance stats
-    const attendanceRecords = await Attendance.find({ studentId: student._id });
+    const attendanceRecords = await Attendance.find({ 
+      schoolId: req.schoolId,
+      studentId: student._id 
+    });
     const totalAttendance = attendanceRecords.length;
     const presentCount = attendanceRecords.filter(a => a.status === 'present').length;
     const attendancePercentage = totalAttendance > 0 
@@ -59,12 +64,14 @@ export const getDashboard = async (req, res) => {
     
     // Get completed assignments count
     const completedAssignments = await Submission.countDocuments({
+      schoolId: req.schoolId,
       studentId: student._id,
       status: { $in: ['submitted', 'graded'] }
     });
     
     // Get total assignments count for the student's grade (all active assignments for their grade)
     const totalAssignments = await Assignment.countDocuments({
+      schoolId: req.schoolId,
       grade: String(student.grade),
       status: 'active'
     });
@@ -104,7 +111,11 @@ export const getCourses = async (req, res) => {
     }
 
     // Filter courses by matching grade and active status
-    const courses = await Course.find({ status: 'active', grade: Number(student.grade) })
+    const courses = await Course.find({ 
+      schoolId: req.schoolId,
+      status: 'active', 
+      grade: Number(student.grade) 
+    })
       .populate('teacherId', 'name email');
 
     res.json({ success: true, courses });

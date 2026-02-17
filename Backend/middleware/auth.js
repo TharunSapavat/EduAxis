@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import School from '../models/School.js';
 import { AppError } from './errorHandler.js';
 import { catchAsync } from './errorHandler.js';
 
@@ -31,6 +32,21 @@ export const authMiddleware = catchAsync(async (req, res, next) => {
   req.user = user;
   req.userId = user._id;
   req.token = token;
+  
+  // Attach school context for non-superadmin users
+  if (user.role !== 'superadmin' && user.schoolId) {
+    req.schoolId = user.schoolId;
+    
+    // Check if school is active
+    const school = await School.findById(user.schoolId);
+    if (!school) {
+      throw new AppError('School not found', 404);
+    }
+    if (school.status !== 'active') {
+      throw new AppError('School account is not active', 403);
+    }
+    req.school = school;
+  }
   
   next();
 });

@@ -1,0 +1,519 @@
+import School from '../models/School.js';
+import User from '../models/User.js';
+import Course from '../models/Course.js';
+import Assignment from '../models/Assignment.js';
+import Attendance from '../models/Attendance.js';
+import { catchAsync, AppError } from '../middleware/errorHandler.js';
+
+const STUDENT_BILLING_INR = {
+  currency: 'INR',
+  starter: {
+    name: 'Starter',
+    maxStudents: 300,
+    monthlyFee: 1999
+  },
+  growth: {
+    name: 'Growth',
+    maxStudents: 1000,
+    monthlyFee: 4999
+  },
+  scale: {
+    name: 'Scale',
+    baseMonthlyFee: 4999,
+    includedStudents: 1000,
+    additionalPerStudent: 8
+  }
+};
+
+const getBillingForStudentCount = (studentCount = 0) => {
+  const normalized = Math.max(0, Number(studentCount) || 0);
+
+  if (normalized <= STUDENT_BILLING_INR.starter.maxStudents) {
+    return {
+      tier: 'starter',
+      monthlyCharge: STUDENT_BILLING_INR.starter.monthlyFee
+    };
+  }
+
+  if (normalized <= STUDENT_BILLING_INR.growth.maxStudents) {
+    return {
+      tier: 'growth',
+      monthlyCharge: STUDENT_BILLING_INR.growth.monthlyFee
+    };
+  }
+
+  const extraStudents = normalized - STUDENT_BILLING_INR.scale.includedStudents;
+  return {
+    tier: 'scale',
+    monthlyCharge: STUDENT_BILLING_INR.scale.baseMonthlyFee + (extraStudents * STUDENT_BILLING_INR.scale.additionalPerStudent)
+  };
+};
+
+// @desc    Get super admin dashboard statistics
+// @route   GET /api/superadmin/dashboard
+// @access  Super Admin
+export const getSuperAdminDashboard = catchAsync(async (req, res) => {
+  // Get all schools with their stats
+  const schools = await School.find().sort({ createdAt: -1 });
+  
+  const totalSchools = schools.length;
+  const activeSchools = schools.filter(s => s.status === 'active').length;
+  const pendingSchools = schools.filter(s => s.status === 'pending').length;
+  const suspendedSchools = schools.filter(s => s.status === 'suspended').length;
+
+  // Calculate totals across all schools
+  const totalStudents = schools.reduce((sum, school) => sum + school.stats.totalStudents, 0);
+  const totalTeachers = schools.reduce((sum, school) => sum + school.stats.totalTeachers, 0);
+  const totalAdmins = schools.reduce((sum, school) => sum + school.stats.totalAdmins, 0);
+  const totalCourses = schools.reduce((sum, school) => sum + school.stats.totalCourses, 0);
+
+  // Subscription distribution
+  const subscriptionStats = {
+    trial: schools.filter(s => s.subscription.plan === 'trial').length,
+    basic: schools.filter(s => s.subscription.plan === 'basic').length,
+    premium: schools.filter(s => s.subscription.plan === 'premium').length,
+    enterprise: schools.filter(s => s.subscription.plan === 'enterprise').length
+  };
+
+  // Recent schools
+  const recentSchools = schools.slice(0, 5).map(school => ({
+    _id: school._id,
+    name: school.name,
+    code: school.code,
+    status: school.status,
+    subscription: {
+      plan: school.subscription.plan
+    },
+    stats: {
+      totalStudents: school.stats.totalStudents,
+      totalTeachers: school.stats.totalTeachers
+    },
+    createdAt: school.createdAt
+  }));
+
+  res.json({
+    success: true,
+    data: {
+      totalSchools,
+      activeSchools,
+      pendingSchools,
+      suspendedSchools,
+      totalStudents,
+      totalTeachers,
+      totalAdmins,
+      totalCourses,
+      subscriptionStats,
+      recentSchools,
+      schools: schools.map(school => {
+        const billing = getBillingForStudentCount(school.stats?.totalStudents || 0);
+        return {
+          _id: school._id,
+          name: school.name,
+          code: school.code,
+          email: school.email,
+          phone: school.phone,
+          status: school.status,
+          subscription: {
+            plan: school.subscription.plan,
+            endDate: school.subscription.endDate
+          },
+          stats: school.stats,
+          createdAt: school.createdAt,
+          billingPreview: {
+            currency: STUDENT_BILLING_INR.currency,
+            tier: billing.tier,
+            monthlyCharge: billing.monthlyCharge
+          }
+        };
+      })
+    }
+  });
+});
+
+// @desc    Get all schools
+// @route   GET /api/superadmin/schools
+// @access  Super Admin
+export const getAllSchools = catchAsync(async (req, res) => {
+  const { status, plan, search } = req.query;
+  
+  let query = {};
+  
+  if (status) {
+    query.status = status;
+  }
+  
+  if (plan) {
+    query['subscription.plan'] = plan;
+  }
+  
+  if (search) {
+    query.$or = [
+      { name: { $regex: search, $options: 'i' } },
+      { code: { $regex: search, $options: 'i' } },
+      { email: { $regex: search, $options: 'i' } }
+    ];
+  }
+  
+  const schools = await School.find(query).sort({ createdAt: -1 });
+  
+  res.json({
+    success: true,
+    count: schools.length,
+    data: schools
+  });
+});
+
+// @desc    Get single school details
+// @route   GET /api/superadmin/schools/:id
+// @access  Super Admin
+export const getSchoolById = catchAsync(async (req, res) => {
+  const school = await School.findById(req.params.id);
+  
+  if (!school) {
+    throw new AppError('School not found', 404);
+  }
+  
+  // Get detailed stats
+  const [students, teachers, admins, courses, assignments] = await Promise.all([
+    User.find({ schoolId: school._id, role: 'student' }).select('name email studentId grade status'),
+    User.find({ schoolId: school._id, role: 'teacher' }).select('name email teacherId subject status'),
+    User.find({ schoolId: school._id, role: 'admin' }).select('name email status'),
+    Course.find({ schoolId: school._id }).select('name code teacher students'),
+    Assignment.countDocuments({ schoolId: school._id })
+  ]);
+  
+  res.json({
+    success: true,
+    data: {
+      school,
+      details: {
+        students,
+        teachers,
+        admins,
+        courses,
+        totalAssignments: assignments
+      }
+    }
+  });
+});
+
+// @desc    Create new school
+// @route   POST /api/superadmin/schools
+// @access  Super Admin
+export const createSchool = catchAsync(async (req, res) => {
+  const {
+    name,
+    code,
+    email,
+    phone,
+    address,
+    website,
+    principal,
+    subscription,
+    adminUser
+  } = req.body;
+  
+  // Check if school code already exists
+  const existingSchool = await School.findOne({ code: code.toUpperCase() });
+  if (existingSchool) {
+    throw new AppError('School code already exists', 400);
+  }
+  
+  // Check if email already exists
+  const existingEmail = await School.findOne({ email: email.toLowerCase() });
+  if (existingEmail) {
+    throw new AppError('School email already exists', 400);
+  }
+  
+  const school = await School.create({
+    name,
+    code: code.toUpperCase(),
+    email: email.toLowerCase(),
+    phone,
+    address,
+    website,
+    principal,
+    subscription: subscription || {
+      plan: 'trial',
+      startDate: new Date(),
+      endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days trial
+      maxStudents: 100,
+      maxTeachers: 10
+    },
+    status: 'active'
+  });
+  
+  // Create initial admin user if provided
+  let createdAdmin = null;
+  if (adminUser && adminUser.name && adminUser.email && adminUser.password) {
+    try {
+      createdAdmin = await User.create({
+        name: adminUser.name,
+        email: adminUser.email.toLowerCase(),
+        password: adminUser.password,
+        role: 'admin',
+        schoolId: school._id,
+        phone: adminUser.phone || phone,
+        status: 'active'
+      });
+      
+      // Update school stats
+      school.stats.totalAdmins = 1;
+      await school.save();
+    } catch (adminError) {
+      // If admin creation fails, still return school but with a warning
+      console.error('Admin creation failed:', adminError);
+      return res.status(201).json({
+        success: true,
+        message: 'School created successfully, but admin creation failed',
+        data: school,
+        warning: 'Admin user could not be created: ' + adminError.message
+      });
+    }
+  }
+  
+  res.status(201).json({
+    success: true,
+    message: createdAdmin ? 'School and admin created successfully' : 'School created successfully',
+    data: {
+      school,
+      admin: createdAdmin ? createdAdmin.toJSON() : null
+    }
+  });
+});
+
+// @desc    Update school
+// @route   PUT /api/superadmin/schools/:id
+// @access  Super Admin
+export const updateSchool = catchAsync(async (req, res) => {
+  const school = await School.findById(req.params.id);
+  
+  if (!school) {
+    throw new AppError('School not found', 404);
+  }
+  
+  const allowedUpdates = [
+    'name', 'email', 'phone', 'address', 'website', 'principal',
+    'status', 'subscription', 'settings'
+  ];
+  
+  Object.keys(req.body).forEach(key => {
+    if (allowedUpdates.includes(key)) {
+      if (key === 'subscription' && typeof req.body[key] === 'object') {
+        school.subscription = { ...school.subscription.toObject(), ...req.body[key] };
+      } else if (key === 'address' && typeof req.body[key] === 'object') {
+        school.address = { ...school.address, ...req.body[key] };
+      } else if (key === 'settings' && typeof req.body[key] === 'object') {
+        school.settings = { ...school.settings.toObject(), ...req.body[key] };
+      } else {
+        school[key] = req.body[key];
+      }
+    }
+  });
+  
+  await school.save();
+  
+  res.json({
+    success: true,
+    message: 'School updated successfully',
+    data: school
+  });
+});
+
+// @desc    Delete school
+// @route   DELETE /api/superadmin/schools/:id
+// @access  Super Admin
+export const deleteSchool = catchAsync(async (req, res) => {
+  const school = await School.findById(req.params.id);
+  
+  if (!school) {
+    throw new AppError('School not found', 404);
+  }
+  
+  // Check if school has users
+  const userCount = await User.countDocuments({ schoolId: school._id });
+  if (userCount > 0) {
+    throw new AppError(
+      `Cannot delete school. It has ${userCount} users. Please delete or reassign users first.`,
+      400
+    );
+  }
+  
+  await school.deleteOne();
+  
+  res.json({
+    success: true,
+    message: 'School deleted successfully'
+  });
+});
+
+// @desc    Update school status
+// @route   PATCH /api/superadmin/schools/:id/status
+// @access  Super Admin
+export const updateSchoolStatus = catchAsync(async (req, res) => {
+  const { status } = req.body;
+  
+  if (!['active', 'inactive', 'suspended', 'pending'].includes(status)) {
+    throw new AppError('Invalid status value', 400);
+  }
+  
+  const school = await School.findById(req.params.id);
+  
+  if (!school) {
+    throw new AppError('School not found', 404);
+  }
+  
+  school.status = status;
+  await school.save();
+  
+  // If suspending, also suspend all users
+  if (status === 'suspended') {
+    await User.updateMany(
+      { schoolId: school._id },
+      { status: 'suspended' }
+    );
+  }
+  
+  res.json({
+    success: true,
+    message: `School ${status} successfully`,
+    data: school
+  });
+});
+
+// @desc    Update school subscription
+// @route   PATCH /api/superadmin/schools/:id/subscription
+// @access  Super Admin
+export const updateSchoolSubscription = catchAsync(async (req, res) => {
+  const { plan, endDate, maxStudents, maxTeachers, features } = req.body;
+  
+  const school = await School.findById(req.params.id);
+  
+  if (!school) {
+    throw new AppError('School not found', 404);
+  }
+  
+  if (plan) school.subscription.plan = plan;
+  if (endDate) school.subscription.endDate = endDate;
+  if (maxStudents) school.subscription.maxStudents = maxStudents;
+  if (maxTeachers) school.subscription.maxTeachers = maxTeachers;
+  if (features) school.subscription.features = { ...school.subscription.features, ...features };
+  
+  await school.save();
+  
+  res.json({
+    success: true,
+    message: 'Subscription updated successfully',
+    data: school
+  });
+});
+
+// @desc    Get platform statistics
+// @route   GET /api/superadmin/statistics
+// @access  Super Admin
+export const getPlatformStatistics = catchAsync(async (req, res) => {
+  const schools = await School.find();
+  
+  // Calculate total users across all schools
+  const totalUsers = await User.countDocuments();
+  const totalStudents = await User.countDocuments({ role: 'student' });
+  const totalTeachers = await User.countDocuments({ role: 'teacher' });
+  const totalAdmins = await User.countDocuments({ role: 'admin' });
+  
+  // Calculate total resources
+  const totalCourses = await Course.countDocuments();
+  const totalAssignments = await Assignment.countDocuments();
+  const totalAttendance = await Attendance.countDocuments();
+  
+  // Growth metrics (last 30 days)
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const newSchoolsThisMonth = await School.countDocuments({ 
+    createdAt: { $gte: thirtyDaysAgo } 
+  });
+  const newUsersThisMonth = await User.countDocuments({ 
+    createdAt: { $gte: thirtyDaysAgo } 
+  });
+  
+  const billableSchools = schools.filter(
+    school => school.status === 'active' && school.subscription.plan !== 'trial' && school.isSubscriptionActive()
+  );
+
+  const billingSummary = {
+    billableSchools: billableSchools.length,
+    starterSchools: 0,
+    growthSchools: 0,
+    scaleSchools: 0,
+    totalBillableStudents: 0
+  };
+
+  const estimatedRevenue = billableSchools.reduce((sum, school) => {
+    const studentCount = school.stats?.totalStudents || 0;
+    const { tier, monthlyCharge } = getBillingForStudentCount(studentCount);
+
+    if (tier === 'starter') billingSummary.starterSchools += 1;
+    if (tier === 'growth') billingSummary.growthSchools += 1;
+    if (tier === 'scale') billingSummary.scaleSchools += 1;
+    billingSummary.totalBillableStudents += studentCount;
+
+    return sum + monthlyCharge;
+  }, 0);
+
+  const projectedIfAllActiveSchools = schools
+    .filter(school => school.status === 'active')
+    .reduce((sum, school) => {
+      const studentCount = school.stats?.totalStudents || 0;
+      return sum + getBillingForStudentCount(studentCount).monthlyCharge;
+    }, 0);
+
+  const averageRevenuePerSchool = billingSummary.billableSchools > 0
+    ? Math.round(estimatedRevenue / billingSummary.billableSchools)
+    : 0;
+  
+  res.json({
+    success: true,
+    data: {
+      schools: {
+        total: schools.length,
+        active: schools.filter(s => s.status === 'active').length,
+        trial: schools.filter(s => s.subscription.plan === 'trial').length,
+        paid: schools.filter(s => s.subscription.plan !== 'trial').length
+      },
+      users: {
+        total: totalUsers,
+        students: totalStudents,
+        teachers: totalTeachers,
+        admins: totalAdmins
+      },
+      resources: {
+        courses: totalCourses,
+        assignments: totalAssignments,
+        attendanceRecords: totalAttendance
+      },
+      growth: {
+        newSchoolsThisMonth,
+        newUsersThisMonth
+      },
+      billing: {
+        model: 'per_student',
+        currency: STUDENT_BILLING_INR.currency,
+        tiers: {
+          starter: STUDENT_BILLING_INR.starter,
+          growth: STUDENT_BILLING_INR.growth,
+          scale: STUDENT_BILLING_INR.scale
+        },
+        summary: {
+          ...billingSummary,
+          averageRevenuePerSchool
+        },
+        projected: {
+          monthlyIfAllActiveSchoolsCharged: projectedIfAllActiveSchools
+        }
+      },
+      revenue: {
+        estimatedMonthly: estimatedRevenue,
+        estimatedAnnual: estimatedRevenue * 12,
+        currency: STUDENT_BILLING_INR.currency
+      }
+    }
+  });
+});

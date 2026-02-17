@@ -24,6 +24,7 @@ import studentRoutes from './routes/studentRoutes.js';
 import teacherRoutes from './routes/teacherRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import messageRoutes from './routes/messageRoutes.js';
+import superAdminRoutes from './routes/superAdminRoutes.js';
 
 // Import middleware
 import errorHandler, { notFound } from './middleware/errorHandler.js';
@@ -174,6 +175,7 @@ app.use('/api/auth', authRoutes);
 // app.use(csrfErrorHandler);
 
 // Protected routes (CSRF disabled)
+app.use('/api/superadmin', superAdminRoutes);
 app.use('/api/student', studentRoutes);
 app.use('/api/teacher', teacherRoutes);
 app.use('/api/admin', adminRoutes);

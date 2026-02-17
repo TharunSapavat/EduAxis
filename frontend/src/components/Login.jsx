@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, Mail, Lock, User } from 'lucide-react';
+import { X, Mail, Lock, User, Building2 } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useAuth } from '../context/AuthContext';
 import { loginUser } from '../store/slices/authSlice';
@@ -13,7 +13,8 @@ export default function Login({ onClose, onSwitchToRegister }) {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    role: 'student'
+    role: 'student',
+    schoolCode: ''
   });
   const [error, setError] = useState('');
   const loading = authLoading;
@@ -159,6 +160,24 @@ export default function Login({ onClose, onSwitchToRegister }) {
                   placeholder="your.email@example.com"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                School Code (Optional)
+              </label>
+              <div className="relative">
+                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <input
+                  type="text"
+                  value={formData.schoolCode}
+                  onChange={(e) => setFormData({ ...formData, schoolCode: e.target.value.toUpperCase() })}
+                  className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all uppercase"
+                  placeholder="SCH001"
+                  maxLength="10"
+                />
+              </div>
+              <p className="mt-1 text-xs text-slate-500">Leave blank if using school email domain</p>
             </div>
 
             <div>

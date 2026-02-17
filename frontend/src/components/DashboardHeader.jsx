@@ -51,10 +51,16 @@ export default function DashboardHeader({ title, userRole }) {
       iconColor: 'text-purple-600',
       bgColor: 'bg-purple-100',
       userIconColor: 'text-purple-600'
+    },
+    superadmin: {
+      iconColor: 'text-red-600',
+      bgColor: 'bg-red-100',
+      userIconColor: 'text-red-600'
     }
   };
 
-  const styles = roleStyles[userRole] || roleStyles.student;
+  const currentRole = userRole || user?.role || 'student';
+  const styles = roleStyles[currentRole] || roleStyles.student;
 
   return (
     <>
@@ -76,13 +82,18 @@ export default function DashboardHeader({ title, userRole }) {
                   <div className="flex items-center justify-end gap-2">
                     <p className="text-xs text-slate-600">
                       {user?.studentId || user?.teacherId || 
-                       userRole.charAt(0).toUpperCase() + userRole.slice(1)}
+                       (currentRole ? currentRole.charAt(0).toUpperCase() + currentRole.slice(1) : 'User')}
                     </p>
-                    {userRole === 'student' && (
+                    {currentRole === 'student' && (
                       <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
                         <span>Grade {user?.grade || '—'}</span>
                         <span>•</span>
                         <span>Sec {user?.section || 'Not assigned'}</span>
+                      </span>
+                    )}
+                    {currentRole === 'superadmin' && (
+                      <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200 font-semibold">
+                        <span>🔐 System Admin</span>
                       </span>
                     )}
                   </div>
