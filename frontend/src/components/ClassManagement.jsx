@@ -284,6 +284,7 @@ export default function ClassManagement() {
               <option value="Good">Good</option>
               <option value="Average">Average</option>
               <option value="Needs Improvement">Needs Improvement</option>
+              <option value="No Data">No Data Yet</option>
             </select>
           </div>
         </div>
@@ -380,23 +381,33 @@ export default function ClassManagement() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center space-x-2">
-                        <div className="w-16 bg-slate-200 rounded-full h-2">
-                          <div
-                            className={`h-2 rounded-full ${
-                              student.attendance >= 75 ? 'bg-green-500' : 'bg-red-500'
-                            }`}
-                            style={{ width: `${student.attendance}%` }}
-                          ></div>
-                        </div>
-                        <span className={`text-sm font-medium ${
-                          student.attendance >= 75 ? 'text-green-700' : 'text-red-700'
-                        }`}>
-                          {student.attendance}%
-                        </span>
+                        {student.performanceLevel === 'No Data' ? (
+                          <span className="text-sm text-slate-400 italic">No data yet</span>
+                        ) : (
+                          <>
+                            <div className="w-16 bg-slate-200 rounded-full h-2">
+                              <div
+                                className={`h-2 rounded-full ${
+                                  student.attendance >= 75 ? 'bg-green-500' : 'bg-red-500'
+                                }`}
+                                style={{ width: `${student.attendance}%` }}
+                              ></div>
+                            </div>
+                            <span className={`text-sm font-medium ${
+                              student.attendance >= 75 ? 'text-green-700' : 'text-red-700'
+                            }`}>
+                              {student.attendance}%
+                            </span>
+                          </>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-sm font-medium text-slate-700">{student.averageScore}%</span>
+                      {student.performanceLevel === 'No Data' ? (
+                        <span className="text-sm text-slate-400 italic">—</span>
+                      ) : (
+                        <span className="text-sm font-medium text-slate-700">{student.averageScore}%</span>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${getPerformanceColor(student.performanceLevel)}`}>
@@ -404,7 +415,9 @@ export default function ClassManagement() {
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      {student.isAtRisk ? (
+                      {student.performanceLevel === 'No Data' ? (
+                        <span className="text-slate-400 text-xs font-medium italic">Pending Assessment</span>
+                      ) : student.isAtRisk ? (
                         <span className="flex items-center space-x-1 text-red-600">
                           <AlertTriangle className="w-4 h-4" />
                           <span className="text-xs font-medium">At Risk</span>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Users, BookOpen, Calendar, FileText, BarChart3, Settings, Shield, Database, IndianRupee, Library, GraduationCap, ClipboardList, Home, X, Search, Filter, Eye, Mail, Phone, MapPin, Trash2, UserPlus, Lock } from 'lucide-react';
+import { Users, BookOpen, Calendar, FileText, BarChart3, Settings, Shield, Database, IndianRupee, Library, GraduationCap, ClipboardList, Home, X, Search, Filter, Eye, Mail, Phone, MapPin, Trash2, UserPlus, Lock, Award } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { adminAPI } from '../services/api';
 import { useForm } from 'react-hook-form';
@@ -11,6 +11,7 @@ import DashboardFooter from '../components/DashboardFooter';
 import NotificationToast from '../components/NotificationToast';
 import ClassManagement from '../components/ClassManagement.jsx';
 import AdminLibraryManagement from '../components/adminComp/AdminLibraryManagement.jsx';
+import TeacherSubjects from '../components/adminComp/TeacherSubjects.jsx';
 
 // User creation validation schema
 const userSchema = yup.object({
@@ -259,6 +260,11 @@ export default function AdminDashboard() {
   const [isEditUserMode, setIsEditUserMode] = useState(false);
   const [currentCoursePage, setCurrentCoursePage] = useState(1);
   const coursesPerPage = 9;
+
+  // Teacher Subjects Modal States
+  const [showTeacherSubjects, setShowTeacherSubjects] = useState(false);
+  const [teacherSubjectsData, setTeacherSubjectsData] = useState(null);
+  const [teacherSubjectsLoading, setTeacherSubjectsLoading] = useState(false);
 
   // Leave Request States
   const [leaveRequests, setLeaveRequests] = useState([]);
@@ -661,6 +667,20 @@ export default function AdminDashboard() {
     }
   };
 
+  const fetchTeacherSubjects = async (teacherId) => {
+    setTeacherSubjectsLoading(true);
+    try {
+      const res = await adminAPI.getTeacherSubjects(teacherId);
+      setTeacherSubjectsData(res.data);
+      setShowTeacherSubjects(true);
+    } catch (err) {
+      console.error('Failed to fetch teacher subjects:', err);
+      showNotification(err.response?.data?.message || 'Failed to fetch teacher subjects', 'error');
+    } finally {
+      setTeacherSubjectsLoading(false);
+    }
+  };
+
   const handleCreateCourse = async (data) => {
     try {
       setCoursesLoading(true);
@@ -789,6 +809,7 @@ export default function AdminDashboard() {
     { id: 'home', icon: Home, title: 'Home', description: 'Overview and statistics' },
     { id: 'users', icon: Users, title: 'User Management', description: 'Manage students, teachers & staff' },
     { id: 'courses', icon: BookOpen, title: 'Course Management', description: 'Create and manage courses' },
+    { id: 'teacher-subjects', icon: Award, title: 'Teacher Subjects', description: 'View subjects taught by teachers' },
     { id: 'fees', icon: IndianRupee, title: 'Fee Management', description: 'Manage fee structure & payments' },
     { id: 'classes', icon: GraduationCap, title: 'Class Management', description: 'Manage classes and sections' },
     { id: 'library', icon: Library, title: 'Library Management', description: 'Upload and manage library resources' },
@@ -1202,6 +1223,18 @@ export default function AdminDashboard() {
 
                       {/* Action Buttons */}
                       <div className="flex space-x-3 pt-6 border-t border-slate-200">
+                        {selectedUser.role === 'teacher' && (
+                          <button 
+                            onClick={() => {
+                              setShowUserDetails(false);
+                              fetchTeacherSubjects(selectedUser.id);
+                            }}
+                            className="flex-1 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 transition-colors font-medium flex items-center justify-center space-x-2"
+                          >
+                            <BookOpen className="w-4 h-4" />
+                            <span>View Subjects</span>
+                          </button>
+                        )}
                         <button 
                           onClick={() => {
                             setShowUserDetails(false);
@@ -2444,6 +2477,9 @@ export default function AdminDashboard() {
       case '/admin/classes':
         return <ClassManagement />;
 
+      case '/admin/teacher-subjects':
+        return <TeacherSubjects />;
+
       case '/admin/library':
         return <AdminLibraryManagement showNotification={showNotification} />;
 
@@ -2857,6 +2893,108 @@ export default function AdminDashboard() {
               >
                 Delete
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Teacher Subjects Modal */}
+      {showTeacherSubjects && teacherSubjectsData && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl relative max-h-[90vh] overflow-y-auto">
+            <button
+              onClick={() => {
+                setShowTeacherSubjects(false);
+                setTeacherSubjectsData(null);
+              }}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors z-10"
+            >
+              <X className="w-6 h-6" />
+            </button>
+
+            <div className="p-8">
+              {/* Header */}
+              <div className="text-center mb-8">
+                <div className="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <BookOpen className="w-10 h-10 text-indigo-600" />
+                </div>
+                <h2 className="text-2xl font-bold text-slate-900">{teacherSubjectsData.teacher.name}</h2>
+                <p className="text-slate-600 mt-1">{teacherSubjectsData.teacher.email}</p>
+                <div className="flex items-center justify-center space-x-4 mt-4">
+                  <div className="bg-indigo-50 px-4 py-2 rounded-lg">
+                    <p className="text-xs text-indigo-600 uppercase font-medium">Total Subjects</p>
+                    <p className="text-2xl font-bold text-indigo-700 mt-1">{teacherSubjectsData.totalSubjects}</p>
+                  </div>
+                  <div className="bg-green-50 px-4 py-2 rounded-lg">
+                    <p className="text-xs text-green-600 uppercase font-medium">Active Subjects</p>
+                    <p className="text-2xl font-bold text-green-700 mt-1">{teacherSubjectsData.activeSubjects}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Subjects List */}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-lg text-slate-900 border-b pb-2">Subjects Teaching</h3>
+                {teacherSubjectsLoading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+                    <p className="text-slate-500 mt-4">Loading subjects...</p>
+                  </div>
+                ) : teacherSubjectsData.subjects.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-4">
+                    {teacherSubjectsData.subjects.map((subject) => (
+                      <div
+                        key={subject._id}
+                        className="bg-slate-50 p-4 rounded-lg border border-slate-200 hover:shadow-md transition-all"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-3 mb-2">
+                              <h4 className="font-semibold text-slate-900">{subject.name}</h4>
+                              <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                                subject.status === 'active' 
+                                  ? 'bg-green-100 text-green-700' 
+                                  : subject.status === 'inactive'
+                                  ? 'bg-orange-100 text-orange-700'
+                                  : 'bg-slate-100 text-slate-700'
+                              }`}>
+                                {subject.status}
+                              </span>
+                            </div>
+                            <p className="text-sm text-slate-600 mb-3">{subject.code}</p>
+                            {subject.description && (
+                              <p className="text-sm text-slate-600 mb-3">{subject.description}</p>
+                            )}
+                            <div className="flex items-center space-x-4 text-sm text-slate-600">
+                              <div className="flex items-center space-x-1">
+                                <GraduationCap className="w-4 h-4" />
+                                <span>Grade {subject.grade}</span>
+                              </div>
+                              <div className="flex items-center space-x-1">
+                                <BookOpen className="w-4 h-4" />
+                                <span>{subject.credits} Credits</span>
+                              </div>
+                              <div className="flex items-center space-x-1">
+                                <Users className="w-4 h-4" />
+                                <span>{subject.students} Students</span>
+                              </div>
+                              <div className="flex items-center space-x-1">
+                                <Calendar className="w-4 h-4" />
+                                <span>{subject.semester}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 bg-slate-50 rounded-lg">
+                    <BookOpen className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                    <p className="text-slate-500">No subjects assigned to this teacher yet</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

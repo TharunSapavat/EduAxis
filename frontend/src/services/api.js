@@ -161,6 +161,7 @@ export const adminAPI = {
   updateUser: (id, userData) => api.put(`/admin/users/${id}`, userData),
   deleteUser: (id) => api.delete(`/admin/users/${id}`),
   getCourses: () => api.get('/admin/courses'),
+  getTeacherSubjects: (teacherId) => api.get(`/admin/teachers/${teacherId}/subjects`),
   createCourse: (courseData) => api.post('/admin/courses', courseData),
   updateCourse: (id, courseData) => api.put(`/admin/courses/${id}`, courseData),
   deleteCourse: (id) => api.delete(`/admin/courses/${id}`),

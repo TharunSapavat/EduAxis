@@ -378,9 +378,116 @@ export const decideLeaveRequest = async (req, res) => {
 export const getCourses = async (req, res) => {
   try {
     const courses = await Course.find({ schoolId: req.schoolId }).sort({ createdAt: -1 });
-    res.json({ courses });
+    
+    // Calculate enrolled student count for each course based on grade
+    const coursesWithStudentCount = await Promise.all(courses.map(async (course) => {
+      // Count all active students registered in the same grade as the course
+      const studentCount = await User.countDocuments({
+        schoolId: req.schoolId,
+        role: 'student',
+        grade: String(course.grade),
+        status: 'active'
+      });
+      
+      return {
+        ...course.toObject(),
+        students: studentCount
+      };
+    }));
+    
+    res.json({ courses: coursesWithStudentCount });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+export const getTeacherSubjects = async (req, res) => {
+  try {
+    const { teacherId } = req.params;
+
+    // Validate teacher exists and belongs to this school
+    const teacher = await User.findOne({
+      _id: teacherId,
+      schoolId: req.schoolId,
+      role: 'teacher',
+      status: 'active'
+    }).select('name email teacherId phone');
+
+    if (!teacher) {
+      return res.status(404).json({
+        success: false,
+        message: 'Teacher not found'
+      });
+    }
+
+    // Get all courses/subjects taught by this teacher
+    const courses = await Course.find({
+      schoolId: req.schoolId,
+      teacherId: teacherId
+    }).sort({ grade: 1, name: 1 });
+
+    // Calculate student count for each course
+    const coursesWithDetails = await Promise.all(courses.map(async (course) => {
+      const studentCount = await User.countDocuments({
+        schoolId: req.schoolId,
+        role: 'student',
+        grade: String(course.grade),
+        status: 'active'
+      });
+
+      return {
+        _id: course._id,
+        name: course.name,
+        code: course.code,
+        description: course.description,
+        grade: course.grade,
+        credits: course.credits,
+        semester: course.semester,
+        status: course.status,
+        students: studentCount,
+        createdAt: course.createdAt
+      };
+    }));
+
+    // Group subjects by similar names (case-insensitive) for counting
+    const subjectGroups = {};
+    coursesWithDetails.forEach(course => {
+      const normalizedName = course.name.toLowerCase().trim();
+      if (!subjectGroups[normalizedName]) {
+        subjectGroups[normalizedName] = {
+          displayName: course.name,
+          count: 0,
+          courses: []
+        };
+      }
+      subjectGroups[normalizedName].count++;
+      subjectGroups[normalizedName].courses.push(course);
+    });
+
+    const groupedSubjects = Object.values(subjectGroups);
+
+    res.json({
+      success: true,
+      teacher: {
+        id: teacher._id,
+        name: teacher.name,
+        email: teacher.email,
+        teacherId: teacher.teacherId,
+        phone: teacher.phone
+      },
+      subjects: coursesWithDetails,
+      groupedSubjects: groupedSubjects,
+      totalSubjects: coursesWithDetails.length,
+      activeSubjects: coursesWithDetails.filter(c => c.status === 'active').length,
+      uniqueSubjects: groupedSubjects.length
+    });
+  } catch (error) {
+    console.error('Error fetching teacher subjects:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
+    });
   }
 };
 
@@ -945,23 +1052,35 @@ export const getStudentAnalytics = async (req, res) => {
       
       const totalDays = attendanceRecords.length;
       const presentDays = attendanceRecords.filter(a => a.status === 'present' || a.status === 'late').length;
-      const attendance = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
-
+      
       // Calculate real average score from grades
       const grades = await Grade.find({ schoolId: req.schoolId, studentId: student._id });
-      const averageScore = grades.length > 0 
+      
+      // Check if we have enough data to calculate meaningful metrics
+      const hasEnoughAttendanceData = totalDays >= 5;
+      const hasEnoughGradeData = grades.length >= 3;
+      
+      // Calculate attendance only if we have enough data, otherwise show N/A
+      const attendance = hasEnoughAttendanceData 
+        ? (totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0)
+        : null; // null indicates "No data yet"
+      
+      const averageScore = hasEnoughGradeData
         ? Math.round(grades.reduce((sum, g) => sum + (g.score / g.maxScore * 100), 0) / grades.length)
-        : 0;
+        : null; // null indicates "No data yet"
 
       // Determine performance level
-      let performanceLevel = 'Good';
-      if (averageScore >= 90) performanceLevel = 'Excellent';
-      else if (averageScore >= 75) performanceLevel = 'Good';
-      else if (averageScore >= 60) performanceLevel = 'Average';
-      else performanceLevel = 'Needs Improvement';
+      let performanceLevel = 'No Data';
+      if (averageScore !== null) {
+        if (averageScore >= 90) performanceLevel = 'Excellent';
+        else if (averageScore >= 75) performanceLevel = 'Good';
+        else if (averageScore >= 60) performanceLevel = 'Average';
+        else performanceLevel = 'Needs Improvement';
+      }
 
-      // Check if at-risk (attendance < 75)
-      const isAtRisk = attendance < 75 || averageScore < 60;
+      // Check if at-risk - only if we have sufficient data
+      const isAtRisk = (hasEnoughAttendanceData && attendance < 75) || 
+                       (hasEnoughGradeData && averageScore < 60);
 
       return {
         id: student._id,
@@ -972,12 +1091,13 @@ export const getStudentAnalytics = async (req, res) => {
         phone: student.phone,
         dateOfBirth: student.dateOfBirth,
         enrolledDate: student.createdAt,
-        attendance: attendance,
-        averageScore: averageScore,
+        attendance: attendance !== null ? attendance : 0, // Display 0 but don't use for risk calculation
+        averageScore: averageScore !== null ? averageScore : 0, // Display 0 but don't use for risk calculation
         performanceLevel: performanceLevel,
         totalPaid: totalPaid,
         pendingPayments: pendingPayments,
-        isAtRisk: isAtRisk
+        isAtRisk: isAtRisk,
+        hasEnoughData: hasEnoughAttendanceData || hasEnoughGradeData // New field to indicate data sufficiency
       };
     }));
 
@@ -1023,16 +1143,30 @@ export const getAtRiskStudents = async (req, res) => {
       
       const totalDays = attendanceRecords.length;
       const presentDays = attendanceRecords.filter(a => a.status === 'present' || a.status === 'late').length;
-      const attendance = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
-
+      
       // Calculate real average score
       const grades = await Grade.find({ schoolId: req.schoolId, studentId: student._id });
+      
+      // IMPORTANT: Only calculate risk if there's sufficient data
+      // Minimum threshold: at least 5 attendance records OR at least 3 grades
+      const hasEnoughAttendanceData = totalDays >= 5;
+      const hasEnoughGradeData = grades.length >= 3;
+      
+      // Skip students without sufficient data - they're not at risk, just new/no assessments yet
+      if (!hasEnoughAttendanceData && !hasEnoughGradeData) {
+        return null;
+      }
+
+      const attendance = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
       const averageScore = grades.length > 0 
         ? Math.round(grades.reduce((sum, g) => sum + (g.score / g.maxScore * 100), 0) / grades.length)
         : 0;
 
-      const isLowAttendance = attendance < 75;
-      const isLowPerformance = averageScore < 60;
+      // Only flag attendance as low if we have enough data
+      const isLowAttendance = hasEnoughAttendanceData && attendance < 75;
+      // Only flag performance as low if we have enough data
+      const isLowPerformance = hasEnoughGradeData && averageScore < 60;
+      
       const isAtRisk = isLowAttendance || isLowPerformance;
 
       if (!isAtRisk) return null;
