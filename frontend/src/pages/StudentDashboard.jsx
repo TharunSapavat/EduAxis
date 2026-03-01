@@ -28,6 +28,10 @@ import StudentLibrary from '../components/student/StudentLibrary';
 import StudentLeave from '../components/student/StudentLeave';
 import StudentFees from '../components/student/StudentFees';
 import StudentMaterials from '../components/student/StudentMaterials';
+import CourseRegistration from '../components/student/CourseRegistration';
+import QuizModule from '../components/student/QuizModule';
+import StudentFeedbackDashboard from '../components/student/StudentFeedbackDashboard';
+import PerformanceAnalytics from '../components/student/PerformanceAnalytics';
 
 import { STUDENT_MODULES } from '../config/studentModules';
 
@@ -394,25 +398,33 @@ export default function StudentDashboard() {
     }
   };
 
-  // Fetch Courses
+  // Fetch Courses (now fetches enrollments to show only enrolled courses)
   const fetchCourses = useCallback(async () => {
     try {
       setCoursesLoading(true);
-      const response = await studentAPI.getCourses();
-      console.log('Courses response:', response.data);
+      const studentId = user?._id || user?.id;
+      const response = await studentAPI.getEnrollments(studentId);
+      console.log('Enrollments response:', response.data);
+      
       if (response.data.success) {
-        setCourses(response.data.courses || []);
+        // Map enrollments to course format with enrollmentId
+        const enrolledCourses = (response.data.data || []).map(enrollment => ({
+          ...enrollment.courseId,
+          enrollmentId: enrollment._id, // Add enrollmentId for dropping courses
+          enrollmentStatus: enrollment.status
+        }));
+        setCourses(enrolledCourses);
       } else {
         showNotification(response.data.message || 'Failed to load courses', 'error');
       }
     } catch (error) {
-      console.error('Error fetching courses:', error);
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to load courses';
+      console.error('Error fetching enrolled courses:', error);
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to load enrolled courses';
       showNotification(errorMsg, 'error');
     } finally {
       setCoursesLoading(false);
     }
-  }, [showNotification]);
+  }, [showNotification, user]);
 
   // Fetch Course Details
   const fetchCourseDetails = useCallback(async (courseId) => {
@@ -441,6 +453,29 @@ export default function StudentDashboard() {
       fetchCourseDetails(course._id);
     }
   };
+
+  // Handle dropping/unenrolling from a course
+  const handleDropCourse = useCallback(async (enrollmentId, courseName) => {
+    if (!window.confirm(`Are you sure you want to drop "${courseName}"? This action cannot be undone.`)) {
+      return;
+    }
+    
+    try {
+      const response = await studentAPI.dropCourse(enrollmentId);
+      
+      if (response.data.success) {
+        showNotification('Course dropped successfully', 'success');
+        // Refresh the courses list
+        fetchCourses();
+      } else {
+        showNotification(response.data.message || 'Failed to drop course', 'error');
+      }
+    } catch (error) {
+      console.error('Error dropping course:', error);
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to drop course';
+      showNotification(errorMsg, 'error');
+    }
+  }, [showNotification, fetchCourses]);
 
   // Fetch Grades
   const fetchGrades = useCallback(async () => {
@@ -615,6 +650,8 @@ export default function StudentDashboard() {
           courses={courses} 
           coursesLoading={coursesLoading}
           openCourseDetails={openCourseDetails}
+          handleDropCourse={handleDropCourse}
+          showNotification={showNotification}
         />;
       
       case '/student/assignments':
@@ -702,6 +739,30 @@ export default function StudentDashboard() {
 
       case '/student/materials':
         return <StudentMaterials />;
+
+      case '/student/enrollment':
+        return <CourseRegistration 
+          studentId={user?._id}
+          showNotification={showNotification}
+        />;
+
+      case '/student/quiz':
+        return <QuizModule 
+          studentId={user?._id}
+          showNotification={showNotification}
+        />;
+
+      case '/student/feedback':
+        return <StudentFeedbackDashboard 
+          studentId={user?._id}
+          showNotification={showNotification}
+        />;
+
+      case '/student/performance':
+        return <PerformanceAnalytics 
+          studentId={user?._id}
+          showNotification={showNotification}
+        />;
 
       default:
         return (

@@ -113,6 +113,30 @@ export const studentAPI = {
   getLeaveRequests: () => api.get('/student/leave-requests'),
   // Study Materials
   getStudyMaterials: () => api.get('/student/study-materials'),
+  
+  // NEW: Enrollment & Course Registration
+  getEnrollments: (studentId) => api.get(`/enrollments/student/${studentId}`),
+  getAvailableCourses: (studentId) => api.get(`/enrollments/available/${studentId}`),
+  enrollCourse: (data) => api.post('/enrollments/enroll', data),
+  dropCourse: (enrollmentId) => api.delete(`/enrollments/drop/${enrollmentId}`),
+  
+  // NEW: Quiz APIs
+  getQuiz: (quizId) => api.get(`/quiz/${quizId}`),
+  checkQuizPrerequisite: (quizId, studentId) => api.get(`/quiz/check/${quizId}/${studentId}`),
+  startQuizAttempt: (data) => api.post('/quiz/attempt/start', data),
+  submitQuizAttempt: (data) => api.post('/quiz/attempt/submit', data),
+  getQuizResults: (attemptId) => api.get(`/quiz/results/${attemptId}`),
+  getQuizAttempts: (studentId, courseId) => api.get(`/quiz/attempts/${studentId}/${courseId}`),
+  
+  // NEW: Feedback APIs
+  submitFeedback: (data) => api.post('/feedback', data),
+  getMyFeedback: (studentId) => api.get(`/feedback/student/${studentId}`),
+  getCourseFeedback: (courseId) => api.get(`/feedback/course/${courseId}`),
+  getModuleFeedback: (moduleId) => api.get(`/feedback/module/${moduleId}`),
+  
+  // NEW: Performance Analytics
+  getStudentPerformance: (studentId, courseId) => api.get(`/analytics/student/${studentId}/${courseId}`),
+  getPerformanceTrend: (studentId, courseId) => api.get(`/analytics/trend/${studentId}/${courseId}`),
 };
 
 // Teacher APIs
@@ -200,7 +224,20 @@ export const adminAPI = {
   getTimetables: (params) => api.get('/admin/timetables', { params }),
   saveTimetable: (data) => api.post('/admin/timetables', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
   updateTimetable: (id, updates) => api.patch(`/admin/timetables/${id}`, updates),
-  deleteTimetable: (id) => api.delete(`/admin/timetables/${id}`)
+  deleteTimetable: (id) => api.delete(`/admin/timetables/${id}`),
+  
+  // NEW: Feedback APIs
+  getFeedbackDashboard: () => api.get('/feedback/dashboard'),
+  reviewFeedback: (feedbackId, data) => api.put(`/feedback/${feedbackId}/review`, data),
+  
+  // NEW: Enrollment Management  
+  getEnrollmentStats: (courseId) => api.get(`/enrollments/stats/${courseId}`),
+  updateEnrollment: (enrollmentId, data) => api.put(`/enrollments/${enrollmentId}`, data),
+  
+  // NEW: Analytics APIs
+  getAtRiskStudentsForCourse: (courseId) => api.get(`/analytics/at-risk/${courseId}`),
+  getClassPerformanceReport: (courseId) => api.get(`/analytics/class-report/${courseId}`),
+  updateStudentPerformance: (studentId, courseId) => api.post(`/analytics/update/${studentId}/${courseId}`),
 };
 
 // Super Admin APIs

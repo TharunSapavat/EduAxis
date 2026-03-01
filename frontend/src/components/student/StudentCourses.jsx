@@ -1,9 +1,11 @@
-import { BookOpen, FileText } from 'lucide-react';
+import { BookOpen, Trash2 } from 'lucide-react';
 
 export default function StudentCourses({ 
   courses, 
   coursesLoading, 
-  openCourseDetails 
+  openCourseDetails,
+  handleDropCourse,
+  showNotification
 }) {
   return (
     <div>
@@ -50,6 +52,14 @@ export default function StudentCourses({
                   className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium text-sm"
                 >
                   View Details
+                </button>
+                <button 
+                  onClick={() => handleDropCourse(course.enrollmentId, course.name)}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium text-sm flex items-center space-x-2"
+                  title="Drop this course"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Drop</span>
                 </button>
               </div>
             </div>

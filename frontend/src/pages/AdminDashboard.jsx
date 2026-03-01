@@ -12,6 +12,10 @@ import NotificationToast from '../components/NotificationToast';
 import ClassManagement from '../components/ClassManagement.jsx';
 import AdminLibraryManagement from '../components/adminComp/AdminLibraryManagement.jsx';
 import TeacherSubjects from '../components/adminComp/TeacherSubjects.jsx';
+import FeedbackDashboard from '../components/adminComp/FeedbackDashboard.jsx';
+import LeaveImpactDashboard from '../components/adminComp/LeaveImpactDashboard.jsx';
+import FinancialAnalytics from '../components/adminComp/FinancialAnalytics.jsx';
+import BulkImportExport from '../components/adminComp/BulkImportExport.jsx';
 
 // User creation validation schema
 const userSchema = yup.object({
@@ -811,10 +815,13 @@ export default function AdminDashboard() {
     { id: 'courses', icon: BookOpen, title: 'Course Management', description: 'Create and manage courses' },
     { id: 'teacher-subjects', icon: Award, title: 'Teacher Subjects', description: 'View subjects taught by teachers' },
     { id: 'fees', icon: IndianRupee, title: 'Fee Management', description: 'Manage fee structure & payments' },
+    { id: 'financial-analytics', icon: BarChart3, title: 'Financial Analytics', description: 'Track payments & collections' },
     { id: 'classes', icon: GraduationCap, title: 'Class Management', description: 'Manage classes and sections' },
     { id: 'library', icon: Library, title: 'Library Management', description: 'Upload and manage library resources' },
     { id: 'leave', icon: Mail, title: 'Leave Requests', description: 'Review leave applications' },
-     
+    { id: 'leave-impact', icon: Calendar, title: 'Leave Impact', description: 'Analyze leave impacts' },
+    { id: 'feedback', icon: FileText, title: 'Feedback Dashboard', description: 'Review student feedback' },
+    { id: 'bulk-import', icon: Database, title: 'Bulk Import/Export', description: 'Import/export data' },
   ];
 
   const renderMainContent = () => {
@@ -2730,6 +2737,18 @@ export default function AdminDashboard() {
             )}
           </div>
         );
+
+      case '/admin/financial-analytics':
+        return <FinancialAnalytics showNotification={showNotification} />;
+
+      case '/admin/leave-impact':
+        return <LeaveImpactDashboard showNotification={showNotification} />;
+
+      case '/admin/feedback':
+        return <FeedbackDashboard showNotification={showNotification} />;
+
+      case '/admin/bulk-import':
+        return <BulkImportExport showNotification={showNotification} />;
 
       default:
         return (

@@ -25,6 +25,10 @@ import teacherRoutes from './routes/teacherRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import messageRoutes from './routes/messageRoutes.js';
 import superAdminRoutes from './routes/superAdminRoutes.js';
+import enrollmentRoutes from './routes/enrollmentRoutes.js';
+import quizRoutes from './routes/quizRoutes.js';
+import feedbackRoutes from './routes/feedbackRoutes.js';
+import analyticsRoutes from './routes/analyticsRoutes.js';
 
 // Import middleware
 import errorHandler, { notFound } from './middleware/errorHandler.js';
@@ -180,6 +184,10 @@ app.use('/api/student', studentRoutes);
 app.use('/api/teacher', teacherRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/enrollments', enrollmentRoutes);
+app.use('/api/quiz', quizRoutes);
+app.use('/api/feedback', feedbackRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // 404 handler - must be after all routes
 app.use(notFound);
