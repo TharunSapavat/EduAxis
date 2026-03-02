@@ -236,6 +236,11 @@ export const adminAPI = {
   getAtRiskStudentsForCourse: (courseId) => api.get(`/analytics/at-risk/${courseId}`),
   getClassPerformanceReport: (courseId) => api.get(`/analytics/class-report/${courseId}`),
   updateStudentPerformance: (studentId, courseId) => api.post(`/analytics/update/${studentId}/${courseId}`),
+  
+  // NEW: Subscription/Plan APIs
+  getAvailablePlans: () => api.get('/administrator/subscription/plans'),
+  getCurrentSubscription: () => api.get('/administrator/subscription/current'),
+  upgradePlan: (planData) => api.post('/administrator/subscription/upgrade', planData),
 };
 
 // Super Admin APIs
@@ -256,6 +261,11 @@ export const superAdminAPI = {
   // Subscription Management
   updateSchoolSubscription: (id, subscriptionData) => 
     api.patch(`/superadmin/schools/${id}/subscription`, subscriptionData),
+  
+  // Subscription Analytics (Phase 1)
+  getSubscriptionAnalytics: () => api.get('/superadmin/analytics/subscriptions'),
+  getRevenueTrends: (months = 6) => api.get('/superadmin/analytics/revenue-trends', { params: { months } }),
+  getSubscriptionsList: (params) => api.get('/superadmin/analytics/subscriptions-list', { params }),
 };
 
 export default api;

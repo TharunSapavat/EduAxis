@@ -9,6 +9,7 @@ import Remark from '../models/Remark.js';
 import LeaveRequest from '../models/LeaveRequest.js';
 import LibraryResource from '../models/LibraryResource.js';
 import Timetable from '../models/Timetable.js';
+import School from '../models/School.js';
 import { assertSameSchoolStudent } from '../middleware/tenantGuards.js';
 
 const parseCSVLine = (line) => {
@@ -1910,5 +1911,232 @@ export const getStudentDetails = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Get available subscription plans
+// @route   GET /api/administrator/subscription/plans
+// @access  Admin
+export const getAvailablePlans = async (req, res) => {
+  try {
+    const plans = [
+      {
+        id: 'basic',
+        name: 'Basic',
+        monthlyPrice: 2999,
+        annualPrice: 29990,
+        description: 'Perfect for small schools',
+        features: [
+          'Up to 500 students',
+          'Up to 50 teachers',
+          'Email support'
+        ],
+        limitations: []
+      },
+      {
+        id: 'premium',
+        name: 'Premium',
+        monthlyPrice: 5999,
+        annualPrice: 59990,
+        description: 'For growing schools',
+        features: [
+          'Up to 2000 students',
+          'Up to 200 teachers',
+          'Priority email & phone support'
+        ],
+        limitations: []
+      },
+      {
+        id: 'enterprise',
+        name: 'Enterprise',
+        monthlyPrice: 9999,
+        annualPrice: 99990,
+        description: 'For large-scale institutions',
+        features: [
+          'Unlimited students & teachers',
+          'Custom API access',
+          'Dedicated account manager',
+          '24/7 priority support',
+          'Custom integrations available'
+        ],
+        limitations: []
+      }
+    ];
+
+    res.json({
+      success: true,
+      data: { plans }
+    });
+  } catch (error) {
+    console.error('Error fetching plans:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Get current school subscription details
+// @route   GET /api/administrator/subscription/current
+// @access  Admin
+export const getCurrentSubscription = async (req, res) => {
+  try {
+    const school = await School.findById(req.schoolId);
+    
+    if (!school) {
+      return res.status(404).json({ success: false, message: 'School not found' });
+    }
+
+    const currentPlan = school.subscription.plan;
+    const daysRemaining = school.subscription.endDate 
+      ? Math.ceil((new Date(school.subscription.endDate) - new Date()) / (1000 * 60 * 60 * 24))
+      : 0;
+
+    res.json({
+      success: true,
+      data: {
+        currentPlan: currentPlan,
+        startDate: school.subscription.startDate,
+        endDate: school.subscription.endDate,
+        maxStudents: school.subscription.maxStudents,
+        totalStudents: school.stats.totalStudents,
+        billingCycle: school.billing.billingCycle,
+        monthlyPrice: school.billing.monthlyPrice,
+        annualPrice: school.billing.annualPrice,
+        paymentStatus: school.billing.paymentStatus,
+        lastPaymentDate: school.billing.lastPaymentDate,
+        nextPaymentDate: school.billing.nextPaymentDate,
+        daysRemaining: daysRemaining,
+        isTrialExpired: currentPlan === 'trial' && daysRemaining < 0
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching subscription:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Process plan upgrade/payment
+// @route   POST /api/administrator/subscription/upgrade
+// @access  Admin
+export const upgradePlan = async (req, res) => {
+  try {
+    // Validate request data
+    if (!req.schoolId) {
+      return res.status(401).json({ success: false, message: 'School ID not found in session' });
+    }
+
+    const { newPlan, billingCycle = 'monthly', transactionId } = req.body;
+
+    // Validate plan
+    const validPlans = ['basic', 'premium', 'enterprise'];
+    if (!validPlans.includes(newPlan)) {
+      return res.status(400).json({ success: false, message: 'Invalid plan selected' });
+    }
+
+    // Plan pricing
+    const planPricing = {
+      basic: { monthlyPrice: 2999, annualPrice: 29990, maxStudents: 500 },
+      premium: { monthlyPrice: 5999, annualPrice: 59990, maxStudents: 2000 },
+      enterprise: { monthlyPrice: 9999, annualPrice: 99990, maxStudents: null }
+    };
+
+    const pricing = planPricing[newPlan];
+    const amountToPay = billingCycle === 'annual' ? pricing.annualPrice : pricing.monthlyPrice;
+
+    const school = await School.findById(req.schoolId);
+    if (!school) {
+      return res.status(404).json({ success: false, message: 'School not found' });
+    }
+
+    // Calculate subscription end date
+    const startDate = new Date();
+    const endDate = new Date();
+    if (billingCycle === 'annual') {
+      endDate.setFullYear(endDate.getFullYear() + 1);
+    } else {
+      endDate.setMonth(endDate.getMonth() + 1);
+    }
+
+    // Create payment record
+    const paymentMethodMap = {
+      'credit_card': 'Credit Card',
+      'debit_card': 'Debit Card',
+      'net_banking': 'Bank Transfer',
+      'upi': 'UPI',
+      'bank_transfer': 'Bank Transfer',
+      'Credit Card': 'Credit Card',
+      'Debit Card': 'Debit Card',
+      'Bank Transfer': 'Bank Transfer',
+      'UPI': 'UPI'
+    };
+
+    const mappedPaymentMethod = paymentMethodMap[req.body.paymentMethod] || 'Credit Card';
+
+    const paymentData = {
+      schoolId: req.schoolId,
+      studentId: null,
+      studentName: school.name,
+      amount: amountToPay,
+      paymentMethod: mappedPaymentMethod,
+      paymentDate: new Date(),
+      status: 'completed',
+      paymentType: 'subscription',
+      feeTitle: `${newPlan.charAt(0).toUpperCase() + newPlan.slice(1)} Plan - ${billingCycle === 'annual' ? 'Annual' : 'Monthly'}`,
+      description: `Subscription payment for ${newPlan} plan`
+    };
+
+    if (transactionId) {
+      paymentData.transactionId = transactionId;
+    }
+
+    const payment = new Payment(paymentData);
+    await payment.save();
+
+    // Update school subscription
+    school.subscription.plan = newPlan;
+    school.subscription.startDate = startDate;
+    school.subscription.endDate = endDate;
+    school.subscription.maxStudents = pricing.maxStudents;
+    school.billing.monthlyPrice = pricing.monthlyPrice;
+    school.billing.annualPrice = pricing.annualPrice;
+    school.billing.billingCycle = billingCycle;
+    school.billing.paymentStatus = 'active';
+    school.billing.lastPaymentDate = new Date();
+    school.billing.nextPaymentDate = endDate;
+    school.billing.failedPaymentAttempts = 0;
+
+    await school.save();
+
+    // Emit real-time event
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('plan:upgraded', {
+        schoolId: req.schoolId,
+        schoolName: school.name,
+        newPlan: newPlan,
+        amount: amountToPay,
+        billingCycle: billingCycle,
+        timestamp: new Date()
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Successfully upgraded to ${newPlan} plan`,
+      data: {
+        plan: newPlan,
+        startDate: startDate,
+        endDate: endDate,
+        amountPaid: amountToPay,
+        billingCycle: billingCycle,
+        paymentId: payment._id
+      }
+    });
+  } catch (error) {
+    console.error('Plan upgrade error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error processing plan upgrade', 
+      error: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 };

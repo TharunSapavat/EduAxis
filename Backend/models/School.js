@@ -92,12 +92,42 @@ const schoolSchema = new mongoose.Schema({
   billing: {
     pricingModel: {
       type: String,
-      enum: ['per_student'],
+      enum: ['per_student', 'per_course', 'flat_fee'],
       default: 'per_student'
     },
     currency: {
       type: String,
       default: 'INR'
+    },
+    monthlyPrice: {
+      type: Number,
+      default: 0
+    },
+    annualPrice: {
+      type: Number,
+      default: 0
+    },
+    billingCycle: {
+      type: String,
+      enum: ['monthly', 'annual'],
+      default: 'monthly'
+    },
+    paymentStatus: {
+      type: String,
+      enum: ['active', 'overdue', 'failed', 'cancelled'],
+      default: 'active'
+    },
+    lastPaymentDate: {
+      type: Date,
+      default: null
+    },
+    nextPaymentDate: {
+      type: Date,
+      default: null
+    },
+    failedPaymentAttempts: {
+      type: Number,
+      default: 0
     },
     custom: {
       type: Boolean,

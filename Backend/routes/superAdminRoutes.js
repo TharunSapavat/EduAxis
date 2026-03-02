@@ -8,7 +8,10 @@ import {
   deleteSchool,
   updateSchoolStatus,
   updateSchoolSubscription,
-  getPlatformStatistics
+  getPlatformStatistics,
+  getSubscriptionAnalytics,
+  getRevenueTrends,
+  getSubscriptionsList
 } from '../controllers/superAdminController.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
 
@@ -21,6 +24,11 @@ router.use(roleMiddleware('superadmin'));
 // Dashboard and statistics
 router.get('/dashboard', getSuperAdminDashboard);
 router.get('/statistics', getPlatformStatistics);
+
+// Subscription and revenue analytics (Phase 1)
+router.get('/analytics/subscriptions', getSubscriptionAnalytics);
+router.get('/analytics/revenue-trends', getRevenueTrends);
+router.get('/analytics/subscriptions-list', getSubscriptionsList);
 
 // School management
 router.route('/schools')

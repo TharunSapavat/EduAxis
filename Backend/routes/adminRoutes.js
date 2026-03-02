@@ -29,7 +29,10 @@ import {
   getStudentDetails,
   getLeaveRequests,
   decideLeaveRequest,
-  bulkImportCSV
+  bulkImportCSV,
+  getAvailablePlans,
+  getCurrentSubscription,
+  upgradePlan
 } from '../controllers/adminController.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
 import { uploadCSVFile } from '../config/multer.js';
@@ -91,5 +94,10 @@ router.get('/class/students/:id', getStudentDetails);
 router.get('/leave-requests', getLeaveRequests);
 router.patch('/leave-requests/:id', decideLeaveRequest);
 router.post('/bulk-import', uploadCSVFile.single('file'), bulkImportCSV);
+
+// Subscription/Plan Management Routes
+router.get('/subscription/plans', getAvailablePlans);
+router.get('/subscription/current', getCurrentSubscription);
+router.post('/subscription/upgrade', upgradePlan);
 
 export default router;

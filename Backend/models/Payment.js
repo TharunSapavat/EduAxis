@@ -10,7 +10,10 @@ const paymentSchema = new mongoose.Schema({
   studentId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: [true, 'Student ID is required']
+    required: function() {
+      // Only required if not a subscription payment
+      return this.paymentType !== 'subscription';
+    }
   },
   studentName: {
     type: String,
@@ -18,12 +21,18 @@ const paymentSchema = new mongoose.Schema({
   },
   studentEmail: {
     type: String,
-    required: true
+    required: function() {
+      // Only required if not a subscription payment
+      return this.paymentType !== 'subscription';
+    }
   },
   feeId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Fee',
-    required: [true, 'Fee ID is required']
+    required: function() {
+      // Only required if not a subscription payment
+      return this.paymentType !== 'subscription';
+    }
   },
   feeTitle: {
     type: String,
@@ -37,8 +46,17 @@ const paymentSchema = new mongoose.Schema({
   paymentMethod: {
     type: String,
     required: [true, 'Payment method is required'],
-    enum: ['Cash', 'Credit Card', 'Debit Card', 'Bank Transfer', 'Online Payment', 'Check', 'UPI', 'Other'],
+    enum: ['Cash', 'Credit Card', 'Debit Card', 'Bank Transfer', 'Online Payment', 'Check', 'UPI', 'Other', 'credit_card', 'debit_card', 'net_banking', 'upi', 'bank_transfer'],
     default: 'Cash'
+  },
+  paymentType: {
+    type: String,
+    enum: ['fee', 'subscription'],
+    default: 'fee'
+  },
+  description: {
+    type: String,
+    trim: true
   },
   transactionId: {
     type: String,

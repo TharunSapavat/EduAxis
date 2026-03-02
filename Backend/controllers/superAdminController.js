@@ -545,3 +545,202 @@ export const getPlatformStatistics = catchAsync(async (req, res) => {
     }
   });
 });
+// @desc    Get subscription analytics (MRR, ARR, active subscriptions, plan breakdown)
+// @route   GET /api/superadmin/analytics/subscriptions
+// @access  Super Admin
+export const getSubscriptionAnalytics = catchAsync(async (req, res) => {
+  try {
+    const schools = await School.find({ status: { $ne: 'suspended' } });
+    
+    // Calculate subscription metrics
+    let totalMRR = 0;  // Monthly Recurring Revenue
+    let totalARR = 0;  // Annual Recurring Revenue
+    const activeSubscriptions = schools.filter(s => s.subscription.plan !== 'trial' && s.billing.paymentStatus === 'active').length;
+    const overduPayments = schools.filter(s => s.billing.paymentStatus === 'overdue').length;
+    
+    // Plan breakdown
+    const planBreakdown = {
+      trial: { count: 0, revenue: 0 },
+      basic: { count: 0, revenue: 0 },
+      premium: { count: 0, revenue: 0 },
+      enterprise: { count: 0, revenue: 0 }
+    };
+    
+    // Calculate MRR and ARR
+    schools.forEach(school => {
+      const plan = school.subscription.plan;
+      planBreakdown[plan].count++;
+      
+      // Calculate month's revenue
+      if (school.billing.billingCycle === 'monthly') {
+        totalMRR += school.billing.monthlyPrice || 0;
+        totalARR += (school.billing.monthlyPrice || 0) * 12;
+      } else if (school.billing.billingCycle === 'annual') {
+        totalMRR += (school.billing.annualPrice || 0) / 12;
+        totalARR += school.billing.annualPrice || 0;
+      }
+      
+      // Plan-wise revenue
+      if (school.billing.billingCycle === 'monthly') {
+        planBreakdown[plan].revenue += school.billing.monthlyPrice || 0;
+      } else {
+        planBreakdown[plan].revenue += (school.billing.annualPrice || 0) / 12;
+      }
+    });
+    
+    res.json({
+      success: true,
+      data: {
+        metrics: {
+          totalMRR: Math.round(totalMRR * 100) / 100,    // Monthly revenue
+          totalARR: Math.round(totalARR * 100) / 100,    // Annual revenue
+          activeSubscriptions,
+          overduPayments,
+          totalSchools: schools.length,
+          trialSchools: planBreakdown.trial.count,
+          paidSchools: activeSubscriptions + overduPayments
+        },
+        planBreakdown: planBreakdown,
+        currency: 'INR'
+      }
+    });
+  } catch (error) {
+    console.error('Subscription analytics error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+});
+
+// @desc    Get revenue trends (last 6-12 months)
+// @route   GET /api/superadmin/analytics/revenue-trends
+// @access  Super Admin
+export const getRevenueTrends = catchAsync(async (req, res) => {
+  try {
+    const { months = 6 } = req.query;
+    const monthsNum = parseInt(months) || 6;
+    
+    // Get all schools and their payment history
+    const schools = await School.find({ status: { $ne: 'suspended' } });
+    
+    // Generate monthly data for last N months
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const trendData = [];
+    
+    for (let i = monthsNum - 1; i >= 0; i--) {
+      const date = new Date();
+      date.setMonth(date.getMonth() - i);
+      const year = date.getFullYear();
+      const month = date.getMonth();
+      
+      let monthlyRevenue = 0;
+      let subscriptionCount = 0;
+      
+      // Calculate revenue for this month
+      schools.forEach(school => {
+        // Check if subscription was active in this month
+        const subStartDate = new Date(school.subscription.startDate);
+        const paymentDate = school.billing.lastPaymentDate ? new Date(school.billing.lastPaymentDate) : subStartDate;
+        
+        if (subStartDate.getFullYear() < year || 
+            (subStartDate.getFullYear() === year && subStartDate.getMonth() <= month)) {
+          
+          if (school.billing.billingCycle === 'monthly') {
+            monthlyRevenue += school.billing.monthlyPrice || 0;
+          } else if (school.billing.billingCycle === 'annual') {
+            monthlyRevenue += (school.billing.annualPrice || 0) / 12;
+          }
+          
+          if (school.subscription.plan !== 'trial') {
+            subscriptionCount++;
+          }
+        }
+      });
+      
+      trendData.push({
+        month: monthNames[month],
+        revenue: Math.round(monthlyRevenue * 100) / 100,
+        subscriptions: subscriptionCount
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        trends: trendData,
+        currency: 'INR',
+        period: `Last ${monthsNum} months`
+      }
+    });
+  } catch (error) {
+    console.error('Revenue trends error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+});
+
+// @desc    Get subscription list with payment status
+// @route   GET /api/superadmin/analytics/subscriptions-list
+// @access  Super Admin
+export const getSubscriptionsList = catchAsync(async (req, res) => {
+  try {
+    const { page = 1, limit = 10, paymentStatus = 'all', plan = 'all' } = req.query;
+    
+    const query = { status: { $ne: 'suspended' } };
+    
+    if (paymentStatus !== 'all') {
+      query['billing.paymentStatus'] = paymentStatus;
+    }
+    
+    if (plan !== 'all') {
+      query['subscription.plan'] = plan;
+    }
+    
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    const schools = await School.find(query)
+      .select('name code email subscription billing stats status createdAt')
+      .sort({ 'billing.nextPaymentDate': 1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+    
+    const total = await School.countDocuments(query);
+    
+    // Format subscription data
+    const subscriptionsList = schools.map(school => ({
+      _id: school._id,
+      name: school.name,
+      code: school.code,
+      email: school.email,
+      status: school.status,
+      plan: school.subscription.plan,
+      startDate: school.subscription.startDate,
+      endDate: school.subscription.endDate,
+      maxStudents: school.subscription.maxStudents,
+      currentStudents: school.stats.totalStudents,
+      monthlyPrice: school.billing.monthlyPrice || 0,
+      annualPrice: school.billing.annualPrice || 0,
+      billingCycle: school.billing.billingCycle,
+      paymentStatus: school.billing.paymentStatus,
+      lastPaymentDate: school.billing.lastPaymentDate,
+      nextPaymentDate: school.billing.nextPaymentDate,
+      failedPaymentAttempts: school.billing.failedPaymentAttempts,
+      monthlyRevenue: school.billing.billingCycle === 'monthly' 
+        ? school.billing.monthlyPrice 
+        : (school.billing.annualPrice || 0) / 12
+    }));
+    
+    res.json({
+      success: true,
+      data: {
+        subscriptions: subscriptionsList,
+        pagination: {
+          total,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          pages: Math.ceil(total / parseInt(limit))
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Subscriptions list error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+});

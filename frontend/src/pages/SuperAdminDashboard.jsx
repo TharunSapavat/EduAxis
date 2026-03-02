@@ -14,6 +14,7 @@ import {
 import { Pie, Line } from 'react-chartjs-2';
 import DashboardHeader from '../components/DashboardHeader';
 import DashboardFooter from '../components/DashboardFooter';
+import SuperAdminAnalytics from '../components/SuperAdminAnalytics';
 import api from '../services/api';
 import {
   LayoutDashboard,
@@ -65,6 +66,7 @@ const SuperAdminDashboard = () => {
   // Sidebar modules
   const modules = [
     { id: 'home', title: 'Dashboard', icon: LayoutDashboard, path: '/superadmin/home' },
+    { id: 'analytics', title: 'Subscriptions', icon: TrendingUp, path: '/superadmin/analytics' },
     { id: 'schools', title: 'Schools', icon: Building2, path: '/superadmin/schools' },
     { id: 'statistics', title: 'Statistics', icon: BarChart3, path: '/superadmin/statistics' },
     { id: 'settings', title: 'Settings', icon: Settings, path: '/superadmin/settings' },
@@ -130,7 +132,7 @@ const SuperAdminDashboard = () => {
         return (
           <div>
             {/* Welcome Banner */}
-            <div className="bg-gradient-to-r from-red-600 to-pink-600 rounded-2xl p-8 mb-8 text-white shadow-lg">
+            <div className="bg-linear-to-r from-red-600 to-pink-600 rounded-2xl p-8 mb-8 text-white shadow-lg">
               <h1 className="text-3xl font-bold mb-2">Platform Control Center</h1>
               <p className="text-red-100">Complete oversight of all schools and platform-wide operations.</p>
             </div>
@@ -195,7 +197,7 @@ const SuperAdminDashboard = () => {
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {Object.entries(dashboardData?.subscriptionStats || {}).map(([plan, count]) => (
-                  <div key={plan} className="text-center p-4 bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg border border-slate-200">
+                  <div key={plan} className="text-center p-4 bg-linear-to-br from-slate-50 to-slate-100 rounded-lg border border-slate-200">
                     <div className="text-3xl font-bold text-slate-900">{count}</div>
                     <div className="text-sm text-slate-600 capitalize mt-1">{plan} Plan</div>
                   </div>
@@ -371,6 +373,13 @@ const SuperAdminDashboard = () => {
                 </tbody>
               </table>
             </div>
+          </div>
+        );
+
+      case '/superadmin/analytics':
+        return (
+          <div>
+            <SuperAdminAnalytics />
           </div>
         );
 
@@ -804,7 +813,7 @@ const PlatformStatistics = ({ stats }) => {
 
   return (
     <div className="space-y-6">
-      <div className="bg-gradient-to-r from-red-600 via-rose-600 to-orange-500 rounded-2xl p-7 text-white shadow-lg">
+      <div className="bg-linear-to-r from-red-600 via-rose-600 to-orange-500 rounded-2xl p-7 text-white shadow-lg">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <div>
             <h2 className="text-2xl md:text-3xl font-bold">Platform Analytics Intelligence</h2>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Users, BookOpen, Calendar, FileText, BarChart3, Settings, Shield, Database, IndianRupee, Library, GraduationCap, ClipboardList, Home, X, Search, Filter, Eye, Mail, Phone, MapPin, Trash2, UserPlus, Lock, Award } from 'lucide-react';
+import { Users, BookOpen, Calendar, FileText, BarChart3, Settings, Shield, Database, IndianRupee, Library, GraduationCap, ClipboardList, Home, X, Search, Filter, Eye, Mail, Phone, MapPin, Trash2, UserPlus, Lock, Award, CreditCard } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { adminAPI } from '../services/api';
 import { useForm } from 'react-hook-form';
@@ -16,6 +16,7 @@ import FeedbackDashboard from '../components/adminComp/FeedbackDashboard.jsx';
 
 import FinancialAnalytics from '../components/adminComp/FinancialAnalytics.jsx';
 import BulkImportExport from '../components/adminComp/BulkImportExport.jsx';
+import AdminPaymentPlans from '../components/adminComp/AdminPaymentPlans.jsx';
 
 // User creation validation schema
 const userSchema = yup.object({
@@ -824,6 +825,7 @@ export default function AdminDashboard() {
     { id: 'courses', icon: BookOpen, title: 'Course Management', description: 'Create and manage courses' },
     { id: 'teacher-subjects', icon: Award, title: 'Teacher Subjects', description: 'View subjects taught by teachers' },
     { id: 'fees', icon: IndianRupee, title: 'Fee Management', description: 'Manage fee structure & payments' },
+    { id: 'payment-plans', icon: CreditCard, title: 'Payment Plans', description: 'Subscribe to school plans' },
     { id: 'financial-analytics', icon: BarChart3, title: 'Financial Analytics', description: 'Track payments & collections' },
     { id: 'classes', icon: GraduationCap, title: 'Class Management', description: 'Manage classes and sections' },
     { id: 'library', icon: Library, title: 'Library Management', description: 'Upload and manage library resources' },
@@ -2762,6 +2764,9 @@ export default function AdminDashboard() {
 
       case '/administrator/financial-analytics':
         return <FinancialAnalytics showNotification={showNotification} />;
+
+      case '/administrator/payment-plans':
+        return <AdminPaymentPlans />;
 
       case '/administrator/feedback':
         return <FeedbackDashboard showNotification={showNotification} />;
