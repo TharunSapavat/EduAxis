@@ -13,7 +13,7 @@ import ClassManagement from '../components/ClassManagement.jsx';
 import AdminLibraryManagement from '../components/adminComp/AdminLibraryManagement.jsx';
 import TeacherSubjects from '../components/adminComp/TeacherSubjects.jsx';
 import FeedbackDashboard from '../components/adminComp/FeedbackDashboard.jsx';
-import LeaveImpactDashboard from '../components/adminComp/LeaveImpactDashboard.jsx';
+
 import FinancialAnalytics from '../components/adminComp/FinancialAnalytics.jsx';
 import BulkImportExport from '../components/adminComp/BulkImportExport.jsx';
 
@@ -280,6 +280,9 @@ export default function AdminDashboard() {
   const leaveRequestsPerPage = 5;
   const [notification, setNotification] = useState(null);
   const [processingLeaveIds, setProcessingLeaveIds] = useState({});
+  const [leaveRejectionReason, setLeaveRejectionReason] = useState({});
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [selectedLeaveForReject, setSelectedLeaveForReject] = useState(null);
 
   const showNotification = (message, type = 'success') => {
     setNotification({ message, type });
@@ -422,7 +425,17 @@ export default function AdminDashboard() {
           if (leaveStatusFilter !== 'all' && leaveStatusFilter !== updated.status) {
             return prev.filter(r => r._id !== id);
           }
-          return prev.map(r => (r._id === id ? { ...r, ...updated } : r));
+          return prev.map(r => {
+            if (r._id === id) {
+              // Merge updated data while preserving requesterId if it exists
+              return {
+                ...r,
+                ...updated,
+                requesterId: updated.requesterId || r.requesterId
+              };
+            }
+            return r;
+          });
         });
       }
     } catch (err) {
@@ -819,7 +832,6 @@ export default function AdminDashboard() {
     { id: 'classes', icon: GraduationCap, title: 'Class Management', description: 'Manage classes and sections' },
     { id: 'library', icon: Library, title: 'Library Management', description: 'Upload and manage library resources' },
     { id: 'leave', icon: Mail, title: 'Leave Requests', description: 'Review leave applications' },
-    { id: 'leave-impact', icon: Calendar, title: 'Leave Impact', description: 'Analyze leave impacts' },
     { id: 'feedback', icon: FileText, title: 'Feedback Dashboard', description: 'Review student feedback' },
     { id: 'bulk-import', icon: Database, title: 'Bulk Import/Export', description: 'Import/export data' },
   ];
@@ -2649,10 +2661,20 @@ export default function AdminDashboard() {
                         <p className="text-xs font-medium text-slate-700 mb-1">Reason:</p>
                         <p className="text-xs text-slate-700">{req.reason}</p>
                       </div>
-                      {req.adminRemarks && (
-                        <div className="mb-3 p-2 bg-blue-50 rounded border border-blue-200">
-                          <p className="text-xs font-medium text-slate-700 mb-1">Admin Remarks:</p>
-                          <p className="text-xs text-slate-700">{req.adminRemarks}</p>
+                      {req.reviewRemarks && (
+                        <div className={`mb-3 p-3 rounded border-l-4 ${
+                          req.status === 'rejected' 
+                            ? 'bg-red-50 border-red-500' 
+                            : 'bg-blue-50 border-blue-500'
+                        }`}>
+                          <p className={`text-xs font-medium mb-1 ${
+                            req.status === 'rejected' ? 'text-red-700' : 'text-blue-700'
+                          }`}>
+                            {req.status === 'rejected' ? 'Rejection Reason:' : 'Admin Remarks:'}
+                          </p>
+                          <p className={`text-xs ${
+                            req.status === 'rejected' ? 'text-red-600' : 'text-blue-600'
+                          }`}>{req.reviewRemarks}</p>
                         </div>
                       )}
                       <div className="text-xs text-slate-500 mb-2">Submitted: {new Date(req.createdAt).toLocaleString()}</div>
@@ -2670,7 +2692,11 @@ export default function AdminDashboard() {
                             {processingLeaveIds[req._id] ? 'Processing...' : 'Approve'}
                           </button>
                           <button
-                            onClick={() => handleLeaveDecision(req._id, 'reject', '')}
+                            onClick={() => {
+                              setSelectedLeaveForReject(req);
+                              setShowRejectModal(true);
+                              setLeaveRejectionReason({ [req._id]: '' });
+                            }}
                             disabled={!!processingLeaveIds[req._id]}
                             className={`flex-1 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium text-white ${
                               processingLeaveIds[req._id]
@@ -2740,9 +2766,6 @@ export default function AdminDashboard() {
 
       case '/admin/financial-analytics':
         return <FinancialAnalytics showNotification={showNotification} />;
-
-      case '/admin/leave-impact':
-        return <LeaveImpactDashboard showNotification={showNotification} />;
 
       case '/admin/feedback':
         return <FeedbackDashboard showNotification={showNotification} />;
@@ -2835,6 +2858,60 @@ export default function AdminDashboard() {
 
       {/* Footer */}
       <DashboardFooter />
+
+      {/* Reject Leave Modal */}
+      {showRejectModal && selectedLeaveForReject && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-slate-900 mb-4">Reject Leave Request</h3>
+            <p className="text-sm text-slate-600 mb-4">
+              {selectedLeaveForReject.requesterId?.name} - {new Date(selectedLeaveForReject.startDate).toLocaleDateString()} to {new Date(selectedLeaveForReject.endDate).toLocaleDateString()}
+            </p>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-slate-700 mb-2">Rejection Reason *</label>
+              <textarea
+                value={leaveRejectionReason[selectedLeaveForReject._id] || ''}
+                onChange={(e) => setLeaveRejectionReason({ ...leaveRejectionReason, [selectedLeaveForReject._id]: e.target.value })}
+                placeholder="Explain why this leave request is being rejected..."
+                rows="4"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none resize-none"
+                maxLength={300}
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                {(leaveRejectionReason[selectedLeaveForReject._id] || '').length}/300
+              </p>
+            </div>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowRejectModal(false);
+                  setSelectedLeaveForReject(null);
+                  setLeaveRejectionReason({});
+                }}
+                className="px-4 py-2 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const reason = leaveRejectionReason[selectedLeaveForReject._id] || '';
+                  if (!reason.trim()) {
+                    showNotification('Please provide a rejection reason', 'error');
+                    return;
+                  }
+                  handleLeaveDecision(selectedLeaveForReject._id, 'reject', reason);
+                  setShowRejectModal(false);
+                  setSelectedLeaveForReject(null);
+                  setLeaveRejectionReason({});
+                }}
+                className="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors font-medium"
+              >
+                Reject
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete User Confirmation Modal */}
       {showDeleteUserModal && (

@@ -172,7 +172,13 @@ const StudentLeave = ({
                 </div>
                 <p className="text-sm text-slate-700 mb-2"><span className="font-medium">Reason:</span> {req.reason}</p>
                 {req.reviewRemarks && (
-                  <p className="text-sm text-slate-600 mt-2 p-3 bg-slate-50 rounded"><span className="font-medium">Admin Remarks:</span> {req.reviewRemarks}</p>
+                  <p className={`text-sm mt-2 p-3 rounded border-l-4 ${
+                    req.status === 'rejected'
+                      ? 'bg-red-50 border-red-500 text-red-700'
+                      : 'bg-blue-50 border-blue-500 text-blue-700'
+                  }`}>
+                    <span className="font-medium">{req.status === 'rejected' ? 'Rejection Reason:' : 'Admin Remarks:'}</span> {req.reviewRemarks}
+                  </p>
                 )}
                 <p className="text-xs text-slate-500 mt-3">Submitted: {new Date(req.createdAt).toLocaleString()}</p>
               </div>

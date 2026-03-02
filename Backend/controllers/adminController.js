@@ -356,6 +356,11 @@ export const decideLeaveRequest = async (req, res) => {
     lr.reviewRemarks = remarks || '';
     await lr.save();
 
+    // Populate requesterId and return the updated document
+    const populatedLR = await LeaveRequest.findOne({ _id: id, schoolId: req.schoolId })
+      .populate('requesterId', 'name email role grade section')
+      .populate('reviewedBy', 'name');
+
     // Emit updates
     const io = req.app.get('io');
     if (io) {
@@ -368,7 +373,7 @@ export const decideLeaveRequest = async (req, res) => {
       });
     }
 
-    res.json({ success: true, message: `Leave ${lr.status}`, leaveRequest: lr });
+    res.json({ success: true, message: `Leave ${lr.status}`, leaveRequest: populatedLR });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }

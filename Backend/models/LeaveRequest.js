@@ -19,7 +19,7 @@ const leaveRequestSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['sick', 'casual', 'personal', 'emergency', 'other'],
+    enum: ['sick', 'casual', 'earned', 'maternity', 'paternity', 'emergency', 'personal', 'other'],
     default: 'other'
   },
   startDate: {
