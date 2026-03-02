@@ -139,7 +139,7 @@ export default function Login({ onClose, onSwitchToRegister }) {
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
-                    {role.charAt(0).toUpperCase() + role.slice(1)}
+                    {role === 'admin' ? 'Administrator' : role.charAt(0).toUpperCase() + role.slice(1)}
                   </button>
                 ))}
               </div>

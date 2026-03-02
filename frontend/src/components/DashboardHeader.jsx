@@ -82,7 +82,7 @@ export default function DashboardHeader({ title, userRole }) {
                   <div className="flex items-center justify-end gap-2">
                     <p className="text-xs text-slate-600">
                       {user?.studentId || user?.teacherId || 
-                       (currentRole ? currentRole.charAt(0).toUpperCase() + currentRole.slice(1) : 'User')}
+                       (currentRole === 'admin' ? 'Administrator' : currentRole ? currentRole.charAt(0).toUpperCase() + currentRole.slice(1) : 'User')}
                     </p>
                     {currentRole === 'student' && (
                       <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">

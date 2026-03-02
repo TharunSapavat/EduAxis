@@ -402,7 +402,7 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    if (location.pathname === '/admin/leave') {
+    if (location.pathname === '/administrator/leave') {
       fetchLeaveRequests();
     }
   }, [location.pathname]);
@@ -452,7 +452,7 @@ export default function AdminDashboard() {
 
   // Fetch fees and payments when fees module is active
   useEffect(() => {
-    if (location.pathname === '/admin/fees') {
+    if (location.pathname === '/administrator/fees') {
       fetchFees();
       fetchPayments();
     }
@@ -460,7 +460,7 @@ export default function AdminDashboard() {
 
   // Fetch courses when courses module is active
   useEffect(() => {
-    if (location.pathname === '/admin/courses') {
+    if (location.pathname === '/administrator/courses') {
       fetchCourses();
     }
   }, [location.pathname]);
@@ -834,13 +834,13 @@ export default function AdminDashboard() {
 
   const renderMainContent = () => {
     switch (location.pathname) {
-      case '/admin':
-      case '/admin/home':
+      case '/administrator':
+      case '/administrator/home':
         return (
           <div>
             {/* Welcome Banner */}
             <div className="bg-linear-to-r from-purple-600 to-indigo-600 rounded-2xl p-8 mb-8 text-white shadow-lg">
-              <h1 className="text-3xl font-bold mb-2">Admin Dashboard</h1>
+              <h1 className="text-3xl font-bold mb-2">Administrator Dashboard</h1>
               <p className="text-purple-100">Complete control over your school management system.</p>
             </div>
 
@@ -897,14 +897,14 @@ export default function AdminDashboard() {
               <h2 className="text-xl font-semibold text-slate-900 mb-4">Quick Actions</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <button
-                  onClick={() => navigate('/admin/users')}
+                  onClick={() => navigate('/administrator/users')}
                   className="flex items-center space-x-3 p-4 rounded-lg border border-slate-200 hover:border-purple-400 hover:bg-purple-50 transition-all group"
                 >
                   <Users className="w-5 h-5 text-purple-600" />
                   <span className="text-slate-700 group-hover:text-purple-900 font-medium">Add New User</span>
                 </button>
                 <button
-                  onClick={() => navigate('/admin/courses')}
+                  onClick={() => navigate('/administrator/courses')}
                   className="flex items-center space-x-3 p-4 rounded-lg border border-slate-200 hover:border-purple-400 hover:bg-purple-50 transition-all group"
                 >
                   <BookOpen className="w-5 h-5 text-purple-600" />
@@ -916,7 +916,7 @@ export default function AdminDashboard() {
           </div>
         );
 
-      case '/admin/users':
+      case '/administrator/users':
         return (
           <div>
             {/* Header with Stats */}
@@ -1486,7 +1486,7 @@ export default function AdminDashboard() {
           </div>
         );
 
-      case '/admin/fees':
+      case '/administrator/fees':
         return (
           <div>
             {/* Fee Management Header */}
@@ -1940,7 +1940,7 @@ export default function AdminDashboard() {
           </div>
         );
 
-      case '/admin/courses':
+      case '/administrator/courses':
         return (
           <div>
             {/* Header with Stats */}
@@ -2489,16 +2489,16 @@ export default function AdminDashboard() {
           </div>
         );
 
-      case '/admin/classes':
+      case '/administrator/classes':
         return <ClassManagement />;
 
-      case '/admin/teacher-subjects':
+      case '/administrator/teacher-subjects':
         return <TeacherSubjects />;
 
-      case '/admin/library':
+      case '/administrator/library':
         return <AdminLibraryManagement showNotification={showNotification} />;
 
-      case '/admin/leave':
+      case '/administrator/leave':
         // Calculate stats
         const pendingCount = leaveRequests.filter(req => req.status === 'pending').length;
         const approvedCount = leaveRequests.filter(req => req.status === 'approved').length;
@@ -2666,7 +2666,7 @@ export default function AdminDashboard() {
                           <p className={`text-xs font-medium mb-1 ${
                             req.status === 'rejected' ? 'text-red-700' : 'text-blue-700'
                           }`}>
-                            {req.status === 'rejected' ? 'Rejection Reason:' : 'Admin Remarks:'}
+                            {req.status === 'rejected' ? 'Rejection Reason:' : 'Administrator Remarks:'}
                           </p>
                           <p className={`text-xs ${
                             req.status === 'rejected' ? 'text-red-600' : 'text-blue-600'
@@ -2760,13 +2760,13 @@ export default function AdminDashboard() {
           </div>
         );
 
-      case '/admin/financial-analytics':
+      case '/administrator/financial-analytics':
         return <FinancialAnalytics showNotification={showNotification} />;
 
-      case '/admin/feedback':
+      case '/administrator/feedback':
         return <FeedbackDashboard showNotification={showNotification} />;
 
-      case '/admin/bulk-import':
+      case '/administrator/bulk-import':
         return <BulkImportExport showNotification={showNotification} />;
 
       default:
@@ -2790,7 +2790,7 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50 to-slate-100">
       {/* Header */}
-      <DashboardHeader title="Admin Portal" userRole="admin" />
+      <DashboardHeader title="Administrator Portal" userRole="admin" />
 
       {/* Notification Toast */}
       {notification && (
@@ -2808,9 +2808,9 @@ export default function AdminDashboard() {
             {modules.map((module) => (
               <button
                 key={module.id}
-                onClick={() => navigate(`/admin/${module.id}`)}
+                onClick={() => navigate(`/administrator/${module.id}`)}
                 className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
-                  location.pathname === `/admin/${module.id}` || (module.id === 'home' && location.pathname === '/admin')
+                  location.pathname === `/administrator/${module.id}` || (module.id === 'home' && location.pathname === '/administrator')
                     ? 'bg-purple-600 text-white shadow-md'
                     : 'text-slate-700 hover:bg-slate-100'
                 }`}
@@ -2841,7 +2841,7 @@ export default function AdminDashboard() {
               )}
             </button>
             <p className="text-sm text-slate-600">
-              {modules.find(m => location.pathname === `/admin/${m.id}` || (m.id === 'home' && location.pathname === '/admin'))?.title || 'Dashboard'}
+              {modules.find(m => location.pathname === `/administrator/${m.id}` || (m.id === 'home' && location.pathname === '/administrator'))?.title || 'Dashboard'}
             </p>
           </div>
 

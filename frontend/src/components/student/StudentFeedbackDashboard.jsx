@@ -231,7 +231,7 @@ export default function StudentFeedbackDashboard({ studentId, showNotification }
                   
                   {feedback.adminResponse && (
                     <div className="bg-blue-50 border-l-4 border-blue-400 p-3 mt-3">
-                      <p className="text-xs font-medium text-blue-900 mb-1">Admin Response:</p>
+                      <p className="text-xs font-medium text-blue-900 mb-1">Administrator Response:</p>
                       <p className="text-sm text-blue-800">{feedback.adminResponse}</p>
                     </div>
                   )}

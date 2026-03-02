@@ -177,7 +177,7 @@ const StudentLeave = ({
                       ? 'bg-red-50 border-red-500 text-red-700'
                       : 'bg-blue-50 border-blue-500 text-blue-700'
                   }`}>
-                    <span className="font-medium">{req.status === 'rejected' ? 'Rejection Reason:' : 'Admin Remarks:'}</span> {req.reviewRemarks}
+                    <span className="font-medium">{req.status === 'rejected' ? 'Rejection Reason:' : 'Administrator Remarks:'}</span> {req.reviewRemarks}
                   </p>
                 )}
                 <p className="text-xs text-slate-500 mt-3">Submitted: {new Date(req.createdAt).toLocaleString()}</p>

@@ -112,9 +112,9 @@ function AppContent() {
         } 
       />
       
-      {/* Admin Routes */}
+      {/* Administrator Routes */}
       <Route 
-        path="/admin/*" 
+        path="/administrator/*" 
         element={
           user?.role === 'admin' ? (
             <AdminDashboard />

@@ -174,53 +174,53 @@ export const teacherAPI = {
 
 // Admin APIs
 export const adminAPI = {
-  getDashboard: () => api.get('/admin/dashboard'),
-  getStats: () => api.get('/admin/stats'),
-  getUsers: () => api.get('/admin/users'),
-  createUser: (userData) => api.post('/admin/users', userData),
-  updateUser: (id, userData) => api.put(`/admin/users/${id}`, userData),
-  deleteUser: (id) => api.delete(`/admin/users/${id}`),
-  getCourses: () => api.get('/admin/courses'),
-  getTeacherSubjects: (teacherId) => api.get(`/admin/teachers/${teacherId}/subjects`),
-  createCourse: (courseData) => api.post('/admin/courses', courseData),
-  updateCourse: (id, courseData) => api.put(`/admin/courses/${id}`, courseData),
-  deleteCourse: (id) => api.delete(`/admin/courses/${id}`),
-  getClasses: () => api.get('/admin/classes'),
-  getReports: () => api.get('/admin/reports'),
+  getDashboard: () => api.get('/administrator/dashboard'),
+  getStats: () => api.get('/administrator/stats'),
+  getUsers: () => api.get('/administrator/users'),
+  createUser: (userData) => api.post('/administrator/users', userData),
+  updateUser: (id, userData) => api.put(`/administrator/users/${id}`, userData),
+  deleteUser: (id) => api.delete(`/administrator/users/${id}`),
+  getCourses: () => api.get('/administrator/courses'),
+  getTeacherSubjects: (teacherId) => api.get(`/administrator/teachers/${teacherId}/subjects`),
+  createCourse: (courseData) => api.post('/administrator/courses', courseData),
+  updateCourse: (id, courseData) => api.put(`/administrator/courses/${id}`, courseData),
+  deleteCourse: (id) => api.delete(`/administrator/courses/${id}`),
+  getClasses: () => api.get('/administrator/classes'),
+  getReports: () => api.get('/administrator/reports'),
   
   // Fee Management
-  getFees: () => api.get('/admin/fees'),
-  createFee: (feeData) => api.post('/admin/fees', feeData),
-  updateFee: (id, feeData) => api.put(`/admin/fees/${id}`, feeData),
-  deleteFee: (id) => api.delete(`/admin/fees/${id}`),
+  getFees: () => api.get('/administrator/fees'),
+  createFee: (feeData) => api.post('/administrator/fees', feeData),
+  updateFee: (id, feeData) => api.put(`/administrator/fees/${id}`, feeData),
+  deleteFee: (id) => api.delete(`/administrator/fees/${id}`),
   
   // Payment Management
-  getPayments: (params) => api.get('/admin/payments', { params }),
-  createPayment: (paymentData) => api.post('/admin/payments', paymentData),
-  getPaymentStats: () => api.get('/admin/payments/stats'),
+  getPayments: (params) => api.get('/administrator/payments', { params }),
+  createPayment: (paymentData) => api.post('/administrator/payments', paymentData),
+  getPaymentStats: () => api.get('/administrator/payments/stats'),
   // Library management
-  getLibraryResources: () => api.get('/admin/library'),
+  getLibraryResources: () => api.get('/administrator/library'),
   createLibraryResource: (data) => {
     const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
     const config = isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {};
-    return api.post('/admin/library', data, config);
+    return api.post('/administrator/library', data, config);
   },
-  deleteLibraryResource: (id) => api.delete(`/admin/library/${id}`),
-  exportPayments: (params) => api.get('/admin/payments/export', { params }),
-  sendFeeReminders: (feeId) => api.post('/admin/fees/reminders', { feeId }),
+  deleteLibraryResource: (id) => api.delete(`/administrator/library/${id}`),
+  exportPayments: (params) => api.get('/administrator/payments/export', { params }),
+  sendFeeReminders: (feeId) => api.post('/administrator/fees/reminders', { feeId }),
   // Class Management
-  getClassOverview: () => api.get('/admin/class/overview'),
-  getStudentAnalytics: (params) => api.get('/admin/class/students', { params }),
-  getAtRiskStudents: () => api.get('/admin/class/at-risk'),
-  getStudentDetails: (id) => api.get(`/admin/class/students/${id}`),
+  getClassOverview: () => api.get('/administrator/class/overview'),
+  getStudentAnalytics: (params) => api.get('/administrator/class/students', { params }),
+  getAtRiskStudents: () => api.get('/administrator/class/at-risk'),
+  getStudentDetails: (id) => api.get(`/administrator/class/students/${id}`),
   // Leave Requests
-  getLeaveRequests: (params) => api.get('/admin/leave-requests', { params }),
-  decideLeaveRequest: (id, action, remarks) => api.patch(`/admin/leave-requests/${id}`, { action, remarks }),
+  getLeaveRequests: (params) => api.get('/administrator/leave-requests', { params }),
+  decideLeaveRequest: (id, action, remarks) => api.patch(`/administrator/leave-requests/${id}`, { action, remarks }),
   // Timetables
-  getTimetables: (params) => api.get('/admin/timetables', { params }),
-  saveTimetable: (data) => api.post('/admin/timetables', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
-  updateTimetable: (id, updates) => api.patch(`/admin/timetables/${id}`, updates),
-  deleteTimetable: (id) => api.delete(`/admin/timetables/${id}`),
+  getTimetables: (params) => api.get('/administrator/timetables', { params }),
+  saveTimetable: (data) => api.post('/administrator/timetables', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  updateTimetable: (id, updates) => api.patch(`/administrator/timetables/${id}`, updates),
+  deleteTimetable: (id) => api.delete(`/administrator/timetables/${id}`),
   
   // NEW: Feedback APIs
   getFeedbackDashboard: () => api.get('/feedback/dashboard'),

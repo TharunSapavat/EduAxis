@@ -285,7 +285,7 @@ export default function TeacherLeave() {
                       <p className={`text-xs font-semibold ${
                         request.status === 'rejected' ? 'text-red-700' : 'text-blue-700'
                       }`}>
-                        {request.status === 'rejected' ? 'Rejection Reason:' : 'Admin Remarks:'}
+                        {request.status === 'rejected' ? 'Rejection Reason:' : 'Administrator Remarks:'}
                       </p>
                       <p className={`text-sm ${
                         request.status === 'rejected' ? 'text-red-600' : 'text-blue-600'
@@ -295,7 +295,7 @@ export default function TeacherLeave() {
                   
                   {request.adminRemarks && !request.reviewRemarks && (
                     <div className="mt-2 p-2 bg-slate-50 rounded border-l-4 border-blue-500">
-                      <p className="text-xs font-semibold text-slate-700">Admin Remarks:</p>
+                      <p className="text-xs font-semibold text-slate-700">Administrator Remarks:</p>
                       <p className="text-sm text-slate-600">{request.adminRemarks}</p>
                     </div>
                   )}

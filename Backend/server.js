@@ -177,12 +177,11 @@ app.use('/api/auth', authRoutes);
 // CSRF Protection DISABLED - Causing issues with delete/send operations
 // app.use(doubleCsrfProtection);
 // app.use(csrfErrorHandler);
-
 // Protected routes (CSRF disabled)
 app.use('/api/superadmin', superAdminRoutes);
 app.use('/api/student', studentRoutes);
 app.use('/api/teacher', teacherRoutes);
-app.use('/api/admin', adminRoutes);
+app.use('/api/administrator', adminRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/enrollments', enrollmentRoutes);
 app.use('/api/quiz', quizRoutes);
