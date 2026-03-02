@@ -28,24 +28,9 @@ export default function StudentHome({ user, stats, loading, error, fetchDashboar
       )}
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         {/* Average Grade Card */}
-        <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-6 rounded-xl shadow-lg text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-purple-100 text-sm font-medium">Average Grade</p>
-              <p className="text-4xl font-bold mt-1">
-                {loading ? '...' : `${stats.averageGrade || 0}%`}
-              </p>
-              <p className="text-purple-100 text-xs mt-1">
-                {!loading && `Based on ${stats.totalGrades || 0} grades`}
-              </p>
-            </div>
-            <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
-              <BarChart3 className="w-6 h-6 text-white" />
-            </div>
-          </div>
-        </div>
+         
 
         <div className="bg-white p-6 rounded-xl shadow-md border border-slate-100">
           <div className="flex items-center justify-between">
