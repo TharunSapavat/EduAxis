@@ -342,7 +342,7 @@ export default function PerformanceAnalytics({ studentId }) {
   return (
     <div className="space-y-6">
       {/* Header with Filters */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-6 text-white">
+      <div className="bg-linear-to-r from-blue-600 to-purple-600 rounded-xl p-6 text-white">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold mb-2">Performance Analytics</h1>
