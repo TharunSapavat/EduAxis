@@ -27,9 +27,11 @@ import {
   getAtRiskStudents,
   getStudentDetails,
   getLeaveRequests,
-  decideLeaveRequest
+  decideLeaveRequest,
+  bulkImportCSV
 } from '../controllers/adminController.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
+import { uploadCSVFile } from '../config/multer.js';
 
 const router = express.Router();
 
@@ -86,5 +88,6 @@ router.get('/class/students/:id', getStudentDetails);
 // Leave Request Management
 router.get('/leave-requests', getLeaveRequests);
 router.patch('/leave-requests/:id', decideLeaveRequest);
+router.post('/bulk-import', uploadCSVFile.single('file'), bulkImportCSV);
 
 export default router;

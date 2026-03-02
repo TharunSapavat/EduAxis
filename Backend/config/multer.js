@@ -138,3 +138,26 @@ export const uploadStudyMaterialFiles = multer({
     fileSize: 50 * 1024 * 1024 // 50MB limit for study materials
   }
 });
+
+const csvMemoryStorage = multer.memoryStorage();
+
+const csvFileFilter = (req, file, cb) => {
+  const lowerName = (file.originalname || '').toLowerCase();
+  const isCsvMime = file.mimetype === 'text/csv' || file.mimetype === 'application/vnd.ms-excel';
+  const isCsvExt = lowerName.endsWith('.csv');
+
+  if (isCsvMime || isCsvExt) {
+    cb(null, true);
+    return;
+  }
+
+  cb(new Error('Invalid file type. Only CSV files are allowed.'), false);
+};
+
+export const uploadCSVFile = multer({
+  storage: csvMemoryStorage,
+  fileFilter: csvFileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024
+  }
+});

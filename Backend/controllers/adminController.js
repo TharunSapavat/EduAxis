@@ -11,6 +11,64 @@ import LibraryResource from '../models/LibraryResource.js';
 import Timetable from '../models/Timetable.js';
 import { assertSameSchoolStudent } from '../middleware/tenantGuards.js';
 
+const parseCSVLine = (line) => {
+  const values = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    const nextChar = line[i + 1];
+
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        current += '"';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (char === ',' && !inQuotes) {
+      values.push(current.trim());
+      current = '';
+      continue;
+    }
+
+    current += char;
+  }
+
+  values.push(current.trim());
+  return values;
+};
+
+const parseCSVBuffer = (buffer) => {
+  const csvText = buffer.toString('utf8').replace(/^\uFEFF/, '');
+  const lines = csvText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length < 2) {
+    return [];
+  }
+
+  const headers = parseCSVLine(lines[0]).map((h) => h.toLowerCase().trim());
+  const records = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseCSVLine(lines[i]);
+    const row = {};
+    headers.forEach((header, idx) => {
+      row[header] = (cols[idx] || '').trim();
+    });
+    records.push(row);
+  }
+
+  return records;
+};
+
 // Library resource admin management
 export const adminCreateLibraryResource = async (req, res) => {
   try {
@@ -376,6 +434,143 @@ export const decideLeaveRequest = async (req, res) => {
     res.json({ success: true, message: `Leave ${lr.status}`, leaveRequest: populatedLR });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+export const bulkImportCSV = async (req, res) => {
+  try {
+    const { type = 'students' } = req.body;
+    const importType = String(type).toLowerCase();
+
+    if (!['students', 'teachers', 'courses'].includes(importType)) {
+      return res.status(400).json({ success: false, message: 'Invalid import type' });
+    }
+
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({ success: false, message: 'CSV file is required' });
+    }
+
+    const records = parseCSVBuffer(req.file.buffer);
+    if (records.length === 0) {
+      return res.status(400).json({ success: false, message: 'CSV is empty or has invalid format' });
+    }
+
+    const summary = {
+      type: importType,
+      totalRows: records.length,
+      created: 0,
+      skipped: 0,
+      errors: []
+    };
+
+    for (let index = 0; index < records.length; index++) {
+      const row = records[index];
+      const rowNumber = index + 2;
+
+      try {
+        if (importType === 'courses') {
+          const name = row.name;
+          const code = (row.code || '').toUpperCase();
+          const grade = Number(row.grade);
+
+          if (!name || !code || !Number.isFinite(grade)) {
+            summary.skipped += 1;
+            summary.errors.push({ row: rowNumber, reason: 'Course requires name, code, and numeric grade' });
+            continue;
+          }
+
+          const exists = await Course.findOne({ schoolId: req.schoolId, code });
+          if (exists) {
+            summary.skipped += 1;
+            summary.errors.push({ row: rowNumber, reason: `Course code ${code} already exists` });
+            continue;
+          }
+
+          let teacherId = row.teacherid || '';
+          let teacherName = row.teacher || 'TBD';
+
+          if (!teacherId && row.teacheremail) {
+            const teacherUser = await User.findOne({
+              schoolId: req.schoolId,
+              role: 'teacher',
+              email: row.teacheremail.toLowerCase()
+            });
+            if (teacherUser) {
+              teacherId = teacherUser._id;
+              teacherName = teacherUser.name;
+            }
+          }
+
+          await Course.create({
+            schoolId: req.schoolId,
+            name,
+            code,
+            description: row.description || '',
+            teacher: teacherName,
+            teacherId: teacherId || undefined,
+            credits: Number(row.credits) || 3,
+            grade,
+            semester: row.semester || 'Annual'
+          });
+
+          summary.created += 1;
+          continue;
+        }
+
+        const role = importType === 'students' ? 'student' : 'teacher';
+        const name = row.name;
+        const email = (row.email || '').toLowerCase();
+        const password = row.password || 'ChangeMe123';
+
+        if (!name || !email) {
+          summary.skipped += 1;
+          summary.errors.push({ row: rowNumber, reason: 'User requires name and email' });
+          continue;
+        }
+
+        if (role === 'student' && !row.grade) {
+          summary.skipped += 1;
+          summary.errors.push({ row: rowNumber, reason: 'Student requires grade' });
+          continue;
+        }
+
+        const exists = await User.findOne({ email });
+        if (exists) {
+          summary.skipped += 1;
+          summary.errors.push({ row: rowNumber, reason: `Email ${email} already exists` });
+          continue;
+        }
+
+        const userData = {
+          name,
+          email,
+          password,
+          role,
+          schoolId: req.schoolId,
+          phone: row.phone || undefined,
+          dateOfBirth: row.dateofbirth ? new Date(row.dateofbirth) : undefined,
+          grade: role === 'student' ? String(row.grade) : undefined,
+          subject: role === 'teacher' ? (row.subject || undefined) : undefined,
+          gradesTeaching: role === 'teacher' && row.gradesteaching
+            ? row.gradesteaching.split('|').map((g) => g.trim()).filter(Boolean)
+            : undefined
+        };
+
+        await User.create(userData);
+        summary.created += 1;
+      } catch (error) {
+        summary.skipped += 1;
+        summary.errors.push({ row: rowNumber, reason: error.message });
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Import completed: ${summary.created} created, ${summary.skipped} skipped`,
+      summary
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Bulk import failed', error: error.message });
   }
 };
 
@@ -870,55 +1065,203 @@ export const getPaymentStats = async (req, res) => {
 // Export payments to CSV
 export const exportPayments = async (req, res) => {
   try {
-    const { studentName, paymentMethod, status, startDate, endDate } = req.query;
-    const query = { schoolId: req.schoolId };
+    const { type = 'payments', studentName, paymentMethod, status, startDate, endDate } = req.query;
+    const exportType = String(type).toLowerCase();
+    const formatDate = (value) => (value ? new Date(value).toISOString().slice(0, 10) : '');
+    const escapeCsv = (value) => {
+      if (value === null || value === undefined) return '';
+      const stringValue = String(value);
+      if (/[",\n]/.test(stringValue)) {
+        return `"${stringValue.replace(/"/g, '""')}"`;
+      }
+      return stringValue;
+    };
+    const toCsv = (columns, rows) => {
+      const header = columns.map((c) => escapeCsv(c.label)).join(',');
+      const body = rows.map((row) => columns.map((c) => escapeCsv(row[c.key])).join(','));
+      return [header, ...body].join('\n');
+    };
 
-    if (studentName && studentName.trim()) {
-      query.$or = [
-        { studentName: { $regex: studentName.trim(), $options: 'i' } },
-        { studentEmail: { $regex: studentName.trim(), $options: 'i' } }
+    let columns = [];
+    let rows = [];
+
+    if (exportType === 'students') {
+      const students = await User.find({ schoolId: req.schoolId, role: 'student' })
+        .select('name email phone studentId grade status createdAt')
+        .sort({ createdAt: -1 })
+        .lean();
+      columns = [
+        { key: 'name', label: 'Name' },
+        { key: 'email', label: 'Email' },
+        { key: 'phone', label: 'Phone' },
+        { key: 'studentId', label: 'Student ID' },
+        { key: 'grade', label: 'Grade' },
+        { key: 'status', label: 'Status' },
+        { key: 'createdAt', label: 'Created Date' }
       ];
+      rows = students.map((s) => ({
+        ...s,
+        createdAt: formatDate(s.createdAt)
+      }));
+    } else if (exportType === 'teachers') {
+      const teachers = await User.find({ schoolId: req.schoolId, role: 'teacher' })
+        .select('name email phone teacherId subject gradesTeaching status createdAt')
+        .sort({ createdAt: -1 })
+        .lean();
+      columns = [
+        { key: 'name', label: 'Name' },
+        { key: 'email', label: 'Email' },
+        { key: 'phone', label: 'Phone' },
+        { key: 'teacherId', label: 'Teacher ID' },
+        { key: 'subject', label: 'Subject' },
+        { key: 'gradesTeaching', label: 'Grades Teaching' },
+        { key: 'status', label: 'Status' },
+        { key: 'createdAt', label: 'Created Date' }
+      ];
+      rows = teachers.map((t) => ({
+        ...t,
+        gradesTeaching: Array.isArray(t.gradesTeaching) ? t.gradesTeaching.join('|') : '',
+        createdAt: formatDate(t.createdAt)
+      }));
+    } else if (exportType === 'courses') {
+      const courses = await Course.find({ schoolId: req.schoolId })
+        .select('name code grade teacher credits semester status description createdAt')
+        .sort({ createdAt: -1 })
+        .lean();
+      columns = [
+        { key: 'name', label: 'Name' },
+        { key: 'code', label: 'Code' },
+        { key: 'grade', label: 'Grade' },
+        { key: 'teacher', label: 'Teacher' },
+        { key: 'credits', label: 'Credits' },
+        { key: 'semester', label: 'Semester' },
+        { key: 'status', label: 'Status' },
+        { key: 'description', label: 'Description' },
+        { key: 'createdAt', label: 'Created Date' }
+      ];
+      rows = courses.map((c) => ({
+        ...c,
+        createdAt: formatDate(c.createdAt)
+      }));
+    } else if (exportType === 'attendance') {
+      const attendanceRows = await Attendance.find({ schoolId: req.schoolId })
+        .populate('studentId', 'name email studentId')
+        .populate('courseId', 'name code')
+        .populate('markedBy', 'name')
+        .sort({ date: -1 })
+        .lean();
+      columns = [
+        { key: 'date', label: 'Date' },
+        { key: 'studentName', label: 'Student Name' },
+        { key: 'studentEmail', label: 'Student Email' },
+        { key: 'studentId', label: 'Student ID' },
+        { key: 'courseName', label: 'Course' },
+        { key: 'courseCode', label: 'Course Code' },
+        { key: 'status', label: 'Status' },
+        { key: 'markedBy', label: 'Marked By' },
+        { key: 'remarks', label: 'Remarks' }
+      ];
+      rows = attendanceRows.map((a) => ({
+        date: formatDate(a.date),
+        studentName: a.studentId?.name || '',
+        studentEmail: a.studentId?.email || '',
+        studentId: a.studentId?.studentId || '',
+        courseName: a.courseId?.name || '',
+        courseCode: a.courseId?.code || '',
+        status: a.status,
+        markedBy: a.markedBy?.name || '',
+        remarks: a.remarks || ''
+      }));
+    } else if (exportType === 'grades') {
+      const gradeRows = await Grade.find({ schoolId: req.schoolId })
+        .populate('studentId', 'name email studentId')
+        .populate('courseId', 'name')
+        .sort({ date: -1 })
+        .lean();
+      columns = [
+        { key: 'date', label: 'Date' },
+        { key: 'studentName', label: 'Student Name' },
+        { key: 'studentEmail', label: 'Student Email' },
+        { key: 'studentId', label: 'Student ID' },
+        { key: 'subject', label: 'Subject' },
+        { key: 'course', label: 'Course' },
+        { key: 'score', label: 'Score' },
+        { key: 'maxScore', label: 'Max Score' },
+        { key: 'percentage', label: 'Percentage' },
+        { key: 'type', label: 'Type' },
+        { key: 'title', label: 'Title' },
+        { key: 'semester', label: 'Semester' },
+        { key: 'remarks', label: 'Remarks' }
+      ];
+      rows = gradeRows.map((g) => ({
+        date: formatDate(g.date),
+        studentName: g.studentId?.name || '',
+        studentEmail: g.studentId?.email || '',
+        studentId: g.studentId?.studentId || '',
+        subject: g.subject,
+        course: g.courseId?.name || '',
+        score: g.score,
+        maxScore: g.maxScore,
+        percentage: g.maxScore ? ((g.score / g.maxScore) * 100).toFixed(2) : '',
+        type: g.type,
+        title: g.title,
+        semester: g.semester,
+        remarks: g.remarks || ''
+      }));
+    } else {
+      const query = { schoolId: req.schoolId };
+
+      if (studentName && studentName.trim()) {
+        query.$or = [
+          { studentName: { $regex: studentName.trim(), $options: 'i' } },
+          { studentEmail: { $regex: studentName.trim(), $options: 'i' } }
+        ];
+      }
+      if (paymentMethod && paymentMethod !== 'all') query.paymentMethod = paymentMethod;
+      if (status && status !== 'all') query.status = status;
+      if (startDate || endDate) {
+        query.paymentDate = {};
+        if (startDate) query.paymentDate.$gte = new Date(startDate);
+        if (endDate) query.paymentDate.$lte = new Date(endDate);
+      }
+
+      const payments = await Payment.find(query)
+        .populate('studentId', 'studentId')
+        .sort({ paymentDate: -1 })
+        .lean();
+      columns = [
+        { key: 'receiptNumber', label: 'Receipt Number' },
+        { key: 'date', label: 'Date' },
+        { key: 'studentName', label: 'Student Name' },
+        { key: 'studentEmail', label: 'Student Email' },
+        { key: 'studentId', label: 'Student ID' },
+        { key: 'feeTitle', label: 'Fee Title' },
+        { key: 'amount', label: 'Amount' },
+        { key: 'paymentMethod', label: 'Payment Method' },
+        { key: 'transactionId', label: 'Transaction ID' },
+        { key: 'status', label: 'Status' },
+        { key: 'remarks', label: 'Remarks' }
+      ];
+      rows = payments.map((p) => ({
+        receiptNumber: p.receiptNumber,
+        date: formatDate(p.paymentDate),
+        studentName: p.studentName,
+        studentEmail: p.studentEmail,
+        studentId: p.studentId?.studentId || '',
+        feeTitle: p.feeTitle,
+        amount: p.amount,
+        paymentMethod: p.paymentMethod,
+        transactionId: p.transactionId || '',
+        status: p.status,
+        remarks: p.remarks || ''
+      }));
     }
 
-    if (paymentMethod && paymentMethod !== 'all') {
-      query.paymentMethod = paymentMethod;
-    }
-
-    if (status && status !== 'all') {
-      query.status = status;
-    }
-
-    if (startDate || endDate) {
-      query.paymentDate = {};
-      if (startDate) query.paymentDate.$gte = new Date(startDate);
-      if (endDate) query.paymentDate.$lte = new Date(endDate);
-    }
-
-    const payments = await Payment.find(query)
-      .populate('studentId', 'name email phone studentId')
-      .populate('feeId', 'title amount')
-      .sort({ paymentDate: -1 });
-
-    // Convert to CSV format
-    const csvData = payments.map(p => ({
-      receiptNumber: p.receiptNumber,
-      date: new Date(p.paymentDate).toLocaleDateString(),
-      studentName: p.studentName,
-      studentEmail: p.studentEmail,
-      studentId: p.studentId?.studentId || 'N/A',
-      feeTitle: p.feeTitle,
-      amount: p.amount,
-      paymentMethod: p.paymentMethod,
-      transactionId: p.transactionId || 'N/A',
-      status: p.status,
-      remarks: p.remarks || ''
-    }));
-
-    res.json({
-      success: true,
-      data: csvData,
-      count: csvData.length
-    });
+    const csv = toCsv(columns, rows);
+    const filename = `${exportType}_export_${new Date().toISOString().slice(0, 10)}.csv`;
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.status(200).send(csv);
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }

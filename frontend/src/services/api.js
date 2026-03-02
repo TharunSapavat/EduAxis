@@ -206,7 +206,7 @@ export const adminAPI = {
     return api.post('/administrator/library', data, config);
   },
   deleteLibraryResource: (id) => api.delete(`/administrator/library/${id}`),
-  exportPayments: (params) => api.get('/administrator/payments/export', { params }),
+  exportPayments: (params) => api.get('/administrator/payments/export', { params, responseType: 'blob' }),
   sendFeeReminders: (feeId) => api.post('/administrator/fees/reminders', { feeId }),
   // Class Management
   getClassOverview: () => api.get('/administrator/class/overview'),
@@ -216,6 +216,7 @@ export const adminAPI = {
   // Leave Requests
   getLeaveRequests: (params) => api.get('/administrator/leave-requests', { params }),
   decideLeaveRequest: (id, action, remarks) => api.patch(`/administrator/leave-requests/${id}`, { action, remarks }),
+  bulkImportCSV: (formData) => api.post('/administrator/bulk-import', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
   // Timetables
   getTimetables: (params) => api.get('/administrator/timetables', { params }),
   saveTimetable: (data) => api.post('/administrator/timetables', data, { headers: { 'Content-Type': 'multipart/form-data' } }),

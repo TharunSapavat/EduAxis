@@ -28,12 +28,15 @@ export default function BulkImportExport({ showNotification }) {
       formData.append('file', importFile);
       formData.append('type', importType);
 
-      // This would call your backend bulk import endpoint
-      showNotification(`${importType} imported successfully!`, 'success');
+      const response = await adminAPI.bulkImportCSV(formData);
+      const summary = response?.data?.summary;
+      const created = summary?.created ?? 0;
+      const skipped = summary?.skipped ?? 0;
+      showNotification(`Import completed: ${created} created, ${skipped} skipped`, 'success');
       setImportFile(null);
     } catch (err) {
       console.error('Import error:', err);
-      showNotification('Failed to import data', 'error');
+      showNotification(err?.response?.data?.message || 'Failed to import data', 'error');
     } finally {
       setLoading(false);
     }
@@ -44,16 +47,17 @@ export default function BulkImportExport({ showNotification }) {
       setLoading(true);
       
       // Export based on type
-      const data = await adminAPI.exportPayments({ format: 'csv', type: dataType });
+      const response = await adminAPI.exportPayments({ format: 'csv', type: dataType });
       
       // Create download link
-      const url = window.URL.createObjectURL(new Blob([data]));
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'text/csv;charset=utf-8;' }));
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `${dataType}_export_${new Date().toISOString().split('T')[0]}.csv`);
       document.body.appendChild(link);
       link.click();
-      link.parentChild.removeChild(link);
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
       
       showNotification('Data exported successfully!', 'success');
     } catch (err) {
@@ -83,7 +87,6 @@ export default function BulkImportExport({ showNotification }) {
             >
               <option value="students">Students</option>
               <option value="teachers">Teachers</option>
-              <option value="users">Users (Mixed)</option>
               <option value="courses">Courses</option>
             </select>
           </div>
@@ -106,7 +109,12 @@ export default function BulkImportExport({ showNotification }) {
 
           <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
             <p className="text-sm text-blue-800">
-              <strong>CSV Format:</strong> Ensure your CSV has columns: name, email, phone, (and role for mixed import)
+              <strong>CSV Format:</strong>{' '}
+              {importType === 'courses'
+                ? 'name, code, grade are required. Optional: description, teacher, teacherEmail, credits, semester'
+                : importType === 'students'
+                  ? 'name, email, grade are required. Optional: phone, password, dateOfBirth'
+                  : 'name, email are required. Optional: phone, password, subject, gradesTeaching (use | separator)'}
             </p>
           </div>
 
