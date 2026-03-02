@@ -1,17 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import {
-  Chart as ChartJS,
-  ArcElement,
-  Tooltip,
-  Legend,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Filler
-} from 'chart.js';
-import { Pie, Line } from 'react-chartjs-2';
 import DashboardHeader from '../components/DashboardHeader';
 import DashboardFooter from '../components/DashboardFooter';
 import SuperAdminAnalytics from '../components/SuperAdminAnalytics';
@@ -39,17 +27,6 @@ import {
   BookOpen,
   GraduationCap
 } from 'lucide-react';
-
-ChartJS.register(
-  ArcElement,
-  Tooltip,
-  Legend,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Filler
-);
 
 const SuperAdminDashboard = () => {
   const navigate = useNavigate();
@@ -682,143 +659,31 @@ const PlatformStatistics = ({ stats }) => {
 
   const totalSchools = stats.schools?.total || 0;
   const activeSchools = stats.schools?.active || 0;
+  const inactiveSchools = stats.schools?.inactive || 0;
+  const suspendedSchools = stats.schools?.suspended || 0;
+  const byPlan = stats.schools?.byPlan || {};
 
   const totalUsers = stats.users?.total || 0;
   const totalStudents = stats.users?.students || 0;
   const totalTeachers = stats.users?.teachers || 0;
   const totalAdmins = stats.users?.admins || 0;
+  const avgStudentsPerSchool = stats.users?.averageStudentsPerSchool || 0;
+  const avgTeachersPerSchool = stats.users?.averageTeachersPerSchool || 0;
 
   const totalCourses = stats.resources?.courses || 0;
   const totalAssignments = stats.resources?.assignments || 0;
   const totalAttendance = stats.resources?.attendanceRecords || 0;
 
-  const billing = stats.billing || {};
-  const currency = billing.currency || stats.revenue?.currency || 'INR';
-  const formatMoney = (value) => {
-    const normalized = Number(value) || 0;
-    return currency === 'INR'
-      ? `Rs${normalized.toLocaleString('en-IN')}`
-      : `${normalized.toLocaleString()}`;
-  };
-
-  const monthlyRevenue = stats.revenue?.estimatedMonthly || 0;
-  const annualRevenue = stats.revenue?.estimatedAnnual || 0;
-  const projectedMonthlyRevenue = billing.projected?.monthlyIfAllActiveSchoolsCharged || monthlyRevenue;
-  const billableSchools = billing.summary?.billableSchools || 0;
-
-  const conversionRate = activeSchools > 0 ? ((billableSchools / activeSchools) * 100).toFixed(1) : '0.0';
   const schoolActivationRate = totalSchools > 0 ? ((activeSchools / totalSchools) * 100).toFixed(1) : '0.0';
-  const arpu = billableSchools > 0 ? Math.round(monthlyRevenue / billableSchools) : 0;
-
-  const userMix = [
-    { label: 'Students', value: totalStudents, color: 'bg-blue-500' },
-    { label: 'Teachers', value: totalTeachers, color: 'bg-emerald-500' },
-    { label: 'Admins', value: totalAdmins, color: 'bg-violet-500' }
-  ];
-
-  const resourceMix = [
-    { label: 'Courses', value: totalCourses, color: 'bg-orange-500' },
-    { label: 'Assignments', value: totalAssignments, color: 'bg-rose-500' },
-    { label: 'Attendance', value: totalAttendance, color: 'bg-cyan-500' }
-  ];
-
-  const userPieData = [
-    { label: 'Students', value: totalStudents, color: '#3b82f6' },
-    { label: 'Teachers', value: totalTeachers, color: '#10b981' },
-    { label: 'Admins', value: totalAdmins, color: '#8b5cf6' }
-  ];
-
-  const maxUserMix = Math.max(...userMix.map(item => item.value), 1);
-  const maxResourceMix = Math.max(...resourceMix.map(item => item.value), 1);
-
-  const starterTier = billing.tiers?.starter || { monthlyFee: 1999, maxStudents: 300 };
-  const growthTier = billing.tiers?.growth || { monthlyFee: 4999, maxStudents: 1000 };
-  const scaleTier = billing.tiers?.scale || { baseMonthlyFee: 4999, additionalPerStudent: 8, includedStudents: 1000 };
-
-  const revenueLineLabels = ['Now', 'M+1', 'M+2', 'M+3', 'M+4', 'M+5'];
-  const revenueLineValues = Array.from({ length: 6 }, (_, i) => {
-    const start = monthlyRevenue;
-    const end = projectedMonthlyRevenue;
-    const value = start + ((end - start) * i) / 5;
-    return Math.max(0, Math.round(value));
-  });
-
-  const pieData = {
-    labels: userPieData.map(item => item.label),
-    datasets: [
-      {
-        data: userPieData.map(item => item.value),
-        backgroundColor: userPieData.map(item => item.color),
-        borderColor: '#ffffff',
-        borderWidth: 2
-      }
-    ]
-  };
-
-  const pieOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'bottom'
-      }
-    }
-  };
-
-  const lineData = {
-    labels: revenueLineLabels,
-    datasets: [
-      {
-        label: 'MRR Projection',
-        data: revenueLineValues,
-        borderColor: '#ef4444',
-        backgroundColor: 'rgba(239, 68, 68, 0.15)',
-        fill: true,
-        tension: 0.35,
-        pointRadius: 4,
-        pointBackgroundColor: '#ef4444'
-      }
-    ]
-  };
-
-  const lineOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        display: false
-      },
-      tooltip: {
-        callbacks: {
-          label: (context) => formatMoney(context.parsed.y || 0)
-        }
-      }
-    },
-    scales: {
-      y: {
-        ticks: {
-          callback: (value) => formatMoney(value)
-        },
-        grid: {
-          color: '#e2e8f0'
-        }
-      },
-      x: {
-        grid: {
-          display: false
-        }
-      }
-    }
-  };
 
   return (
     <div className="space-y-6">
-      <div className="bg-linear-to-r from-red-600 via-rose-600 to-orange-500 rounded-2xl p-7 text-white shadow-lg">
+      <div className="bg-linear-to-r from-red-600 to-pink-600 rounded-2xl p-7 text-white shadow-lg">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <div>
-            <h2 className="text-2xl md:text-3xl font-bold">Platform Analytics Intelligence</h2>
+            <h2 className="text-2xl md:text-3xl font-bold">Platform Statistics</h2>
             <p className="text-red-100 mt-2">
-              Operational metrics + monetization strategy in one view.
+              Users and schools overview across the platform.
             </p>
           </div>
           <div className="flex items-center gap-2 bg-white/20 px-4 py-2 rounded-lg text-sm font-medium">
@@ -835,60 +700,31 @@ const PlatformStatistics = ({ stats }) => {
           <p className="text-xs text-slate-500 mt-2">{schoolActivationRate}% active</p>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+          <p className="text-sm text-slate-500">Active Schools</p>
+          <p className="text-3xl font-bold text-emerald-600 mt-1">{activeSchools}</p>
+          <p className="text-xs text-slate-500 mt-2">{inactiveSchools} inactive, {suspendedSchools} suspended</p>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
           <p className="text-sm text-slate-500">Total Users</p>
           <p className="text-3xl font-bold text-slate-900 mt-1">{totalUsers.toLocaleString()}</p>
           <p className="text-xs text-slate-500 mt-2">{totalStudents.toLocaleString()} students</p>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-          <p className="text-sm text-slate-500">Billable Schools</p>
-          <p className="text-3xl font-bold text-emerald-600 mt-1">{conversionRate}%</p>
-          <p className="text-xs text-slate-500 mt-2">{billableSchools} billable / {activeSchools} active</p>
-        </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-          <p className="text-sm text-slate-500">Estimated MRR</p>
-          <p className="text-3xl font-bold text-rose-600 mt-1">{formatMoney(monthlyRevenue)}</p>
-          <p className="text-xs text-slate-500 mt-2">ARPU: {formatMoney(arpu)}/billable school</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">Users Mix (Pie)</h3>
-          <div className="h-64">
-            <Pie data={pieData} options={pieOptions} />
-          </div>
-          <div className="mt-4 space-y-2">
-            {userPieData.map((item) => (
-              <div key={item.label} className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <span
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: item.color }}
-                  />
-                  <span className="text-slate-700">{item.label}</span>
-                </div>
-                <span className="font-semibold text-slate-900">{item.value.toLocaleString()}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="xl:col-span-2 bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-slate-900 mb-1">MRR Projection Graph</h3>
-          <p className="text-sm text-slate-500 mb-4">
-            Scenario trend from current MRR to projected opportunity.
-          </p>
-          <div className="h-72">
-            <Line data={lineData} options={lineOptions} />
-          </div>
+          <p className="text-sm text-slate-500">New Schools (30d)</p>
+          <p className="text-3xl font-bold text-blue-600 mt-1">{stats.growth?.newSchoolsThisMonth || 0}</p>
+          <p className="text-xs text-slate-500 mt-2">New users: {stats.growth?.newUsersThisMonth || 0}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-slate-900 mb-5">User Distribution</h3>
+          <h3 className="text-lg font-semibold text-slate-900 mb-5">Users Distribution</h3>
           <div className="space-y-4">
-            {userMix.map((item) => (
+            {[
+              { label: 'Students', value: totalStudents, color: 'bg-blue-500' },
+              { label: 'Teachers', value: totalTeachers, color: 'bg-emerald-500' },
+              { label: 'Admins', value: totalAdmins, color: 'bg-violet-500' }
+            ].map((item) => (
               <div key={item.label}>
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-sm text-slate-700">{item.label}</span>
@@ -897,139 +733,76 @@ const PlatformStatistics = ({ stats }) => {
                 <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full ${item.color}`}
-                    style={{ width: `${(item.value / maxUserMix) * 100}%` }}
+                    style={{ width: `${(item.value / Math.max(totalUsers, 1)) * 100}%` }}
                   />
                 </div>
               </div>
             ))}
           </div>
-        </div>
-
-        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-slate-900 mb-5">Resource Footprint</h3>
-          <div className="space-y-4">
-            {resourceMix.map((item) => (
-              <div key={item.label}>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-sm text-slate-700">{item.label}</span>
-                  <span className="text-sm font-semibold text-slate-900">{item.value.toLocaleString()}</span>
-                </div>
-                <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full ${item.color}`}
-                    style={{ width: `${(item.value / maxResourceMix) * 100}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div className="xl:col-span-2 bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-slate-900 mb-5">Revenue & Growth Snapshot</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-              <p className="text-sm text-slate-600">Estimated Monthly</p>
-              <p className="text-3xl font-bold text-slate-900 mt-1">{formatMoney(monthlyRevenue)}</p>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="rounded-lg bg-slate-50 p-3 border border-slate-200">
+              <p className="text-xs text-slate-500">Avg Students/School</p>
+              <p className="text-xl font-bold text-slate-900">{avgStudentsPerSchool}</p>
             </div>
-            <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-              <p className="text-sm text-slate-600">Estimated Annual</p>
-              <p className="text-3xl font-bold text-slate-900 mt-1">{formatMoney(annualRevenue)}</p>
+            <div className="rounded-lg bg-slate-50 p-3 border border-slate-200">
+              <p className="text-xs text-slate-500">Avg Teachers/School</p>
+              <p className="text-xl font-bold text-slate-900">{avgTeachersPerSchool}</p>
             </div>
-            <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-              <p className="text-sm text-slate-600">New Schools (30d)</p>
-              <p className="text-3xl font-bold text-slate-900 mt-1">{stats.growth?.newSchoolsThisMonth || 0}</p>
-            </div>
-            <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-              <p className="text-sm text-slate-600">New Users (30d)</p>
-              <p className="text-3xl font-bold text-slate-900 mt-1">{stats.growth?.newUsersThisMonth || 0}</p>
-            </div>
-          </div>
-          <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-            <p className="text-sm font-medium text-emerald-800">MRR Opportunity (Scenario)</p>
-            <p className="text-2xl font-bold text-emerald-700 mt-1">
-              {formatMoney(projectedMonthlyRevenue)}
-            </p>
-            <p className="text-xs text-emerald-700 mt-1">
-              If all active schools are charged using per-student INR billing.
-            </p>
           </div>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">Billing Tier Mix</h3>
+          <h3 className="text-lg font-semibold text-slate-900 mb-5">Schools Breakdown</h3>
           <div className="space-y-3">
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-600">Starter Schools</span>
-              <span className="font-semibold text-slate-900">{billing.summary?.starterSchools || 0}</span>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-slate-600">Active</span>
+              <span className="font-semibold text-slate-900">{activeSchools}</span>
             </div>
-            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-amber-500 rounded-full"
-                style={{ width: `${billableSchools > 0 ? ((billing.summary?.starterSchools || 0) / billableSchools) * 100 : 0}%` }}
-              />
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-slate-600">Inactive</span>
+              <span className="font-semibold text-slate-900">{inactiveSchools}</span>
             </div>
-            <div className="flex justify-between text-sm pt-2">
-              <span className="text-slate-600">Growth Schools</span>
-              <span className="font-semibold text-slate-900">{billing.summary?.growthSchools || 0}</span>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-slate-600">Suspended</span>
+              <span className="font-semibold text-slate-900">{suspendedSchools}</span>
             </div>
-            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-emerald-500 rounded-full"
-                style={{ width: `${billableSchools > 0 ? ((billing.summary?.growthSchools || 0) / billableSchools) * 100 : 0}%` }}
-              />
+          </div>
+          <h4 className="text-sm font-semibold text-slate-700 mt-6 mb-3">Plan Distribution (count only)</h4>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-lg bg-slate-50 p-3 border border-slate-200">
+              <p className="text-xs text-slate-500">Trial</p>
+              <p className="text-lg font-bold text-slate-900">{byPlan.trial || 0}</p>
             </div>
-            <div className="flex justify-between text-sm pt-2">
-              <span className="text-slate-600">Scale Schools</span>
-              <span className="font-semibold text-slate-900">{billing.summary?.scaleSchools || 0}</span>
+            <div className="rounded-lg bg-slate-50 p-3 border border-slate-200">
+              <p className="text-xs text-slate-500">Basic</p>
+              <p className="text-lg font-bold text-slate-900">{byPlan.basic || 0}</p>
             </div>
-            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-violet-500 rounded-full"
-                style={{ width: `${billableSchools > 0 ? ((billing.summary?.scaleSchools || 0) / billableSchools) * 100 : 0}%` }}
-              />
+            <div className="rounded-lg bg-slate-50 p-3 border border-slate-200">
+              <p className="text-xs text-slate-500">Premium</p>
+              <p className="text-lg font-bold text-slate-900">{byPlan.premium || 0}</p>
+            </div>
+            <div className="rounded-lg bg-slate-50 p-3 border border-slate-200">
+              <p className="text-xs text-slate-500">Enterprise</p>
+              <p className="text-lg font-bold text-slate-900">{byPlan.enterprise || 0}</p>
             </div>
           </div>
         </div>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="text-lg font-semibold text-slate-900">Student-Based INR Pricing</h3>
-          <span className="text-xs text-slate-500">Fair usage billing model</span>
-        </div>
+        <h3 className="text-lg font-semibold text-slate-900 mb-5">Resource Overview</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="rounded-xl border border-slate-200 p-5">
-            <p className="text-sm font-medium text-slate-500">Starter</p>
-            <p className="text-3xl font-bold text-slate-900 mt-2">{formatMoney(starterTier.monthlyFee)}</p>
-            <p className="text-xs text-slate-500">per school/month</p>
-            <ul className="mt-4 text-sm text-slate-700 space-y-2">
-              <li>Up to {starterTier.maxStudents} students</li>
-              <li>Core admin + attendance</li>
-              <li>Email support</li>
-            </ul>
+          <div className="rounded-lg bg-slate-50 p-4 border border-slate-200">
+            <p className="text-sm text-slate-600">Courses</p>
+            <p className="text-2xl font-bold text-slate-900 mt-1">{totalCourses.toLocaleString()}</p>
           </div>
-          <div className="rounded-xl border-2 border-blue-500 bg-blue-50 p-5">
-            <p className="text-sm font-medium text-blue-700">Growth</p>
-            <p className="text-3xl font-bold text-blue-900 mt-2">{formatMoney(growthTier.monthlyFee)}</p>
-            <p className="text-xs text-blue-700">per school/month</p>
-            <ul className="mt-4 text-sm text-blue-900 space-y-2">
-              <li>Up to {growthTier.maxStudents} students</li>
-              <li>Advanced analytics</li>
-              <li>Priority support</li>
-            </ul>
+          <div className="rounded-lg bg-slate-50 p-4 border border-slate-200">
+            <p className="text-sm text-slate-600">Assignments</p>
+            <p className="text-2xl font-bold text-slate-900 mt-1">{totalAssignments.toLocaleString()}</p>
           </div>
-          <div className="rounded-xl border border-slate-200 p-5">
-            <p className="text-sm font-medium text-slate-500">Scale</p>
-            <p className="text-3xl font-bold text-slate-900 mt-2">{formatMoney(scaleTier.baseMonthlyFee)}</p>
-            <p className="text-xs text-slate-500">base/month + {formatMoney(scaleTier.additionalPerStudent)}/student</p>
-            <ul className="mt-4 text-sm text-slate-700 space-y-2">
-              <li>After {scaleTier.includedStudents} students</li>
-              <li>Custom branding + API access</li>
-              <li>Dedicated account manager</li>
-            </ul>
+          <div className="rounded-lg bg-slate-50 p-4 border border-slate-200">
+            <p className="text-sm text-slate-600">Attendance Records</p>
+            <p className="text-2xl font-bold text-slate-900 mt-1">{totalAttendance.toLocaleString()}</p>
           </div>
         </div>
       </div>

@@ -462,85 +462,48 @@ export const getPlatformStatistics = catchAsync(async (req, res) => {
     createdAt: { $gte: thirtyDaysAgo } 
   });
   
-  const billableSchools = schools.filter(
-    school => school.status === 'active' && school.subscription.plan !== 'trial' && school.isSubscriptionActive()
-  );
-
-  const billingSummary = {
-    billableSchools: billableSchools.length,
-    starterSchools: 0,
-    growthSchools: 0,
-    scaleSchools: 0,
-    totalBillableStudents: 0
+  const schoolsByPlan = {
+    trial: schools.filter(s => s.subscription?.plan === 'trial').length,
+    basic: schools.filter(s => s.subscription?.plan === 'basic').length,
+    premium: schools.filter(s => s.subscription?.plan === 'premium').length,
+    enterprise: schools.filter(s => s.subscription?.plan === 'enterprise').length
   };
 
-  const estimatedRevenue = billableSchools.reduce((sum, school) => {
-    const studentCount = school.stats?.totalStudents || 0;
-    const { tier, monthlyCharge } = getBillingForStudentCount(studentCount);
+  const schoolsByStatus = {
+    active: schools.filter(s => s.status === 'active').length,
+    inactive: schools.filter(s => s.status === 'inactive').length,
+    suspended: schools.filter(s => s.status === 'suspended').length
+  };
 
-    if (tier === 'starter') billingSummary.starterSchools += 1;
-    if (tier === 'growth') billingSummary.growthSchools += 1;
-    if (tier === 'scale') billingSummary.scaleSchools += 1;
-    billingSummary.totalBillableStudents += studentCount;
-
-    return sum + monthlyCharge;
-  }, 0);
-
-  const projectedIfAllActiveSchools = schools
-    .filter(school => school.status === 'active')
-    .reduce((sum, school) => {
-      const studentCount = school.stats?.totalStudents || 0;
-      return sum + getBillingForStudentCount(studentCount).monthlyCharge;
-    }, 0);
-
-  const averageRevenuePerSchool = billingSummary.billableSchools > 0
-    ? Math.round(estimatedRevenue / billingSummary.billableSchools)
-    : 0;
+  const averageStudentsPerSchool = schools.length > 0 ? Math.round(totalStudents / schools.length) : 0;
+  const averageTeachersPerSchool = schools.length > 0 ? Math.round(totalTeachers / schools.length) : 0;
+  const averageCoursesPerSchool = schools.length > 0 ? Math.round(totalCourses / schools.length) : 0;
   
   res.json({
     success: true,
     data: {
       schools: {
         total: schools.length,
-        active: schools.filter(s => s.status === 'active').length,
-        trial: schools.filter(s => s.subscription.plan === 'trial').length,
-        paid: schools.filter(s => s.subscription.plan !== 'trial').length
+        ...schoolsByStatus,
+        byPlan: schoolsByPlan
       },
       users: {
         total: totalUsers,
         students: totalStudents,
         teachers: totalTeachers,
-        admins: totalAdmins
+        admins: totalAdmins,
+        averageStudentsPerSchool,
+        averageTeachersPerSchool
       },
       resources: {
         courses: totalCourses,
         assignments: totalAssignments,
-        attendanceRecords: totalAttendance
+        attendanceRecords: totalAttendance,
+        averageCoursesPerSchool
       },
       growth: {
         newSchoolsThisMonth,
         newUsersThisMonth
-      },
-      billing: {
-        model: 'per_student',
-        currency: STUDENT_BILLING_INR.currency,
-        tiers: {
-          starter: STUDENT_BILLING_INR.starter,
-          growth: STUDENT_BILLING_INR.growth,
-          scale: STUDENT_BILLING_INR.scale
-        },
-        summary: {
-          ...billingSummary,
-          averageRevenuePerSchool
-        },
-        projected: {
-          monthlyIfAllActiveSchoolsCharged: projectedIfAllActiveSchools
-        }
-      },
-      revenue: {
-        estimatedMonthly: estimatedRevenue,
-        estimatedAnnual: estimatedRevenue * 12,
-        currency: STUDENT_BILLING_INR.currency
       }
     }
   });
