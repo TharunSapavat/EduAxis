@@ -22,8 +22,6 @@ export const getStudentPerformance = async (req, res) => {
       });
     }
 
-    console.log('Analytics Request:', { studentId, courseId, schoolId });
-
     // Build query filters
     const gradeQuery = { studentId, schoolId };
     const attendanceQuery = { studentId, schoolId };
@@ -64,14 +62,6 @@ export const getStudentPerformance = async (req, res) => {
         type: 'assignment'
       }))
     ];
-
-    console.log('Data fetched:', { 
-      directGradesCount: directGrades.length,
-      gradedSubmissionsCount: gradedSubmissions.length,
-      totalGradesCount: grades.length,
-      attendanceCount: attendanceRecords.length,
-      enrollmentsCount: enrollments.length 
-    });
 
     // Calculate average grade
     const totalScore = grades.reduce((sum, grade) => sum + grade.score, 0);
@@ -211,8 +201,6 @@ export const getPerformanceTrend = async (req, res) => {
     const { courseId } = req.query;
     const schoolId = req.user.schoolId;
 
-    console.log('Trend request:', { studentId, courseId, schoolId });
-
     // Get grades from last 6 months
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
@@ -241,13 +229,6 @@ export const getPerformanceTrend = async (req, res) => {
     ];
 
     const attendanceRecords = await Attendance.find(query).sort({ date: 1 });
-
-    console.log('Trend data:', { 
-      directGradesCount: directGrades.length,
-      gradedSubmissionsCount: gradedSubmissions.length,
-      totalGradesCount: grades.length,
-      attendanceCount: attendanceRecords.length 
-    });
 
     // Group by month
     const monthlyData = {};
@@ -319,8 +300,6 @@ export const getGradeBreakdown = async (req, res) => {
     const { courseId } = req.query;
     const schoolId = req.user.schoolId;
 
-    console.log('Breakdown request:', { studentId, courseId, schoolId });
-
     const query = { studentId, schoolId };
     if (courseId) {
       query.courseId = courseId;
@@ -337,12 +316,6 @@ export const getGradeBreakdown = async (req, res) => {
       ...directGrades.map(g => ({ score: g.score, type: g.type })),
       ...gradedSubmissions.map(s => ({ score: s.marks || 0, type: 'assignment' }))
     ];
-
-    console.log('Breakdown data:', {
-      directGradesCount: directGrades.length,
-      gradedSubmissionsCount: gradedSubmissions.length,
-      totalGradesCount: allGrades.length
-    });
 
     // Group by type
     const breakdown = allGrades.reduce((acc, grade) => {

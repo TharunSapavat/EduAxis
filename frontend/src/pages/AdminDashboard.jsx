@@ -587,8 +587,6 @@ export default function AdminDashboard() {
     try {
       setUsersLoading(true);
       
-      console.log('Form data received:', JSON.stringify(data, null, 2)); // Debug log
-      
       // Convert DD-MM-YYYY to YYYY-MM-DD for backend
       const dateOfBirthFormatted = data.dateOfBirth
         ? data.dateOfBirth.split('-').reverse().join('-')
@@ -613,8 +611,6 @@ export default function AdminDashboard() {
         userData.grade = data.grade || undefined;
         userData.section = data.section || undefined;
       }
-      
-      console.log('Sending to backend:', JSON.stringify(userData, null, 2)); // Debug log
       
       let response;
       if (isEditUserMode && selectedUser) {

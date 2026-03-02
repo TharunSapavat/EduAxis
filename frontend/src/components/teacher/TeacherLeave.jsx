@@ -24,12 +24,8 @@ export default function TeacherLeave() {
   const fetchLeaveRequests = async () => {
     try {
       setLoading(true);
-      console.log('Fetching leave requests...');
       const response = await teacherAPI.getLeaveRequests();
-      console.log('Leave requests response:', response);
-      console.log('Response data:', response.data);
       if (response.data.success) {
-        console.log('Leave requests:', response.data.leaveRequests);
         setLeaveRequests(response.data.leaveRequests || []);
       } else {
         console.error('API returned success=false:', response.data);

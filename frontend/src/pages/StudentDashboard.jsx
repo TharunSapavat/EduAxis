@@ -403,8 +403,6 @@ export default function StudentDashboard() {
       setCoursesLoading(true);
       const studentId = user?._id || user?.id;
       const response = await studentAPI.getEnrollments(studentId);
-      console.log('Enrollments response:', response.data);
-      
       if (response.data.success) {
         // Map enrollments to course format with enrollmentId
         const enrolledCourses = (response.data.data || []).map(enrollment => ({
@@ -564,7 +562,6 @@ export default function StudentDashboard() {
     try {
       setLibraryLoading(true);
       const response = await studentAPI.getLibrary(params);
-      console.log('Library response:', response.data);
       if (response.data.success) {
         setLibrary(response.data.library);
       } else {
