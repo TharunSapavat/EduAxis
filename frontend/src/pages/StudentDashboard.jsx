@@ -29,7 +29,6 @@ import StudentLeave from '../components/student/StudentLeave';
 import StudentFees from '../components/student/StudentFees';
 import StudentMaterials from '../components/student/StudentMaterials';
 import CourseRegistration from '../components/student/CourseRegistration';
-import QuizModule from '../components/student/QuizModule';
 import StudentFeedbackDashboard from '../components/student/StudentFeedbackDashboard';
 import PerformanceAnalytics from '../components/student/PerformanceAnalytics';
 
@@ -742,12 +741,6 @@ export default function StudentDashboard() {
 
       case '/student/enrollment':
         return <CourseRegistration 
-          studentId={user?._id}
-          showNotification={showNotification}
-        />;
-
-      case '/student/quiz':
-        return <QuizModule 
           studentId={user?._id}
           showNotification={showNotification}
         />;

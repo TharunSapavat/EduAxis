@@ -10,7 +10,6 @@ import {
   Home, 
   MessageSquare,
   Download,
-  Zap,
   MessageCircle,
   TrendingUp
 } from 'lucide-react';
@@ -23,7 +22,6 @@ export const STUDENT_MODULES = [
   { id: 'attendance', icon: ClipboardList, title: 'Attendance', description: 'View attendance records' },
   { id: 'assignments', icon: FileText, title: 'Assignments', description: 'Submit and track assignments' },
   { id: 'materials', icon: Download, title: 'Study Materials', description: 'Download resources' },
-  { id: 'quiz', icon: Zap, title: 'Quizzes', description: 'Take quizzes and assessments' },
   { id: 'schedule', icon: Calendar, title: 'Weekly Schedule', description: 'See weekly classes' },
   { id: 'announcements', icon: Bell, title: 'Announcements', description: 'Stay updated' },
   { id: 'messages', icon: MessageSquare, title: 'Messages', description: 'Chat with teachers' },

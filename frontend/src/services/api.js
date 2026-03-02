@@ -120,14 +120,6 @@ export const studentAPI = {
   enrollCourse: (data) => api.post('/enrollments/enroll', data),
   dropCourse: (enrollmentId) => api.delete(`/enrollments/drop/${enrollmentId}`),
   
-  // NEW: Quiz APIs
-  getQuiz: (quizId) => api.get(`/quiz/${quizId}`),
-  checkQuizPrerequisite: (quizId, studentId) => api.get(`/quiz/check/${quizId}/${studentId}`),
-  startQuizAttempt: (data) => api.post('/quiz/attempt/start', data),
-  submitQuizAttempt: (data) => api.post('/quiz/attempt/submit', data),
-  getQuizResults: (attemptId) => api.get(`/quiz/results/${attemptId}`),
-  getQuizAttempts: (studentId, courseId) => api.get(`/quiz/attempts/${studentId}/${courseId}`),
-  
   // NEW: Feedback APIs
   submitFeedback: (data) => api.post('/feedback', data),
   getMyFeedback: (studentId) => api.get(`/feedback/student/${studentId}`),

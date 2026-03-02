@@ -13,7 +13,14 @@ export const getStudentEnrollments = async (req, res) => {
       schoolId,
       status: { $in: ['active', 'completed'] }
     })
-      .populate('courseId', 'name code description teacherId')
+      .populate({
+        path: 'courseId',
+        select: 'name code description teacherId semester status',
+        populate: {
+          path: 'teacherId',
+          select: 'name email'
+        }
+      })
       .select('-schoolId')
       .lean();
 
