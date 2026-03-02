@@ -664,6 +664,23 @@ export const makePayment = async (req, res) => {
       remarks: remarks || (lateFee > 0 ? `Includes late fee: ₹${lateFee}` : undefined)
     });
 
+    // Emit socket event for real-time updates
+    const io = req.app.get('io');
+    if (io) {
+      // Broadcast to all admin users in the school
+      io.emit('payment:created', {
+        schoolId: req.schoolId,
+        payment: {
+          _id: payment._id,
+          studentName: payment.studentName,
+          amount: payment.amount,
+          paymentMethod: payment.paymentMethod,
+          feeTitle: payment.feeTitle,
+          paymentDate: payment.paymentDate
+        }
+      });
+    }
+
     // TODO: Send email notification
 
     res.json({

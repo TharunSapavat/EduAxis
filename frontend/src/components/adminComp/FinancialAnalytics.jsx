@@ -1,31 +1,28 @@
 import { useState, useEffect } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { DollarSign, TrendingUp, AlertCircle } from 'lucide-react';
+import { DollarSign, TrendingUp, AlertCircle, RefreshCw } from 'lucide-react';
 import { adminAPI } from '../../services/api';
+import io from 'socket.io-client';
 
 export default function FinancialAnalytics({ showNotification }) {
   const [paymentData, setPaymentData] = useState(null);
   const [trendData, setTrendData] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchFinancialData();
-  }, []);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   const fetchFinancialData = async () => {
     try {
       setLoading(true);
-      const res = await adminAPI.getPaymentStats();
-      setPaymentData(res.data.data);
-
-      // Generate trend data (would come from backend)
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-      const trend = months.map((month, idx) => ({
-        month,
-        collected: Math.random() * 500000 + 300000,
-        pending: Math.random() * 200000 + 100000
-      }));
-      setTrendData(trend);
+      
+      // Fetch payment stats and trends in parallel
+      const [statsRes, trendsRes] = await Promise.all([
+        adminAPI.getPaymentStats(),
+        adminAPI.getPaymentTrends(6)
+      ]);
+      
+      setPaymentData(statsRes.data.data);
+      setTrendData(trendsRes.data.data || []);
+      setLastUpdated(new Date());
     } catch (err) {
       console.error('Error fetching financial data:', err);
       showNotification('Failed to load financial data', 'error');
@@ -34,20 +31,75 @@ export default function FinancialAnalytics({ showNotification }) {
     }
   };
 
+  useEffect(() => {
+    fetchFinancialData();
+
+    // Connect to socket for real-time updates
+    const socket = io('http://localhost:5000', { withCredentials: true });
+
+    socket.on('connect', () => {
+      console.log('Financial analytics connected to socket');
+    });
+
+    // Listen for payment events
+    socket.on('payment:created', (data) => {
+      console.log('Payment received via socket:', data);
+      // Refresh financial data when a new payment is made
+      fetchFinancialData();
+      if (data.payment) {
+        showNotification(`New payment received: ₹${data.payment.amount.toLocaleString()} from ${data.payment.studentName}`, 'success');
+      }
+    });
+
+    socket.on('disconnect', () => {
+      console.log('Financial analytics socket disconnected');
+    });
+
+    // Cleanup on unmount
+    return () => {
+      socket.off('payment:created');
+      socket.off('connect');
+      socket.off('disconnect');
+      socket.close();
+    };
+  }, []);
+
   if (loading) {
     return <div className="text-center py-12">Loading financial data...</div>;
   }
 
-  const collectionRate = paymentData
-    ? ((paymentData.completed / paymentData.total) * 100).toFixed(1)
+  const collectionRate = paymentData && paymentData.expectedAmount > 0
+    ? ((paymentData.totalAmount / paymentData.expectedAmount) * 100).toFixed(1)
     : 0;
 
-  const outstandingFees = paymentData
-    ? (paymentData.totalAmount - (paymentData.totalAmount * (collectionRate / 100)))
+  const outstandingFees = paymentData?.outstandingAmount || 0;
+
+  const outstandingPercentage = paymentData && paymentData.expectedAmount > 0
+    ? ((outstandingFees / paymentData.expectedAmount) * 100).toFixed(1)
     : 0;
 
   return (
     <div className="space-y-6">
+      {/* Header with last updated time and refresh button */}
+      <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-md">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900">Financial Analytics</h2>
+          {lastUpdated && (
+            <p className="text-sm text-slate-600 mt-1">
+              Last updated: {lastUpdated.toLocaleTimeString()}
+            </p>
+          )}
+        </div>
+        <button
+          onClick={fetchFinancialData}
+          disabled={loading}
+          className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          <span>Refresh</span>
+        </button>
+      </div>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-linear-to-br from-green-50 to-green-100 p-6 rounded-xl border border-green-200">
@@ -63,13 +115,13 @@ export default function FinancialAnalytics({ showNotification }) {
           <p className="text-3xl font-bold text-orange-900 mt-1">
             ₹{(outstandingFees).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
           </p>
-          <p className="text-sm text-orange-700 mt-2">{((outstandingFees / paymentData?.totalAmount) * 100).toFixed(1)}% pending</p>
+          <p className="text-sm text-orange-700 mt-2">{outstandingPercentage}% pending</p>
         </div>
 
         <div className="bg-linear-to-br from-blue-50 to-blue-100 p-6 rounded-xl border border-blue-200">
           <p className="text-blue-700 text-sm font-medium">Completed Payments</p>
           <p className="text-3xl font-bold text-blue-900 mt-1">{paymentData?.completed || 0}</p>
-          <p className="text-sm text-blue-700 mt-2">of {paymentData?.total}</p>
+          <p className="text-sm text-blue-700 mt-2">of {paymentData?.total || 0} expected</p>
         </div>
 
         <div className="bg-linear-to-br from-purple-50 to-purple-100 p-6 rounded-xl border border-purple-200">
@@ -104,45 +156,36 @@ export default function FinancialAnalytics({ showNotification }) {
       <div className="bg-white p-6 rounded-xl shadow-md">
         <h3 className="font-semibold text-slate-900 mb-4">Payment Methods Distribution</h3>
         <div className="space-y-3">
-          {[
-            { method: 'Online Payment', count: 45, percentage: 45 },
-            { method: 'Bank Transfer', count: 25, percentage: 25 },
-            { method: 'Cash', count: 20, percentage: 20 },
-            { method: 'Cheque', count: 10, percentage: 10 }
-          ].map(pm => (
-            <div key={pm.method}>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-sm font-medium text-slate-700">{pm.method}</span>
-                <span className="text-sm font-semibold text-slate-900">{pm.percentage}%</span>
-              </div>
-              <div className="w-full bg-slate-200 rounded-full h-2">
-                <div
-                  className="bg-purple-600 h-2 rounded-full"
-                  style={{ width: `${pm.percentage}%` }}
-                ></div>
-              </div>
-            </div>
-          ))}
+          {paymentData?.byMethod && paymentData.byMethod.length > 0 ? (
+            paymentData.byMethod.map(pm => {
+              const percentage = paymentData.completed > 0 
+                ? ((pm.count / paymentData.completed) * 100).toFixed(1)
+                : 0;
+              return (
+                <div key={pm._id}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-medium text-slate-700">
+                      {pm._id} ({pm.count} payments)
+                    </span>
+                    <span className="text-sm font-semibold text-slate-900">
+                      {percentage}% • ₹{pm.total.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-200 rounded-full h-2">
+                    <div
+                      className="bg-purple-600 h-2 rounded-full"
+                      style={{ width: `${percentage}%` }}
+                    ></div>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <p className="text-slate-500 text-center py-4">No payment data available</p>
+          )}
         </div>
       </div>
 
-      {/* Outstanding Fees Alert */}
-      {outstandingFees > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-6">
-          <div className="flex items-start space-x-4">
-            <AlertCircle className="w-6 h-6 text-red-600 mt-1 shrink-0" />
-            <div>
-              <h3 className="font-semibold text-red-900">Action Required</h3>
-              <p className="text-red-800 mt-1">
-                ₹{outstandingFees.toLocaleString('en-IN', { maximumFractionDigits: 0 })} in outstanding fees from {Math.ceil(paymentData?.total * 0.3)} students.
-              </p>
-              <button className="mt-3 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-sm font-medium">
-                Send Reminders
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

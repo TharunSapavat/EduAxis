@@ -20,6 +20,7 @@ import {
   getPayments,
   createPayment,
   getPaymentStats,
+  getPaymentTrends,
   exportPayments,
   sendFeeReminders,
   getClassOverview,
@@ -74,6 +75,7 @@ router.delete('/fees/:id', deleteFee);
 router.get('/payments', getPayments);
 router.post('/payments', createPayment);
 router.get('/payments/stats', getPaymentStats);
+router.get('/payments/trends', getPaymentTrends);
 router.get('/payments/export', exportPayments);
 router.post('/fees/reminders', sendFeeReminders);
 
