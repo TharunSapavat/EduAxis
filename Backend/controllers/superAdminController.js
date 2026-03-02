@@ -3,6 +3,8 @@ import User from '../models/User.js';
 import Course from '../models/Course.js';
 import Assignment from '../models/Assignment.js';
 import Attendance from '../models/Attendance.js';
+import PricingPlan from '../models/PricingPlan.js';
+import AuditLog from '../models/AuditLog.js';
 import { catchAsync, AppError } from '../middleware/errorHandler.js';
 
 const STUDENT_BILLING_INR = {
@@ -47,6 +49,66 @@ const getBillingForStudentCount = (studentCount = 0) => {
     tier: 'scale',
     monthlyCharge: STUDENT_BILLING_INR.scale.baseMonthlyFee + (extraStudents * STUDENT_BILLING_INR.scale.additionalPerStudent)
   };
+};
+
+const DEFAULT_DYNAMIC_PLANS = [
+  {
+    code: 'basic',
+    name: 'Basic',
+    description: 'Perfect for small schools',
+    monthlyPrice: 2999,
+    annualPrice: 29990,
+    maxStudents: 500,
+    maxTeachers: 50,
+    features: [{ label: 'Up to 500 students' }, { label: 'Up to 50 teachers' }, { label: 'Email support' }],
+    displayOrder: 1,
+    isActive: true
+  },
+  {
+    code: 'premium',
+    name: 'Premium',
+    description: 'For growing schools',
+    monthlyPrice: 5999,
+    annualPrice: 59990,
+    maxStudents: 2000,
+    maxTeachers: 200,
+    features: [{ label: 'Up to 2000 students' }, { label: 'Up to 200 teachers' }, { label: 'Priority email & phone support' }],
+    displayOrder: 2,
+    isActive: true
+  },
+  {
+    code: 'enterprise',
+    name: 'Enterprise',
+    description: 'For large-scale institutions',
+    monthlyPrice: 9999,
+    annualPrice: 99990,
+    maxStudents: null,
+    maxTeachers: null,
+    features: [
+      { label: 'Unlimited students & teachers' },
+      { label: 'Custom API access' },
+      { label: 'Dedicated account manager' },
+      { label: '24/7 priority support' }
+    ],
+    displayOrder: 3,
+    isActive: true
+  }
+];
+
+const ensureDefaultPricingPlans = async () => {
+  const count = await PricingPlan.countDocuments();
+  if (count > 0) return;
+  await PricingPlan.insertMany(DEFAULT_DYNAMIC_PLANS);
+};
+
+const normalizeFeatures = (features = []) => {
+  if (!Array.isArray(features)) return [];
+  return features
+    .map((feature) => {
+      if (typeof feature === 'string') return { label: feature.trim() };
+      return { label: (feature?.label || '').trim() };
+    })
+    .filter((feature) => feature.label.length > 0);
 };
 
 // @desc    Get super admin dashboard statistics
@@ -433,6 +495,214 @@ export const updateSchoolSubscription = catchAsync(async (req, res) => {
     success: true,
     message: 'Subscription updated successfully',
     data: school
+  });
+});
+
+// @desc    Get dynamic pricing plans for platform settings
+// @route   GET /api/superadmin/settings/pricing-plans
+// @access  Super Admin
+export const getPricingPlansSettings = catchAsync(async (req, res) => {
+  await ensureDefaultPricingPlans();
+
+  const plans = await PricingPlan.find().sort({ displayOrder: 1 });
+
+  res.json({
+    success: true,
+    data: {
+      safeguards: {
+        confirmationText: 'CONFIRM_PRICING_UPDATE',
+        applyModes: ['new_subscriptions_only', 'next_renewal_all']
+      },
+      plans
+    }
+  });
+});
+
+// @desc    Publish pricing plans with safeguards
+// @route   POST /api/superadmin/settings/pricing-plans/publish
+// @access  Super Admin
+export const publishPricingPlans = catchAsync(async (req, res) => {
+  const { plans, applyMode = 'new_subscriptions_only', confirmText, reason = '' } = req.body;
+
+  if (confirmText !== 'CONFIRM_PRICING_UPDATE') {
+    throw new AppError('Confirmation text mismatch. Use CONFIRM_PRICING_UPDATE', 400);
+  }
+
+  if (!Array.isArray(plans) || plans.length === 0) {
+    throw new AppError('No pricing plans provided for publish', 400);
+  }
+
+  if (!['new_subscriptions_only', 'next_renewal_all'].includes(applyMode)) {
+    throw new AppError('Invalid apply mode selected', 400);
+  }
+
+  await ensureDefaultPricingPlans();
+
+  const existingPlans = await PricingPlan.find();
+  const existingMap = new Map(existingPlans.map((plan) => [plan.code, plan]));
+  const validCodes = ['basic', 'premium', 'enterprise'];
+
+  let impactedSchools = 0;
+  const updateResults = [];
+
+  for (const incomingPlan of plans) {
+    const code = String(incomingPlan.code || '').toLowerCase();
+    if (!validCodes.includes(code)) {
+      throw new AppError(`Invalid plan code: ${incomingPlan.code}`, 400);
+    }
+
+    const monthlyPrice = Number(incomingPlan.monthlyPrice);
+    const annualPrice = Number(incomingPlan.annualPrice);
+    const maxStudents = incomingPlan.maxStudents === null || incomingPlan.maxStudents === '' ? null : Number(incomingPlan.maxStudents);
+    const maxTeachers = incomingPlan.maxTeachers === null || incomingPlan.maxTeachers === '' ? null : Number(incomingPlan.maxTeachers);
+
+    if (Number.isNaN(monthlyPrice) || monthlyPrice < 0) {
+      throw new AppError(`Invalid monthly price for ${code}`, 400);
+    }
+    if (Number.isNaN(annualPrice) || annualPrice < 0) {
+      throw new AppError(`Invalid annual price for ${code}`, 400);
+    }
+    if (maxStudents !== null && (Number.isNaN(maxStudents) || maxStudents < 0)) {
+      throw new AppError(`Invalid max students for ${code}`, 400);
+    }
+    if (maxTeachers !== null && (Number.isNaN(maxTeachers) || maxTeachers < 0)) {
+      throw new AppError(`Invalid max teachers for ${code}`, 400);
+    }
+
+    const existingPlan = existingMap.get(code);
+    const historyEntry = existingPlan
+      ? {
+          version: existingPlan.version,
+          monthlyPrice: existingPlan.monthlyPrice,
+          annualPrice: existingPlan.annualPrice,
+          maxStudents: existingPlan.maxStudents,
+          maxTeachers: existingPlan.maxTeachers,
+          changedAt: new Date(),
+          changedBy: req.user?._id,
+          reason: reason || 'Platform pricing publish'
+        }
+      : null;
+
+    const updated = await PricingPlan.findOneAndUpdate(
+      { code },
+      {
+        $set: {
+          name: incomingPlan.name || code.charAt(0).toUpperCase() + code.slice(1),
+          description: incomingPlan.description || '',
+          monthlyPrice,
+          annualPrice,
+          maxStudents,
+          maxTeachers,
+          features: normalizeFeatures(incomingPlan.features),
+          isActive: incomingPlan.isActive !== false,
+          displayOrder: Number(incomingPlan.displayOrder || 0),
+          'publishPolicy.applyMode': applyMode,
+          'publishPolicy.lastPublishedAt': new Date(),
+          'publishPolicy.lastPublishedBy': req.user?._id
+        },
+        ...(historyEntry ? { $push: { versionHistory: historyEntry }, $inc: { version: 1 } } : { $setOnInsert: { version: 1 } })
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    updateResults.push({
+      code: updated.code,
+      monthlyPrice: updated.monthlyPrice,
+      annualPrice: updated.annualPrice,
+      version: updated.version
+    });
+
+    await AuditLog.create({
+      userId: req.user?._id,
+      userName: req.user?.name,
+      userRole: req.user?.role,
+      action: 'PRICING_PLAN_UPDATED',
+      resource: 'PricingPlan',
+      resourceId: updated._id,
+      resourceName: updated.code,
+      changes: {
+        before: existingPlan
+          ? {
+              monthlyPrice: existingPlan.monthlyPrice,
+              annualPrice: existingPlan.annualPrice,
+              maxStudents: existingPlan.maxStudents,
+              maxTeachers: existingPlan.maxTeachers,
+              version: existingPlan.version
+            }
+          : null,
+        after: {
+          monthlyPrice: updated.monthlyPrice,
+          annualPrice: updated.annualPrice,
+          maxStudents: updated.maxStudents,
+          maxTeachers: updated.maxTeachers,
+          version: updated.version,
+          applyMode
+        }
+      },
+      status: 'success'
+    });
+  }
+
+  if (applyMode === 'next_renewal_all') {
+    const activePlanMap = new Map(updateResults.map((item) => [item.code, item]));
+    const eligibleSchools = await School.find({
+      status: { $in: ['active', 'inactive'] },
+      'subscription.plan': { $in: validCodes }
+    });
+
+    for (const school of eligibleSchools) {
+      const pricing = activePlanMap.get(school.subscription.plan);
+      if (!pricing) continue;
+
+      school.billing.monthlyPrice = pricing.monthlyPrice;
+      school.billing.annualPrice = pricing.annualPrice;
+
+      if (school.subscription.plan !== 'enterprise') {
+        const publishedPlan = plans.find((plan) => String(plan.code || '').toLowerCase() === school.subscription.plan);
+        if (publishedPlan && publishedPlan.maxStudents !== undefined) {
+          school.subscription.maxStudents = publishedPlan.maxStudents === null || publishedPlan.maxStudents === ''
+            ? null
+            : Number(publishedPlan.maxStudents);
+        }
+      }
+
+      await school.save();
+      impactedSchools += 1;
+    }
+  }
+
+  await AuditLog.create({
+    userId: req.user?._id,
+    userName: req.user?.name,
+    userRole: req.user?.role,
+    action: 'PRICING_PUBLISHED',
+    resource: 'PlatformSettings',
+    resourceName: 'DynamicPricingPlans',
+    changes: {
+      before: null,
+      after: {
+        applyMode,
+        plans: updateResults,
+        impactedSchools,
+        reason
+      }
+    },
+    status: 'success'
+  });
+
+  res.json({
+    success: true,
+    message: 'Pricing plans published successfully',
+    data: {
+      applyMode,
+      impactedSchools,
+      plans: updateResults,
+      safeguards: {
+        confirmationRequired: true,
+        immutableBillingHistory: true,
+        auditLogged: true
+      }
+    }
   });
 });
 

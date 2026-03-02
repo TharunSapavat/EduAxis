@@ -26,7 +26,8 @@ const auditLogSchema = new mongoose.Schema({
       'GRADE_SUBMITTED', 'ATTENDANCE_MARKED',
       'FEE_CREATED', 'PAYMENT_RECORDED',
       'LEAVE_APPROVED', 'LEAVE_REJECTED',
-      'ANNOUNCEMENT_POSTED', 'ANNOUNCEMENT_DELETED'
+      'ANNOUNCEMENT_POSTED', 'ANNOUNCEMENT_DELETED',
+      'PRICING_PLAN_UPDATED', 'PRICING_PUBLISHED'
     ]
   },
   resource: {
@@ -34,7 +35,8 @@ const auditLogSchema = new mongoose.Schema({
     enum: [
       'User', 'Course', 'Enrollment', 'Grade', 'Attendance',
       'Fee', 'Payment', 'Leave', 'Announcement', 'Quiz',
-      'Module', 'Feedback', 'Submission', 'Timetable'
+      'Module', 'Feedback', 'Submission', 'Timetable',
+      'PricingPlan', 'PlatformSettings'
     ],
     required: true
   },

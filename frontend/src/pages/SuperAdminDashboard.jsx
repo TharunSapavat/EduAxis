@@ -370,10 +370,7 @@ const SuperAdminDashboard = () => {
       case '/superadmin/settings':
         return (
           <div>
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h2 className="text-2xl font-bold text-slate-900 mb-4">Platform Settings</h2>
-              <p className="text-slate-600">Settings management coming soon...</p>
-            </div>
+            <SuperAdminSettings />
           </div>
         );
 
@@ -804,6 +801,255 @@ const PlatformStatistics = ({ stats }) => {
             <p className="text-sm text-slate-600">Attendance Records</p>
             <p className="text-2xl font-bold text-slate-900 mt-1">{totalAttendance.toLocaleString()}</p>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const SuperAdminSettings = () => {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [plans, setPlans] = useState([]);
+  const [applyMode, setApplyMode] = useState('new_subscriptions_only');
+  const [confirmText, setConfirmText] = useState('');
+  const [reason, setReason] = useState('');
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const fetchPricingSettings = async () => {
+      try {
+        setLoading(true);
+        const response = await api.get('/superadmin/settings/pricing-plans');
+        const apiPlans = response.data?.data?.plans || [];
+        setPlans(apiPlans.map((plan) => ({
+          code: plan.code,
+          name: plan.name,
+          description: plan.description || '',
+          monthlyPrice: plan.monthlyPrice || 0,
+          annualPrice: plan.annualPrice || 0,
+          maxStudents: plan.maxStudents ?? '',
+          maxTeachers: plan.maxTeachers ?? '',
+          isActive: plan.isActive !== false,
+          displayOrder: plan.displayOrder || 0,
+          featuresText: Array.isArray(plan.features) ? plan.features.map((feature) => feature.label).join('\n') : ''
+        })));
+
+        const firstPolicy = apiPlans[0]?.publishPolicy?.applyMode;
+        if (firstPolicy) setApplyMode(firstPolicy);
+      } catch (fetchError) {
+        setError(fetchError.response?.data?.message || 'Failed to load pricing settings');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPricingSettings();
+  }, []);
+
+  const updatePlanField = (code, field, value) => {
+    setPlans((currentPlans) =>
+      currentPlans.map((plan) => (plan.code === code ? { ...plan, [field]: value } : plan))
+    );
+  };
+
+  const handlePublish = async () => {
+    try {
+      setSaving(true);
+      setError('');
+      setMessage('');
+
+      const payload = {
+        plans: plans.map((plan) => ({
+          code: plan.code,
+          name: plan.name,
+          description: plan.description,
+          monthlyPrice: Number(plan.monthlyPrice),
+          annualPrice: Number(plan.annualPrice),
+          maxStudents: plan.maxStudents === '' ? null : Number(plan.maxStudents),
+          maxTeachers: plan.maxTeachers === '' ? null : Number(plan.maxTeachers),
+          isActive: !!plan.isActive,
+          displayOrder: Number(plan.displayOrder || 0),
+          features: String(plan.featuresText || '')
+            .split('\n')
+            .map((feature) => feature.trim())
+            .filter(Boolean)
+        })),
+        applyMode,
+        confirmText,
+        reason
+      };
+
+      const response = await api.post('/superadmin/settings/pricing-plans/publish', payload);
+      setMessage(response.data?.message || 'Pricing plans published successfully');
+      setConfirmText('');
+    } catch (publishError) {
+      setError(publishError.response?.data?.message || 'Failed to publish pricing plans');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl shadow-md p-6">
+        <div className="flex items-center gap-3">
+          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-red-600"></div>
+          <p className="text-slate-600">Loading pricing settings...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-linear-to-r from-red-600 to-pink-600 rounded-2xl p-7 text-white shadow-lg">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+          <div>
+            <h2 className="text-2xl md:text-3xl font-bold">Dynamic Pricing Settings</h2>
+            <p className="text-red-100 mt-2">Update subscription plans with controlled publish safeguards.</p>
+          </div>
+          <div className="bg-white/20 rounded-lg px-4 py-2 text-sm font-medium">
+            {plans.filter((plan) => plan.isActive).length} active plans
+          </div>
+        </div>
+      </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 shadow-sm">{error}</div>
+      )}
+      {message && (
+        <div className="bg-green-50 border border-green-200 text-green-700 rounded-xl p-4 shadow-sm">{message}</div>
+      )}
+
+      <div className="bg-white rounded-xl shadow-md p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl font-semibold text-slate-900">Plan Configuration</h3>
+          <span className="text-sm text-slate-500">All prices in INR</span>
+        </div>
+        {plans.map((plan) => (
+          <div key={plan.code} className="border border-slate-200 rounded-xl p-4 space-y-3 bg-slate-50/40">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-slate-900 capitalize">{plan.code} Plan</h3>
+              <label className="flex items-center gap-2 text-sm text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={plan.isActive}
+                  onChange={(e) => updatePlanField(plan.code, 'isActive', e.target.checked)}
+                />
+                Active
+              </label>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+              <input
+                className="px-3 py-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                value={plan.name}
+                onChange={(e) => updatePlanField(plan.code, 'name', e.target.value)}
+                placeholder="Plan name"
+              />
+              <input
+                type="number"
+                min="0"
+                className="px-3 py-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                value={plan.monthlyPrice}
+                onChange={(e) => updatePlanField(plan.code, 'monthlyPrice', e.target.value)}
+                placeholder="Monthly price"
+              />
+              <input
+                type="number"
+                min="0"
+                className="px-3 py-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                value={plan.annualPrice}
+                onChange={(e) => updatePlanField(plan.code, 'annualPrice', e.target.value)}
+                placeholder="Annual price"
+              />
+              <input
+                type="number"
+                min="0"
+                className="px-3 py-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                value={plan.displayOrder}
+                onChange={(e) => updatePlanField(plan.code, 'displayOrder', e.target.value)}
+                placeholder="Display order"
+              />
+              <input
+                type="number"
+                min="0"
+                className="px-3 py-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                value={plan.maxStudents}
+                onChange={(e) => updatePlanField(plan.code, 'maxStudents', e.target.value)}
+                placeholder="Max students (blank = unlimited)"
+              />
+              <input
+                type="number"
+                min="0"
+                className="px-3 py-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                value={plan.maxTeachers}
+                onChange={(e) => updatePlanField(plan.code, 'maxTeachers', e.target.value)}
+                placeholder="Max teachers (blank = unlimited)"
+              />
+              <input
+                className="md:col-span-2 px-3 py-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                value={plan.description}
+                onChange={(e) => updatePlanField(plan.code, 'description', e.target.value)}
+                placeholder="Plan description"
+              />
+            </div>
+            <textarea
+              rows={4}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              value={plan.featuresText}
+              onChange={(e) => updatePlanField(plan.code, 'featuresText', e.target.value)}
+              placeholder="One feature per line"
+            />
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-white rounded-xl shadow-md p-6 space-y-4">
+        <h3 className="text-xl font-semibold text-slate-900">Publish Safeguards</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Apply Mode</label>
+            <select
+              value={applyMode}
+              onChange={(e) => setApplyMode(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+            >
+              <option value="new_subscriptions_only">Apply to new subscriptions only</option>
+              <option value="next_renewal_all">Apply to all schools on next renewal</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Change Reason (audit log)</label>
+            <input
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              placeholder="Reason for this update"
+            />
+          </div>
+        </div>
+
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <p className="text-amber-800 text-sm font-medium">Safety check</p>
+          <p className="text-amber-700 text-sm mt-1">Type <span className="font-semibold">CONFIRM_PRICING_UPDATE</span> to publish plan changes.</p>
+          <input
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            className="w-full mt-3 px-3 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+            placeholder="CONFIRM_PRICING_UPDATE"
+          />
+        </div>
+
+        <div className="flex justify-end">
+          <button
+            onClick={handlePublish}
+            disabled={saving}
+            className="px-5 py-2.5 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
+          >
+            {saving ? 'Publishing...' : 'Publish Pricing Changes'}
+          </button>
         </div>
       </div>
     </div>

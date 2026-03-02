@@ -266,6 +266,10 @@ export const superAdminAPI = {
   getSubscriptionAnalytics: () => api.get('/superadmin/analytics/subscriptions'),
   getRevenueTrends: (months = 6) => api.get('/superadmin/analytics/revenue-trends', { params: { months } }),
   getSubscriptionsList: (params) => api.get('/superadmin/analytics/subscriptions-list', { params }),
+
+  // Dynamic Pricing Settings
+  getPricingPlansSettings: () => api.get('/superadmin/settings/pricing-plans'),
+  publishPricingPlans: (payload) => api.post('/superadmin/settings/pricing-plans/publish', payload),
 };
 
 export default api;

@@ -11,7 +11,9 @@ import {
   getPlatformStatistics,
   getSubscriptionAnalytics,
   getRevenueTrends,
-  getSubscriptionsList
+  getSubscriptionsList,
+  getPricingPlansSettings,
+  publishPricingPlans
 } from '../controllers/superAdminController.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
 
@@ -24,6 +26,10 @@ router.use(roleMiddleware('superadmin'));
 // Dashboard and statistics
 router.get('/dashboard', getSuperAdminDashboard);
 router.get('/statistics', getPlatformStatistics);
+
+// Platform settings (dynamic pricing)
+router.get('/settings/pricing-plans', getPricingPlansSettings);
+router.post('/settings/pricing-plans/publish', publishPricingPlans);
 
 // Subscription and revenue analytics (Phase 1)
 router.get('/analytics/subscriptions', getSubscriptionAnalytics);

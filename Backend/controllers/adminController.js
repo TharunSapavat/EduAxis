@@ -10,6 +10,7 @@ import LeaveRequest from '../models/LeaveRequest.js';
 import LibraryResource from '../models/LibraryResource.js';
 import Timetable from '../models/Timetable.js';
 import School from '../models/School.js';
+import PricingPlan from '../models/PricingPlan.js';
 import { assertSameSchoolStudent } from '../middleware/tenantGuards.js';
 
 const parseCSVLine = (line) => {
@@ -1919,18 +1920,28 @@ export const getStudentDetails = async (req, res) => {
 // @access  Admin
 export const getAvailablePlans = async (req, res) => {
   try {
-    const plans = [
+    const plans = await PricingPlan.find({ isActive: true })
+      .sort({ displayOrder: 1 })
+      .select('code name monthlyPrice annualPrice description features maxStudents maxTeachers');
+
+    const normalizedPlans = plans.map((plan) => ({
+      id: plan.code,
+      name: plan.name,
+      monthlyPrice: plan.monthlyPrice,
+      annualPrice: plan.annualPrice,
+      description: plan.description || '',
+      features: Array.isArray(plan.features) ? plan.features.map((feature) => feature.label) : [],
+      limitations: []
+    }));
+
+    const fallbackPlans = [
       {
         id: 'basic',
         name: 'Basic',
         monthlyPrice: 2999,
         annualPrice: 29990,
         description: 'Perfect for small schools',
-        features: [
-          'Up to 500 students',
-          'Up to 50 teachers',
-          'Email support'
-        ],
+        features: ['Up to 500 students', 'Up to 50 teachers', 'Email support'],
         limitations: []
       },
       {
@@ -1939,11 +1950,7 @@ export const getAvailablePlans = async (req, res) => {
         monthlyPrice: 5999,
         annualPrice: 59990,
         description: 'For growing schools',
-        features: [
-          'Up to 2000 students',
-          'Up to 200 teachers',
-          'Priority email & phone support'
-        ],
+        features: ['Up to 2000 students', 'Up to 200 teachers', 'Priority email & phone support'],
         limitations: []
       },
       {
@@ -1952,20 +1959,14 @@ export const getAvailablePlans = async (req, res) => {
         monthlyPrice: 9999,
         annualPrice: 99990,
         description: 'For large-scale institutions',
-        features: [
-          'Unlimited students & teachers',
-          'Custom API access',
-          'Dedicated account manager',
-          '24/7 priority support',
-          'Custom integrations available'
-        ],
+        features: ['Unlimited students & teachers', 'Custom API access', 'Dedicated account manager'],
         limitations: []
       }
     ];
 
     res.json({
       success: true,
-      data: { plans }
+      data: { plans: normalizedPlans.length > 0 ? normalizedPlans : fallbackPlans }
     });
   } catch (error) {
     console.error('Error fetching plans:', error);
@@ -2031,14 +2032,20 @@ export const upgradePlan = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid plan selected' });
     }
 
-    // Plan pricing
-    const planPricing = {
-      basic: { monthlyPrice: 2999, annualPrice: 29990, maxStudents: 500 },
-      premium: { monthlyPrice: 5999, annualPrice: 59990, maxStudents: 2000 },
-      enterprise: { monthlyPrice: 9999, annualPrice: 99990, maxStudents: null }
-    };
+    let pricing = await PricingPlan.findOne({ code: newPlan, isActive: true });
+    if (!pricing) {
+      const fallbackPricing = {
+        basic: { monthlyPrice: 2999, annualPrice: 29990, maxStudents: 500 },
+        premium: { monthlyPrice: 5999, annualPrice: 59990, maxStudents: 2000 },
+        enterprise: { monthlyPrice: 9999, annualPrice: 99990, maxStudents: null }
+      };
+      pricing = fallbackPricing[newPlan];
+    }
 
-    const pricing = planPricing[newPlan];
+    if (!pricing) {
+      return res.status(400).json({ success: false, message: 'Selected plan is not available' });
+    }
+
     const amountToPay = billingCycle === 'annual' ? pricing.annualPrice : pricing.monthlyPrice;
 
     const school = await School.findById(req.schoolId);
