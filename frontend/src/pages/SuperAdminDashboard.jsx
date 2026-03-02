@@ -1037,39 +1037,57 @@ const PlatformStatistics = ({ stats }) => {
   );
 };
 
-// School Details Component
-const SchoolDetails = ({ school, onClose }) => {
+// School Details Modal
+const SchoolDetailsModal = ({ school, onClose, onUpdateStatus }) => {
+  if (!school) return null;
+
+  const stats = school.stats || {};
+  const schoolId = school._id || school.id;
+
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">{school.name}</h2>
-        <button
-          onClick={onClose}
-          className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
-        >
-          Close
-        </button>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-gray-50 p-4 rounded-lg">
-          <h3 className="font-semibold mb-3">Basic Information</h3>
-          <dl className="space-y-2 text-sm">
-            <div><dt className="text-gray-600">Code:</dt><dd className="font-medium">{school.code}</dd></div>
-            <div><dt className="text-gray-600">Email:</dt><dd className="font-medium">{school.email}</dd></div>
-            <div><dt className="text-gray-600">Phone:</dt><dd className="font-medium">{school.phone}</dd></div>
-            <div><dt className="text-gray-600">Status:</dt><dd><StatusBadge status={school.status} /></dd></div>
-          </dl>
-        </div>
-        
-        <div className="bg-gray-50 p-4 rounded-lg">
-          <h3 className="font-semibold mb-3">Statistics</h3>
-          <dl className="space-y-2 text-sm">
-            <div><dt className="text-gray-600">Students:</dt><dd className="font-medium">{school.stats.totalStudents}</dd></div>
-            <div><dt className="text-gray-600">Teachers:</dt><dd className="font-medium">{school.stats.totalTeachers}</dd></div>
-            <div><dt className="text-gray-600">Admins:</dt><dd className="font-medium">{school.stats.totalAdmins}</dd></div>
-            <div><dt className="text-gray-600">Courses:</dt><dd className="font-medium">{school.stats.totalCourses}</dd></div>
-          </dl>
+    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-6 border-b border-slate-200 pb-4">
+            <h2 className="text-2xl font-bold text-slate-900">{school.name || 'School Details'}</h2>
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-slate-200 rounded-lg hover:bg-slate-300"
+            >
+              Close
+            </button>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-slate-50 p-4 rounded-lg">
+              <h3 className="font-semibold mb-3">Basic Information</h3>
+              <dl className="space-y-2 text-sm">
+                <div><dt className="text-slate-600">Code:</dt><dd className="font-medium">{school.code || 'N/A'}</dd></div>
+                <div><dt className="text-slate-600">Email:</dt><dd className="font-medium">{school.email || 'N/A'}</dd></div>
+                <div><dt className="text-slate-600">Phone:</dt><dd className="font-medium">{school.phone || 'N/A'}</dd></div>
+                <div><dt className="text-slate-600">Status:</dt><dd><StatusBadge status={school.status || 'inactive'} /></dd></div>
+              </dl>
+            </div>
+            
+            <div className="bg-slate-50 p-4 rounded-lg">
+              <h3 className="font-semibold mb-3">Statistics</h3>
+              <dl className="space-y-2 text-sm">
+                <div><dt className="text-slate-600">Students:</dt><dd className="font-medium">{stats.totalStudents || 0}</dd></div>
+                <div><dt className="text-slate-600">Teachers:</dt><dd className="font-medium">{stats.totalTeachers || 0}</dd></div>
+                <div><dt className="text-slate-600">Admins:</dt><dd className="font-medium">{stats.totalAdmins || 0}</dd></div>
+                <div><dt className="text-slate-600">Courses:</dt><dd className="font-medium">{stats.totalCourses || 0}</dd></div>
+              </dl>
+            </div>
+          </div>
+
+          <div className="mt-6 flex items-center justify-end">
+            <button
+              onClick={() => onUpdateStatus?.(schoolId, school.status === 'active' ? 'suspended' : 'active')}
+              className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"
+            >
+              {school.status === 'active' ? 'Suspend School' : 'Activate School'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
