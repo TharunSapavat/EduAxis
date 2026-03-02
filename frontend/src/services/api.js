@@ -127,8 +127,12 @@ export const studentAPI = {
   getModuleFeedback: (moduleId) => api.get(`/feedback/module/${moduleId}`),
   
   // NEW: Performance Analytics
-  getStudentPerformance: (studentId, courseId) => api.get(`/analytics/student/${studentId}/${courseId}`),
-  getPerformanceTrend: (studentId, courseId) => api.get(`/analytics/trend/${studentId}/${courseId}`),
+  getStudentPerformance: (studentId, courseId) => courseId 
+    ? api.get(`/analytics/student/${studentId}/${courseId}`)
+    : api.get(`/analytics/student/${studentId}`),
+  getPerformanceTrend: (studentId, courseId) => courseId
+    ? api.get(`/analytics/trend/${studentId}/${courseId}`)
+    : api.get(`/analytics/trend/${studentId}`),
 };
 
 // Teacher APIs

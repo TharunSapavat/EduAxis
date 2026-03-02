@@ -15,10 +15,17 @@ export default function PerformanceAnalytics({ studentId, courseId }) {
   const fetchPerformanceData = async () => {
     try {
       setLoading(true);
-      const perfRes = await studentAPI.getStudentPerformance(studentId, courseId);
+      // Only fetch with courseId if it's available
+      let perfRes, trendRes;
+      if (courseId) {
+        perfRes = await studentAPI.getStudentPerformance(studentId, courseId);
+        trendRes = await studentAPI.getPerformanceTrend(studentId, courseId);
+      } else {
+        // Call endpoints without courseId
+        perfRes = await studentAPI.getStudentPerformance(studentId);
+        trendRes = await studentAPI.getPerformanceTrend(studentId);
+      }
       setPerformance(perfRes.data.data);
-
-      const trendRes = await studentAPI.getPerformanceTrend(studentId, courseId);
       setTrend(trendRes.data.data);
     } catch (err) {
       console.error('Error fetching performance:', err);

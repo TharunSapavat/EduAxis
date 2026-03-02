@@ -11,11 +11,18 @@ export const getStudentPerformance = async (req, res) => {
     const { studentId, courseId } = req.params;
     const { schoolId } = req.user;
 
-    const analytics = await PerformanceAnalytic.findOne({
+    // Build query - courseId is optional
+    const query = {
       studentId,
-      courseId,
       schoolId
-    });
+    };
+
+    // Only add courseId to query if it's provided and not 'undefined'
+    if (courseId && courseId !== 'undefined') {
+      query.courseId = courseId;
+    }
+
+    const analytics = await PerformanceAnalytic.findOne(query);
 
     if (!analytics) {
       return res.status(404).json({
@@ -218,11 +225,18 @@ export const getPerformanceTrend = async (req, res) => {
     const { studentId, courseId } = req.params;
     const { schoolId } = req.user;
 
-    const quizAttempts = await QuizAttempt.find({
+    // Build query - courseId is optional
+    const query = {
       studentId,
-      courseId,
       schoolId
-    })
+    };
+
+    // Only add courseId to query if it's provided and not 'undefined'
+    if (courseId && courseId !== 'undefined') {
+      query.courseId = courseId;
+    }
+
+    const quizAttempts = await QuizAttempt.find(query)
       .sort({ createdAt: 1 })
       .select('percentageScore createdAt')
       .lean();
