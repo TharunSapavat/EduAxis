@@ -1038,26 +1038,184 @@ export const createPayment = async (req, res) => {
 // Get payment statistics
 export const getPaymentStats = async (req, res) => {
   try {
-    const totalPayments = await Payment.countDocuments({ schoolId: req.schoolId, status: 'completed' });
+    // Get total number of payments (both completed and pending)
+    const totalPayments = await Payment.countDocuments({ schoolId: req.schoolId });
+    
+    // Get completed payments count
+    const completedPayments = await Payment.countDocuments({ schoolId: req.schoolId, status: 'completed' });
+    
+    // Get total amount from completed payments
     const totalAmount = await Payment.aggregate([
       { $match: { schoolId: req.schoolId, status: 'completed' } },
       { $group: { _id: null, total: { $sum: '$amount' } } }
     ]);
 
+    // Get payment breakdown by method
     const paymentsByMethod = await Payment.aggregate([
       { $match: { schoolId: req.schoolId, status: 'completed' } },
       { $group: { _id: '$paymentMethod', count: { $sum: 1 }, total: { $sum: '$amount' } } }
     ]);
 
+    // Calculate total expected fees (for all active fees)
+    const allFees = await Fee.find({ schoolId: req.schoolId });
+    const allStudents = await User.find({ schoolId: req.schoolId, role: 'student' });
+    
+    let totalExpectedAmount = 0;
+    let totalExpectedPayments = 0;  // Total number of expected payments
+    
+    for (const fee of allFees) {
+      let applicableStudentCount = 0;
+      
+      if (fee.appliesTo === 'all') {
+        applicableStudentCount = allStudents.length;
+      } else if (fee.appliesTo === 'specific' && fee.grades && fee.grades.length > 0) {
+        applicableStudentCount = allStudents.filter(student => 
+          fee.grades.includes(student.grade?.toString())
+        ).length;
+      }
+      
+      totalExpectedAmount += fee.amount * applicableStudentCount;
+      totalExpectedPayments += applicableStudentCount;  // Each student = 1 expected payment
+    }
+
+    const collectedAmount = totalAmount[0]?.total || 0;
+    const outstandingAmount = Math.max(0, totalExpectedAmount - collectedAmount);
+
     res.json({
       success: true,
-      stats: {
-        totalPayments,
-        totalAmount: totalAmount[0]?.total || 0,
+      data: {
+        total: totalExpectedPayments,  // Expected number of payments
+        completed: completedPayments,
+        totalAmount: collectedAmount,
+        expectedAmount: totalExpectedAmount,
+        outstandingAmount: outstandingAmount,
         byMethod: paymentsByMethod
       }
     });
   } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// Get monthly payment trends for charts
+export const getPaymentTrends = async (req, res) => {
+  try {
+    const { months = 6 } = req.query;
+    const monthsNum = parseInt(months) || 6;
+    
+    // Calculate date range
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - monthsNum);
+
+    // Get completed payments grouped by month
+    const completedPayments = await Payment.aggregate([
+      {
+        $match: {
+          schoolId: req.schoolId,
+          status: 'completed',
+          paymentDate: { $gte: startDate, $lte: endDate }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$paymentDate' },
+            month: { $month: '$paymentDate' }
+          },
+          collected: { $sum: '$amount' },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1 } }
+    ]);
+
+    // Get all fees (not just in date range, to capture all outstanding amounts)
+    const fees = await Fee.find({
+      schoolId: req.schoolId
+    });
+
+    // Get all students in the school for fee calculation
+    const allStudents = await User.find({ schoolId: req.schoolId, role: 'student' });
+
+    // Calculate total expected fees per month and overall outstanding
+    const expectedByMonth = {};
+    let totalOutstanding = 0;
+    
+    for (const fee of fees) {
+      const feeDate = new Date(fee.dueDate);
+      const monthKey = `${feeDate.getFullYear()}-${feeDate.getMonth() + 1}`;
+      
+      // Determine how many students this fee applies to
+      let applicableStudentCount = 0;
+      
+      if (fee.appliesTo === 'all') {
+        // Fee applies to all students
+        applicableStudentCount = allStudents.length;
+      } else if (fee.appliesTo === 'specific' && fee.grades && fee.grades.length > 0) {
+        // Fee applies to specific grades
+        applicableStudentCount = allStudents.filter(student => 
+          fee.grades.includes(student.grade?.toString())
+        ).length;
+      }
+      
+      // Calculate total expected for this fee (fee amount × number of students)
+      const totalExpected = fee.amount * applicableStudentCount;
+      expectedByMonth[monthKey] = (expectedByMonth[monthKey] || 0) + totalExpected;
+      totalOutstanding += totalExpected;
+    }
+    
+    // Get total collected amount across all time
+    const totalCollectedResult = await Payment.aggregate([
+      { $match: { schoolId: req.schoolId, status: 'completed' } },
+      { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]);
+    const totalCollected = totalCollectedResult[0]?.total || 0;
+    const remainingOutstanding = Math.max(0, totalOutstanding - totalCollected);
+
+    // Format data for frontend charts
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const trendData = [];
+    
+    for (let i = monthsNum - 1; i >= 0; i--) {
+      const date = new Date();
+      date.setMonth(date.getMonth() - i);
+      const year = date.getFullYear();
+      const month = date.getMonth() + 1;
+      const monthKey = `${year}-${month}`;
+      
+      // Find collected amount for this month
+      const monthData = completedPayments.find(
+        p => p._id.year === year && p._id.month === month
+      );
+      
+      const collected = monthData ? monthData.collected : 0;
+      const expected = expectedByMonth[monthKey] || 0;
+      
+      // For current month, show all remaining outstanding
+      // For past months, show what was expected vs collected for that month
+      let pending;
+      if (i === 0) {
+        // Current/most recent month - show all outstanding
+        pending = remainingOutstanding;
+      } else {
+        // Historical months - show month-specific pending
+        pending = Math.max(0, expected - collected);
+      }
+      
+      trendData.push({
+        month: monthNames[date.getMonth()],
+        collected: collected,
+        pending: pending
+      });
+    }
+
+    res.json({
+      success: true,
+      data: trendData
+    });
+  } catch (error) {
+    console.error('Payment trends error:', error);
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };

@@ -198,6 +198,7 @@ export const adminAPI = {
   getPayments: (params) => api.get('/administrator/payments', { params }),
   createPayment: (paymentData) => api.post('/administrator/payments', paymentData),
   getPaymentStats: () => api.get('/administrator/payments/stats'),
+  getPaymentTrends: (months = 6) => api.get(`/administrator/payments/trends?months=${months}`),
   // Library management
   getLibraryResources: () => api.get('/administrator/library'),
   createLibraryResource: (data) => {
