@@ -140,8 +140,6 @@ export default function BulkImportExport({ showNotification }) {
             { label: 'Students', value: 'students' },
             { label: 'Teachers', value: 'teachers' },
             { label: 'Payments', value: 'payments' },
-            { label: 'Attendance', value: 'attendance' },
-            { label: 'Grades', value: 'grades' },
             { label: 'Courses', value: 'courses' }
           ].map(item => (
             <button
