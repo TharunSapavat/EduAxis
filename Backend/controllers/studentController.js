@@ -72,6 +72,21 @@ export const getDashboard = async (req, res) => {
       status: 'active'
     });
     
+    // Calculate average grade
+    const grades = await Grade.find({
+      schoolId,
+      studentId: student._id
+    });
+    
+    let averageGrade = 0;
+    if (grades.length > 0) {
+      const totalScore = grades.reduce((sum, grade) => sum + grade.score, 0);
+      averageGrade = Math.round(totalScore / grades.length);
+    }
+    
+    // Calculate grade distribution
+    const gradeCount = grades.length;
+    
     res.json({
       success: true,
       stats: {
@@ -79,7 +94,9 @@ export const getDashboard = async (req, res) => {
         attendance: attendancePercentage,
         completedAssignments,
         totalAssignments,
-        pendingAssignments
+        pendingAssignments,
+        averageGrade,
+        totalGrades: gradeCount
       }
     });
   } catch (error) {

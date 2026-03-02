@@ -29,6 +29,24 @@ export default function StudentHome({ user, stats, loading, error, fetchDashboar
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {/* Average Grade Card */}
+        <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-6 rounded-xl shadow-lg text-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-purple-100 text-sm font-medium">Average Grade</p>
+              <p className="text-4xl font-bold mt-1">
+                {loading ? '...' : `${stats.averageGrade || 0}%`}
+              </p>
+              <p className="text-purple-100 text-xs mt-1">
+                {!loading && `Based on ${stats.totalGrades || 0} grades`}
+              </p>
+            </div>
+            <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+              <BarChart3 className="w-6 h-6 text-white" />
+            </div>
+          </div>
+        </div>
+
         <div className="bg-white p-6 rounded-xl shadow-md border border-slate-100">
           <div className="flex items-center justify-between">
             <div>
@@ -61,30 +79,63 @@ export default function StudentHome({ user, stats, loading, error, fetchDashboar
           <div className="flex items-center justify-between">
             <div>
               <p className="text-slate-600 text-sm font-medium">Completed Assignments</p>
-              <p className="text-3xl font-bold text-purple-600 mt-1">
+              <p className="text-3xl font-bold text-blue-600 mt-1">
                 {loading ? '...' : `${stats.completedAssignments}/${stats.totalAssignments}`}
               </p>
             </div>
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-              <BarChart3 className="w-6 h-6 text-purple-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl shadow-md border border-slate-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-slate-600 text-sm font-medium">Pending Tasks</p>
-              <p className="text-3xl font-bold text-orange-600 mt-1">
-                {loading ? '...' : stats.pendingAssignments}
-              </p>
-            </div>
-            <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-              <FileText className="w-6 h-6 text-orange-600" />
+            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+              <FileText className="w-6 h-6 text-blue-600" />
             </div>
           </div>
         </div>
       </div>
+
+      {/* Performance Summary */}
+      {!loading && stats.totalGrades > 0 && (
+        <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-xl p-6 mb-6">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <h3 className="text-lg font-bold text-slate-900 mb-2">📊 Performance Summary</h3>
+              <p className="text-slate-700 mb-4">
+                You're performing {stats.averageGrade >= 80 ? 'excellently' : stats.averageGrade >= 60 ? 'well' : 'below expectations'} with an average grade of <span className="font-bold text-purple-600">{stats.averageGrade}%</span>.
+                {stats.totalGrades < 5 && ' Keep working hard to build a better track record!'}
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full ${stats.averageGrade >= 80 ? 'bg-green-500' : stats.averageGrade >= 60 ? 'bg-blue-500' : 'bg-yellow-500'}`}></div>
+                  <span className="text-sm text-slate-600">
+                    Grade Status: <span className="font-medium text-slate-900">
+                      {stats.averageGrade >= 80 ? 'Excellent' : stats.averageGrade >= 60 ? 'Good' : 'Needs Improvement'}
+                    </span>
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full ${stats.attendance >= 85 ? 'bg-green-500' : stats.attendance >= 75 ? 'bg-yellow-500' : 'bg-red-500'}`}></div>
+                  <span className="text-sm text-slate-600">
+                    Attendance: <span className="font-medium text-slate-900">
+                      {stats.attendance >= 85 ? 'Great' : stats.attendance >= 75 ? 'Average' : 'Low'}
+                    </span>
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full ${(stats.completedAssignments / stats.totalAssignments) >= 0.8 ? 'bg-green-500' : (stats.completedAssignments / stats.totalAssignments) >= 0.5 ? 'bg-yellow-500' : 'bg-red-500'}`}></div>
+                  <span className="text-sm text-slate-600">
+                    Assignments: <span className="font-medium text-slate-900">
+                      {(stats.completedAssignments / stats.totalAssignments) >= 0.8 ? 'On Track' : (stats.completedAssignments / stats.totalAssignments) >= 0.5 ? 'Fair' : 'Behind'}
+                    </span>
+                  </span>
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate('/student/performance')}
+              className="ml-4 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium whitespace-nowrap"
+            >
+              View Analytics
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Quick Actions */}
       <div className="bg-white rounded-xl shadow-md p-6 border border-slate-100">

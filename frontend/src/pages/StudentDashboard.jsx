@@ -754,7 +754,6 @@ export default function StudentDashboard() {
       case '/student/performance':
         return <PerformanceAnalytics 
           studentId={user?._id}
-          showNotification={showNotification}
         />;
 
       default:

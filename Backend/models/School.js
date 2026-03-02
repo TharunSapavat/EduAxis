@@ -134,7 +134,7 @@ const schoolSchema = new mongoose.Schema({
 });
 
 // Index for faster queries
-schoolSchema.index({ code: 1 });
+// Note: code field already has unique index from schema definition
 schoolSchema.index({ status: 1 });
 schoolSchema.index({ 'subscription.plan': 1 });
 schoolSchema.index({ allowedEmailDomains: 1 });

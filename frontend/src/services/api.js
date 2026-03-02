@@ -126,13 +126,13 @@ export const studentAPI = {
   getCourseFeedback: (courseId) => api.get(`/feedback/course/${courseId}`),
   getModuleFeedback: (moduleId) => api.get(`/feedback/module/${moduleId}`),
   
-  // NEW: Performance Analytics
-  getStudentPerformance: (studentId, courseId) => courseId 
-    ? api.get(`/analytics/student/${studentId}/${courseId}`)
-    : api.get(`/analytics/student/${studentId}`),
-  getPerformanceTrend: (studentId, courseId) => courseId
-    ? api.get(`/analytics/trend/${studentId}/${courseId}`)
-    : api.get(`/analytics/trend/${studentId}`),
+  // Performance Analytics
+  getStudentPerformance: (studentId, courseId) => 
+    api.get(`/student/analytics/performance/${studentId}`, { params: { courseId } }),
+  getPerformanceTrend: (studentId, courseId) => 
+    api.get(`/student/analytics/trend/${studentId}`, { params: { courseId } }),
+  getGradeBreakdown: (studentId, courseId) => 
+    api.get(`/student/analytics/breakdown/${studentId}`, { params: { courseId } }),
 };
 
 // Teacher APIs

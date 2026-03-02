@@ -23,6 +23,11 @@ import {
   getTeachers,
   getStudyMaterials
 } from '../controllers/studentController.js';
+import { 
+  getStudentPerformance, 
+  getPerformanceTrend,
+  getGradeBreakdown
+} from '../controllers/studentAnalyticsController.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
 import { uploadSubmissionFiles } from '../config/multer.js';
 
@@ -79,5 +84,10 @@ router.get('/teachers', getTeachers);
 
 // Study Materials
 router.get('/study-materials', getStudyMaterials);
+
+// Performance Analytics
+router.get('/analytics/performance/:studentId', getStudentPerformance);
+router.get('/analytics/trend/:studentId', getPerformanceTrend);
+router.get('/analytics/breakdown/:studentId', getGradeBreakdown);
 
 export default router;
