@@ -9,6 +9,7 @@ import { dirname } from 'path';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { Server as SocketIOServer } from 'socket.io';
+import swaggerUi from 'swagger-ui-express';
 
 // Import configurations
 import connectDB from './config/database.js';
@@ -17,6 +18,7 @@ import helmetOptions from './config/helmet.js';
 // RATE LIMITING DISABLED - Commented out to avoid rate limit issues
 // import { apiLimiter, authLimiter } from './config/rateLimit.js';
 import logger from './config/logger.js';
+import swaggerSpec from './docs/swagger.js';
 
 // Import routes
 import authRoutes from './routes/authRoutes.js';
@@ -83,6 +85,13 @@ app.use(morgan(logFormat, { stream: morganStream })); // File
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
+
+// API documentation (Swagger)
+app.get('/api-docs.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
+});
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
