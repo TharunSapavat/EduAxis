@@ -8,14 +8,28 @@
  * @returns {Array<string>} Array of allowed origins
  */
 const getAllowedOrigins = () => {
+  const defaultOrigins = [
+    'http://localhost:5000',
+    'http://127.0.0.1:5000',
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'http://localhost:5174',
+    'http://127.0.0.1:5174'
+  ];
+
   const envOrigins = process.env.CORS_ORIGINS;
-  
+
   if (envOrigins) {
-    return envOrigins.split(',').map(origin => origin.trim());
+    const parsedEnvOrigins = envOrigins
+      .split(',')
+      .map(origin => origin.trim())
+      .filter(Boolean);
+
+    return [...new Set([...defaultOrigins, ...parsedEnvOrigins])];
   }
-  
-  // Default origins for development
-  return ['http://localhost:5173', 'http://localhost:5174'];
+
+  // Default origins for development (frontend + swagger on backend)
+  return defaultOrigins;
 };
 
 /**
