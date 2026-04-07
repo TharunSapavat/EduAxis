@@ -242,6 +242,17 @@ const openApiDefinition = {
           remarks: { type: 'string', example: 'Payment for tuition fee' }
         }
       },
+      TeacherMarkAttendanceRequest: {
+        type: 'object',
+        required: ['studentId', 'courseId', 'status'],
+        properties: {
+          studentId: { type: 'string', example: '65db6a1c2e1f4f0012ab3c45' },
+          courseId: { type: 'string', example: '65db6a1c2e1f4f0012ab3c46' },
+          status: { type: 'string', enum: ['present', 'absent', 'late', 'excused'], example: 'present' },
+          date: { type: 'string', format: 'date', example: '2026-04-07' },
+          remarks: { type: 'string', example: 'Arrived late due to transport issue' }
+        }
+      },
       SendFeeRemindersRequest: {
         type: 'object',
         properties: {
@@ -398,26 +409,16 @@ const openApiDefinition = {
       post: operation({
         summary: 'Mark attendance',
         tag: 'Teacher',
-        requestBody: jsonBody({
-          type: 'object',
-          required: ['courseId', 'attendanceDate', 'records'],
-          properties: {
-            courseId: { type: 'string' },
-            attendanceDate: { type: 'string', format: 'date' },
-            records: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  studentId: { type: 'string' },
-                  status: { type: 'string', enum: ['present', 'absent', 'late'] }
-                }
-              }
-            }
-          }
-        })
+        requestBody: jsonBody({ $ref: '#/components/schemas/TeacherMarkAttendanceRequest' })
       }),
-      get: operation({ summary: 'Get attendance for course', tag: 'Teacher' })
+      get: operation({
+        summary: 'Get attendance for course',
+        tag: 'Teacher',
+        parameters: [
+          { in: 'query', name: 'courseId', required: true, schema: { type: 'string' }, description: 'Course identifier' },
+          { in: 'query', name: 'date', required: false, schema: { type: 'string', format: 'date' }, description: 'Attendance date' }
+        ]
+      })
     },
     '/api/teacher/grades': {
       post: operation({
