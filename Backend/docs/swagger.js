@@ -878,16 +878,31 @@ const openApiDefinition = {
 
     '/api/feedback': {
       post: operation({
-        summary: 'Submit feedback',
+        summary: 'Submit course feedback',
         tag: 'Feedback',
         requestBody: jsonBody({
           type: 'object',
-          required: ['courseId', 'rating', 'comment'],
+          required: ['type', 'courseId', 'rating'],
           properties: {
+            studentId: { type: 'string', description: 'Optional when anonymous feedback is true' },
+            type: { type: 'string', enum: ['course'], example: 'course' },
             courseId: { type: 'string' },
-            moduleId: { type: 'string' },
-            rating: { type: 'integer', minimum: 1, maximum: 5 },
-            comment: { type: 'string' }
+            rating: {
+              type: 'object',
+              required: ['overall'],
+              properties: {
+                overall: { type: 'integer', minimum: 1, maximum: 5, example: 4 },
+                contentQuality: { type: 'integer', minimum: 0, maximum: 5, example: 4 },
+                teacherPerformance: { type: 'integer', minimum: 0, maximum: 5, example: 5 },
+                materialRelevance: { type: 'integer', minimum: 0, maximum: 5, example: 4 },
+                difficulty: { type: 'integer', minimum: 0, maximum: 5, example: 3 }
+              }
+            },
+            comments: { type: 'string' },
+            strengths: { type: 'array', items: { type: 'string' } },
+            areasForImprovement: { type: 'array', items: { type: 'string' } },
+            suggestions: { type: 'string' },
+            isAnonymous: { type: 'boolean', example: true }
           }
         })
       })
