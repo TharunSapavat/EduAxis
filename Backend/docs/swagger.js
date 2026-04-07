@@ -189,6 +189,67 @@ const openApiDefinition = {
           newPassword: { type: 'string', format: 'password', minLength: 6 }
         }
       },
+      CreateUserRequest: {
+        type: 'object',
+        required: ['name', 'email', 'password'],
+        properties: {
+          name: { type: 'string', example: 'Jane Smith' },
+          email: { type: 'string', format: 'email', example: 'jane@school.com' },
+          password: { type: 'string', format: 'password', minLength: 6, example: 'SecurePass123' },
+          role: { type: 'string', enum: ['student', 'teacher'], example: 'student' },
+          phone: { type: 'string', example: '+1234567890' },
+          dateOfBirth: { type: 'string', format: 'date', example: '2005-03-15' },
+          grade: { type: 'string', example: '10' },
+          section: { type: 'string', example: 'A' }
+        }
+      },
+      CreateCourseRequest: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', example: 'Mathematics' },
+          code: { type: 'string', example: 'MATH-101' },
+          description: { type: 'string', example: 'Introduction to Mathematics' },
+          teacher: { type: 'string', example: 'Dr. Smith' },
+          teacherId: { type: 'string', example: '65db6a1c2e1f4f0012ab3c45' },
+          credits: { type: 'number', example: 3 },
+          grade: { type: 'string', example: '10' },
+          semester: { type: 'string', example: 'Fall' }
+        }
+      },
+      CreateFeeRequest: {
+        type: 'object',
+        required: ['title', 'amount', 'dueDate'],
+        properties: {
+          title: { type: 'string', example: 'Tuition Fee' },
+          amount: { type: 'number', example: 5000 },
+          dueDate: { type: 'string', format: 'date-time', example: '2025-12-31' },
+          description: { type: 'string', example: 'Annual tuition fee for academic year 2025-2026' },
+          academicYear: { type: 'string', example: '2025-2026' },
+          semester: { type: 'string', example: 'Fall' },
+          appliesTo: { type: 'string', enum: ['all', 'grade-specific'], example: 'all' },
+          grades: { type: 'array', items: { type: 'string' }, example: ['10', '11'] }
+        }
+      },
+      CreatePaymentRequest: {
+        type: 'object',
+        required: ['studentId', 'feeId', 'amount', 'paymentMethod'],
+        properties: {
+          studentId: { type: 'string', example: '65db6a1c2e1f4f0012ab3c45' },
+          feeId: { type: 'string', example: '65db6a1c2e1f4f0012ab3c46' },
+          amount: { type: 'number', example: 5000 },
+          paymentMethod: { type: 'string', example: 'credit_card' },
+          transactionId: { type: 'string', example: 'TXN123456789' },
+          remarks: { type: 'string', example: 'Payment for tuition fee' }
+        }
+      },
+      SendFeeRemindersRequest: {
+        type: 'object',
+        properties: {
+          grade: { type: 'string', example: '10' },
+          section: { type: 'string', example: 'A' },
+          feeId: { type: 'string', example: '65db6a1c2e1f4f0012ab3c46' }
+        }
+      },
       User: {
         type: 'object',
         properties: {
@@ -502,20 +563,7 @@ const openApiDefinition = {
     '/api/administrator/stats': { get: operation({ summary: 'Get admin stats', tag: 'Admin' }) },
     '/api/administrator/users': {
       get: operation({ summary: 'List users', tag: 'Admin' }),
-      post: operation({
-        summary: 'Create user',
-        tag: 'Admin',
-        requestBody: jsonBody({
-          type: 'object',
-          required: ['name', 'email', 'password', 'role'],
-          properties: {
-            name: { type: 'string' },
-            email: { type: 'string', format: 'email' },
-            password: { type: 'string', format: 'password' },
-            role: { type: 'string', enum: ['student', 'teacher', 'admin'] }
-          }
-        })
-      })
+      post: operation({ summary: 'Create user', tag: 'Admin', requestBody: jsonBody({ $ref: '#/components/schemas/CreateUserRequest' }), successCode: 201 })
     },
     '/api/administrator/users/{id}': {
       put: operation({ summary: 'Update user', tag: 'Admin', parameters: [idParam('id')], requestBody: jsonBody({ type: 'object', additionalProperties: true }) }),
@@ -523,7 +571,7 @@ const openApiDefinition = {
     },
     '/api/administrator/courses': {
       get: operation({ summary: 'List courses', tag: 'Admin' }),
-      post: operation({ summary: 'Create course', tag: 'Admin', requestBody: jsonBody({ type: 'object', additionalProperties: true }) })
+      post: operation({ summary: 'Create course', tag: 'Admin', requestBody: jsonBody({ $ref: '#/components/schemas/CreateCourseRequest' }), successCode: 201 })
     },
     '/api/administrator/courses/{id}': {
       put: operation({ summary: 'Update course', tag: 'Admin', parameters: [idParam('id')], requestBody: jsonBody({ type: 'object', additionalProperties: true }) }),
@@ -575,7 +623,7 @@ const openApiDefinition = {
     },
     '/api/administrator/fees': {
       get: operation({ summary: 'Get fee records', tag: 'Admin' }),
-      post: operation({ summary: 'Create fee record', tag: 'Admin', requestBody: jsonBody({ type: 'object', additionalProperties: true }) })
+      post: operation({ summary: 'Create fee record', tag: 'Admin', requestBody: jsonBody({ $ref: '#/components/schemas/CreateFeeRequest' }), successCode: 201 })
     },
     '/api/administrator/fees/{id}': {
       put: operation({ summary: 'Update fee record', tag: 'Admin', parameters: [idParam('id')], requestBody: jsonBody({ type: 'object', additionalProperties: true }) }),
@@ -583,13 +631,13 @@ const openApiDefinition = {
     },
     '/api/administrator/payments': {
       get: operation({ summary: 'Get payments', tag: 'Admin' }),
-      post: operation({ summary: 'Create payment', tag: 'Admin', requestBody: jsonBody({ type: 'object', additionalProperties: true }) })
+      post: operation({ summary: 'Create payment', tag: 'Admin', requestBody: jsonBody({ $ref: '#/components/schemas/CreatePaymentRequest' }), successCode: 201 })
     },
     '/api/administrator/payments/stats': { get: operation({ summary: 'Get payment stats', tag: 'Admin' }) },
     '/api/administrator/payments/trends': { get: operation({ summary: 'Get payment trends', tag: 'Admin' }) },
     '/api/administrator/payments/export': { get: operation({ summary: 'Export payments', tag: 'Admin' }) },
     '/api/administrator/fees/reminders': {
-      post: operation({ summary: 'Send fee reminders', tag: 'Admin', requestBody: jsonBody({ type: 'object', additionalProperties: true }, false) })
+      post: operation({ summary: 'Send fee reminders', tag: 'Admin', requestBody: jsonBody({ $ref: '#/components/schemas/SendFeeRemindersRequest' }, false) })
     },
     '/api/administrator/class/overview': { get: operation({ summary: 'Class overview analytics', tag: 'Admin' }) },
     '/api/administrator/class/students': { get: operation({ summary: 'Class student analytics', tag: 'Admin' }) },
