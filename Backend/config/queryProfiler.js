@@ -1,4 +1,5 @@
 const DEFAULT_SLOW_QUERY_MS = 150;
+let mongooseExecPatched = false;
 
 const toSafeJSON = (value) => {
   try {
@@ -14,6 +15,35 @@ export const configureMongoQueryProfiler = (connection) => {
 
   if (!enableProfiler || !connection?.getClient) {
     return;
+  }
+
+  // Always patch Mongoose exec as a reliable fallback for slow-query visibility.
+  if (!mongooseExecPatched && connection.base?.Query?.prototype?.exec) {
+    const queryProto = connection.base.Query.prototype;
+    const originalExec = queryProto.exec;
+
+    queryProto.exec = async function patchedExec(...args) {
+      const startedAt = Date.now();
+
+      try {
+        return await originalExec.apply(this, args);
+      } finally {
+        const elapsedMs = Date.now() - startedAt;
+        if (elapsedMs >= thresholdMs) {
+          const modelName = this.model?.modelName || 'UnknownModel';
+          const op = this.op || 'unknownOp';
+          const filter = toSafeJSON(this.getQuery ? this.getQuery() : this._conditions);
+          const projection = toSafeJSON(this._fields || {});
+
+          console.warn(`[SLOW-QUERY] Mongoose ${modelName}.${op} took ${elapsedMs.toFixed(2)}ms`, {
+            filter,
+            projection
+          });
+        }
+      }
+    };
+
+    mongooseExecPatched = true;
   }
 
   const client = connection.getClient();
@@ -47,4 +77,6 @@ export const configureMongoQueryProfiler = (connection) => {
   client.on('commandFailed', (event) => {
     inFlight.delete(event.requestId);
   });
+
+  console.log(`[SLOW-QUERY] profiler enabled (threshold=${thresholdMs}ms)`);
 };
