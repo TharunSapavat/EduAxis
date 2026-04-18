@@ -12,6 +12,7 @@ import Timetable from '../models/Timetable.js';
 import School from '../models/School.js';
 import PricingPlan from '../models/PricingPlan.js';
 import { assertSameSchoolStudent } from '../middleware/tenantGuards.js';
+import { cacheKey, delCacheByPattern, getOrSetCache } from '../services/cacheService.js';
 
 const parseCSVLine = (line) => {
   const values = [];
@@ -263,17 +264,28 @@ export const getStats = async (req, res) => {
 export const getUsers = async (req, res) => {
   try {
     const { role, q } = req.query;
-    const filter = { schoolId: req.schoolId };
-    if (role && role !== 'all') filter.role = role;
-    if (q && q.trim()) {
-      filter.$or = [
-        { name: { $regex: q, $options: 'i' } },
-        { email: { $regex: q, $options: 'i' } }
-      ];
-    }
+    const key = cacheKey('admin-users', [req.schoolId, role || 'all', q || '']);
 
-    const users = await User.find(filter).select('-password').sort({ createdAt: -1 });
-    res.json({ users });
+    const { payload, cacheHit } = await getOrSetCache(
+      key,
+      async () => {
+        const filter = { schoolId: req.schoolId };
+        if (role && role !== 'all') filter.role = role;
+        if (q && q.trim()) {
+          filter.$or = [
+            { name: { $regex: q, $options: 'i' } },
+            { email: { $regex: q, $options: 'i' } }
+          ];
+        }
+
+        const users = await User.find(filter).select('-password').sort({ createdAt: -1 }).lean();
+        return { users };
+      },
+      120
+    );
+
+    res.setHeader('X-Cache', cacheHit ? 'HIT' : 'MISS');
+    res.json(payload);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -309,6 +321,8 @@ export const createUser = async (req, res) => {
     if (section) userData.section = section;
 
     const newUser = await User.create(userData);
+
+    await delCacheByPattern(`admin-users:${req.schoolId}:*`);
 
     res.json({
       success: true,
@@ -347,6 +361,8 @@ export const updateUser = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
+    await delCacheByPattern(`admin-users:${req.schoolId}:*`);
+
     res.json({
       success: true,
       message: 'User updated successfully',
@@ -370,6 +386,8 @@ export const deleteUser = async (req, res) => {
     if (!deleted) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
+
+    await delCacheByPattern(`admin-users:${req.schoolId}:*`);
 
     res.json({
       success: true,

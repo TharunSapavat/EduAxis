@@ -92,7 +92,8 @@ const openApiDefinition = {
     { name: 'Enrollments', description: 'Enrollment management endpoints' },
     { name: 'Quiz', description: 'Quiz lifecycle and attempts' },
     { name: 'Feedback', description: 'Feedback and moderation endpoints' },
-    { name: 'Analytics', description: 'Performance analytics endpoints' }
+    { name: 'Analytics', description: 'Performance analytics endpoints' },
+    { name: 'Search', description: 'Cross-entity search endpoints (Solr/Mongo fallback)' }
   ],
   components: {
     securitySchemes: {
@@ -955,6 +956,18 @@ const openApiDefinition = {
     },
     '/api/analytics/trend/{studentId}': {
       get: operation({ summary: 'Get overall trend', tag: 'Analytics', parameters: [idParam('studentId')] })
+    },
+
+    '/api/search': {
+      get: operation({
+        summary: 'Global search across users, courses and library',
+        tag: 'Search',
+        parameters: [
+          { in: 'query', name: 'q', required: true, schema: { type: 'string' }, description: 'Search term (min 2 characters)' },
+          { in: 'query', name: 'type', required: false, schema: { type: 'string', enum: ['all', 'users', 'courses', 'library'] }, description: 'Optional entity filter' },
+          { in: 'query', name: 'limit', required: false, schema: { type: 'integer', minimum: 1, maximum: 50 }, description: 'Max results to return' }
+        ]
+      })
     }
   }
 };

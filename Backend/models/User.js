@@ -75,6 +75,10 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
+userSchema.index({ schoolId: 1, role: 1, status: 1, createdAt: -1 });
+userSchema.index({ schoolId: 1, grade: 1, role: 1 });
+userSchema.index({ schoolId: 1, name: 'text', email: 'text', subject: 'text' });
+
 // Pre-save hook to hash password and generate IDs
 userSchema.pre('save', async function(next) {
   // Hash password if modified

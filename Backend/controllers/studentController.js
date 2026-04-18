@@ -12,6 +12,16 @@ import StudyMaterial from '../models/StudyMaterial.js';
 import Schedule from '../models/Schedule.js';
 import Grade from '../models/Grade.js';
 import { assertSameSchoolStudent } from '../middleware/tenantGuards.js';
+import { cacheKey, delCacheByPattern, getOrSetCache } from '../services/cacheService.js';
+
+const CACHE_TTL = {
+  DASHBOARD: 180,
+  COURSES: 300,
+  ANNOUNCEMENTS: 120,
+  FEES: 90,
+  LIBRARY: 300,
+  TEACHERS: 300
+};
 
 // Get student dashboard data
 export const getDashboard = async (req, res) => {
@@ -19,86 +29,67 @@ export const getDashboard = async (req, res) => {
     const studentId = req.user?._id;
     const schoolId = req.schoolId;
 
-    // Find student
-    const student = await User.findOne({ 
-      _id: studentId,
-      role: 'student',
-      schoolId
-    });
+    const key = cacheKey('student-dashboard', [schoolId, studentId]);
+    const { payload, cacheHit } = await getOrSetCache(
+      key,
+      async () => {
+        const student = await User.findOne({
+          _id: studentId,
+          role: 'student',
+          schoolId
+        }).select('_id grade');
 
-    if (!student) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'Student not found' 
-      });
-    }
+        if (!student) {
+          return {
+            status: 404,
+            body: {
+              success: false,
+              message: 'Student not found'
+            }
+          };
+        }
 
-    // Get pending assignments count
-    const pendingAssignments = await Assignment.countDocuments({
-      schoolId,
-      grade: String(student.grade),
-      status: 'active'
-    });
+        const [pendingAssignments, totalCourses, totalAttendance, presentCount, completedAssignments, totalAssignments, grades] = await Promise.all([
+          Assignment.countDocuments({ schoolId, grade: String(student.grade), status: 'active' }),
+          Course.countDocuments({ schoolId, status: 'active', grade: Number(student.grade) }),
+          Attendance.countDocuments({ schoolId, studentId: student._id }),
+          Attendance.countDocuments({ schoolId, studentId: student._id, status: 'present' }),
+          Submission.countDocuments({ schoolId, studentId: student._id, status: { $in: ['submitted', 'graded'] } }),
+          Assignment.countDocuments({ schoolId, grade: String(student.grade), status: 'active' }),
+          Grade.find({ schoolId, studentId: student._id }).select('score').lean()
+        ]);
 
-    // Get total courses matching student's grade (enrolled courses)
-    const totalCourses = await Course.countDocuments({ 
-      schoolId,
-      status: 'active',
-      grade: Number(student.grade)
-    });
+        const attendancePercentage = totalAttendance > 0
+          ? Math.round((presentCount / totalAttendance) * 100)
+          : 0;
 
-    // Get attendance stats
-    const attendanceRecords = await Attendance.find({ 
-      schoolId,
-      studentId: student._id 
-    });
-    const totalAttendance = attendanceRecords.length;
-    const presentCount = attendanceRecords.filter(a => a.status === 'present').length;
-    const attendancePercentage = totalAttendance > 0 
-      ? Math.round((presentCount / totalAttendance) * 100) 
-      : 0;
-    
-    // Get completed assignments count
-    const completedAssignments = await Submission.countDocuments({
-      schoolId,
-      studentId: student._id,
-      status: { $in: ['submitted', 'graded'] }
-    });
-    
-    // Get total assignments count for the student's grade (all active assignments for their grade)
-    const totalAssignments = await Assignment.countDocuments({
-      schoolId,
-      grade: String(student.grade),
-      status: 'active'
-    });
-    
-    // Calculate average grade
-    const grades = await Grade.find({
-      schoolId,
-      studentId: student._id
-    });
-    
-    let averageGrade = 0;
-    if (grades.length > 0) {
-      const totalScore = grades.reduce((sum, grade) => sum + grade.score, 0);
-      averageGrade = Math.round(totalScore / grades.length);
-    }
-    
-    // Calculate grade distribution
-    const gradeCount = grades.length;
-    
-    res.json({
-      success: true,
-      stats: {
-        totalCourses,
-        attendance: attendancePercentage,
-        completedAssignments,
-        totalAssignments,
-        pendingAssignments,
-        averageGrade,
-        totalGrades: gradeCount
-      }
-    });
+        let averageGrade = 0;
+        if (grades.length > 0) {
+          const totalScore = grades.reduce((sum, grade) => sum + grade.score, 0);
+          averageGrade = Math.round(totalScore / grades.length);
+        }
+
+        return {
+          status: 200,
+          body: {
+            success: true,
+            stats: {
+              totalCourses,
+              attendance: attendancePercentage,
+              completedAssignments,
+              totalAssignments,
+              pendingAssignments,
+              averageGrade,
+              totalGrades: grades.length
+            }
+          }
+        };
+      },
+      CACHE_TTL.DASHBOARD
+    );
+
+    res.setHeader('X-Cache', cacheHit ? 'HIT' : 'MISS');
+    res.status(payload.status).json(payload.body);
   } catch (error) {
     console.error('Dashboard error:', error);
     res.status(500).json({ 
@@ -119,20 +110,30 @@ export const getCourses = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Student ID is required' });
     }
 
-    const student = await User.findOne({ _id: studentId, schoolId, role: 'student' });
-    if (!student || student.role !== 'student') {
-      return res.status(404).json({ success: false, message: 'Student not found' });
-    }
+    const key = cacheKey('student-courses', [schoolId, studentId]);
+    const { payload, cacheHit } = await getOrSetCache(
+      key,
+      async () => {
+        const student = await User.findOne({ _id: studentId, schoolId, role: 'student' }).select('grade').lean();
+        if (!student) {
+          return { status: 404, body: { success: false, message: 'Student not found' } };
+        }
 
-    // Filter courses by matching grade and active status
-    const courses = await Course.find({ 
-      schoolId,
-      status: 'active', 
-      grade: Number(student.grade) 
-    })
-      .populate('teacherId', 'name email');
+        const courses = await Course.find({
+          schoolId,
+          status: 'active',
+          grade: Number(student.grade)
+        })
+          .populate('teacherId', 'name email')
+          .lean();
 
-    res.json({ success: true, courses });
+        return { status: 200, body: { success: true, courses } };
+      },
+      CACHE_TTL.COURSES
+    );
+
+    res.setHeader('X-Cache', cacheHit ? 'HIT' : 'MISS');
+    res.status(payload.status).json(payload.body);
   } catch (error) {
     console.error('Get courses error:', error);
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
@@ -500,40 +501,51 @@ export const getMyLeaveRequests = async (req, res) => {
 export const getAnnouncements = async (req, res) => {
   try {
     const student = req.user; // Loaded by auth middleware
-    
-    const announcements = await Announcement.find({
-      schoolId: req.schoolId,
-      isActive: true,
-      hiddenBy: { $ne: student._id }, // Exclude hidden announcements
-      $or: [
-        { targetAudience: 'all' },
-        { targetAudience: 'students' }
-      ],
-      $and: [
-        {
+
+    const key = cacheKey('student-announcements', [req.schoolId, student._id, student.grade]);
+    const { payload, cacheHit } = await getOrSetCache(
+      key,
+      async () => {
+        const announcements = await Announcement.find({
+          schoolId: req.schoolId,
+          isActive: true,
+          hiddenBy: { $ne: student._id },
           $or: [
-            { grade: { $exists: false } }, // No grade specified (legacy or all grades)
-            { grade: null },
-            { grade: String(student.grade) } // Matches student's grade
+            { targetAudience: 'all' },
+            { targetAudience: 'students' }
+          ],
+          $and: [
+            {
+              $or: [
+                { grade: { $exists: false } },
+                { grade: null },
+                { grade: String(student.grade) }
+              ]
+            },
+            {
+              $or: [
+                { expiresAt: null },
+                { expiresAt: { $gt: new Date() } }
+              ]
+            }
           ]
-        },
-        {
-          $or: [
-            { expiresAt: null },
-            { expiresAt: { $gt: new Date() } }
-          ]
-        }
-      ]
-    })
-    .populate('createdBy', 'name')
-    .populate('courseId', 'name code')
-    .sort({ priority: -1, createdAt: -1 })
-    .limit(20);
-    
-    res.json({ 
-      success: true,
-      announcements 
-    });
+        })
+          .populate('createdBy', 'name')
+          .populate('courseId', 'name code')
+          .sort({ priority: -1, createdAt: -1 })
+          .limit(20)
+          .lean();
+
+        return {
+          success: true,
+          announcements
+        };
+      },
+      CACHE_TTL.ANNOUNCEMENTS
+    );
+
+    res.setHeader('X-Cache', cacheHit ? 'HIT' : 'MISS');
+    res.json(payload);
   } catch (error) {
     console.error('Get announcements error:', error);
     res.status(500).json({ 
@@ -550,54 +562,59 @@ export const getFees = async (req, res) => {
     const studentId = req.user._id; // Get from authenticated user
     const student = req.user; // Already loaded by middleware
 
-    // Get fees that apply to this student's grade
-    // Either fees for all students OR fees for this specific grade
-    const activeFees = await Fee.find({ 
-      schoolId: req.schoolId,
-      status: 'active',
-      $or: [
-        { appliesTo: 'all' },
-        { appliesTo: 'grade-specific', grades: student.grade }
-      ]
-    }).sort({ dueDate: 1 });
+    const key = cacheKey('student-fees', [req.schoolId, studentId, student.grade]);
+    const { payload, cacheHit } = await getOrSetCache(
+      key,
+      async () => {
+        const activeFees = await Fee.find({
+          schoolId: req.schoolId,
+          status: 'active',
+          $or: [
+            { appliesTo: 'all' },
+            { appliesTo: 'grade-specific', grades: student.grade }
+          ]
+        }).sort({ dueDate: 1 }).lean();
 
-    // Get student's payment history
-    const payments = await Payment.find({ schoolId: req.schoolId, studentId }).sort({ paymentDate: -1 });
+        const payments = await Payment.find({ schoolId: req.schoolId, studentId }).sort({ paymentDate: -1 }).lean();
 
-    // Calculate totals
-    const totalFeeAmount = activeFees.reduce((sum, fee) => sum + fee.amount, 0);
-    const totalPaid = payments
-      .filter(p => p.status === 'completed')
-      .reduce((sum, p) => sum + p.amount, 0);
-    const pending = totalFeeAmount - totalPaid;
+        const totalFeeAmount = activeFees.reduce((sum, fee) => sum + fee.amount, 0);
+        const totalPaid = payments
+          .filter((payment) => payment.status === 'completed')
+          .reduce((sum, payment) => sum + payment.amount, 0);
+        const pending = totalFeeAmount - totalPaid;
 
-    // Calculate late fees
-    const now = new Date();
-    const lateFeesAmount = activeFees
-      .filter(fee => new Date(fee.dueDate) < now)
-      .reduce((sum, fee) => {
-        const paidForThisFee = payments.find(p => p.feeId.toString() === fee._id.toString() && p.status === 'completed');
-        if (!paidForThisFee) {
-          const daysLate = Math.floor((now - new Date(fee.dueDate)) / (1000 * 60 * 60 * 24));
-          return sum + (daysLate * 10); // $10 per day late
-        }
-        return sum;
-      }, 0);
+        const now = new Date();
+        const lateFeesAmount = activeFees
+          .filter((fee) => new Date(fee.dueDate) < now)
+          .reduce((sum, fee) => {
+            const paidForThisFee = payments.find((payment) => String(payment.feeId) === String(fee._id) && payment.status === 'completed');
+            if (!paidForThisFee) {
+              const daysLate = Math.floor((now - new Date(fee.dueDate)) / (1000 * 60 * 60 * 24));
+              return sum + (daysLate * 10);
+            }
+            return sum;
+          }, 0);
 
-    res.json({
-      success: true,
-      studentGrade: student.grade,
-      studentSection: student.section,
-      fees: activeFees,
-      payments,
-      summary: {
-        totalFees: totalFeeAmount,
-        totalPaid,
-        pending,
-        lateFees: lateFeesAmount,
-        totalDue: pending + lateFeesAmount
-      }
-    });
+        return {
+          success: true,
+          studentGrade: student.grade,
+          studentSection: student.section,
+          fees: activeFees,
+          payments,
+          summary: {
+            totalFees: totalFeeAmount,
+            totalPaid,
+            pending,
+            lateFees: lateFeesAmount,
+            totalDue: pending + lateFeesAmount
+          }
+        };
+      },
+      CACHE_TTL.FEES
+    );
+
+    res.setHeader('X-Cache', cacheHit ? 'HIT' : 'MISS');
+    res.json(payload);
   } catch (error) {
     console.error('Get fees error:', error);
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
@@ -682,6 +699,9 @@ export const makePayment = async (req, res) => {
     }
 
     // TODO: Send email notification
+
+    await delCacheByPattern(`student-fees:${req.schoolId}:${studentId}:*`);
+    await delCacheByPattern(`student-dashboard:${req.schoolId}:${studentId}`);
 
     res.json({
       success: true,
@@ -948,29 +968,41 @@ export const getLibraryResources = async (req, res) => {
     if (search) query.$and.push({ $text: { $search: search } });
     if (!query.$and.length) delete query.$and;
 
-    const resources = await LibraryResource.find(query)
-      .sort({ createdAt: -1 })
-      .limit(100);
+    const key = cacheKey('student-library', [req.schoolId, student._id, studentGrade, search, category, tag]);
+    const { payload, cacheHit } = await getOrSetCache(
+      key,
+      async () => {
+        const resources = await LibraryResource.find(query)
+          .select('_id title author category isExternal linkUrl file tags')
+          .sort({ createdAt: -1 })
+          .limit(100)
+          .lean();
 
-    const availableResources = resources.map(r => ({
-      _id: r._id,
-      title: r.title,
-      author: r.author,
-      category: r.category,
-      available: 1,
-      downloadUrl: r.isExternal ? r.linkUrl : (r.file?.path ? `http://localhost:5000${r.file.path}` : ''),
-      fileType: r.isExternal ? 'link' : (r.file?.mimetype || 'file'),
-      tags: r.tags,
-    }));
+        const availableResources = resources.map((resource) => ({
+          _id: resource._id,
+          title: resource.title,
+          author: resource.author,
+          category: resource.category,
+          available: 1,
+          downloadUrl: resource.isExternal ? resource.linkUrl : (resource.file?.path ? `http://localhost:5000${resource.file.path}` : ''),
+          fileType: resource.isExternal ? 'link' : (resource.file?.mimetype || 'file'),
+          tags: resource.tags
+        }));
 
-    res.json({
-      success: true,
-      library: {
-        availableResources,
-        borrowedBooks: [],
-        overdueItems: 0
-      }
-    });
+        return {
+          success: true,
+          library: {
+            availableResources,
+            borrowedBooks: [],
+            overdueItems: 0
+          }
+        };
+      },
+      CACHE_TTL.LIBRARY
+    );
+
+    res.setHeader('X-Cache', cacheHit ? 'HIT' : 'MISS');
+    res.json(payload);
   } catch (error) {
     console.error('Get library resources error:', error);
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
@@ -983,35 +1015,40 @@ export const getTeachers = async (req, res) => {
     const studentId = req.user._id;
     const schoolId = req.schoolId;
     
-    // Find student to get their grade
-    const student = await assertSameSchoolStudent(studentId, schoolId, {
-      notFoundMessage: 'Student not found',
-      forbiddenMessage: 'Student is not in your school'
-    });
-
-    // Find teachers who teach courses for this student's grade
-    const courses = await Course.find({ 
-      schoolId,
-      grade: Number(student.grade),
-      status: 'active'
-    }).populate('teacherId', 'name email');
-
-    // Extract unique teachers
-    const teachersMap = new Map();
-    courses.forEach(course => {
-      if (course.teacherId && course.teacherId._id) {
-        teachersMap.set(course.teacherId._id.toString(), {
-          _id: course.teacherId._id,
-          name: course.teacherId.name,
-          email: course.teacherId.email,
-          subject: course.name
+    const key = cacheKey('student-teachers', [schoolId, studentId]);
+    const { payload, cacheHit } = await getOrSetCache(
+      key,
+      async () => {
+        const student = await assertSameSchoolStudent(studentId, schoolId, {
+          notFoundMessage: 'Student not found',
+          forbiddenMessage: 'Student is not in your school'
         });
-      }
-    });
 
-    const teachers = Array.from(teachersMap.values());
-    
-    return res.json({ success: true, data: teachers });
+        const courses = await Course.find({
+          schoolId,
+          grade: Number(student.grade),
+          status: 'active'
+        }).populate('teacherId', 'name email').lean();
+
+        const teachersMap = new Map();
+        courses.forEach((course) => {
+          if (course.teacherId && course.teacherId._id) {
+            teachersMap.set(String(course.teacherId._id), {
+              _id: course.teacherId._id,
+              name: course.teacherId.name,
+              email: course.teacherId.email,
+              subject: course.name
+            });
+          }
+        });
+
+        return { success: true, data: Array.from(teachersMap.values()) };
+      },
+      CACHE_TTL.TEACHERS
+    );
+
+    res.setHeader('X-Cache', cacheHit ? 'HIT' : 'MISS');
+    return res.json(payload);
   } catch (error) {
     console.error('Get teachers error:', error);
     const status = error.statusCode || 500;
@@ -1078,6 +1115,8 @@ export const markAnnouncementAsRead = async (req, res) => {
       await announcement.save();
     }
 
+    await delCacheByPattern(`student-announcements:${req.schoolId}:${studentId}:*`);
+
     res.json({
       success: true,
       message: 'Announcement marked as read'
@@ -1112,6 +1151,8 @@ export const hideAnnouncement = async (req, res) => {
       announcement.hiddenBy.push(studentId);
       await announcement.save();
     }
+
+    await delCacheByPattern(`student-announcements:${req.schoolId}:${studentId}:*`);
 
     res.json({
       success: true,
@@ -1169,6 +1210,8 @@ export const clearAllAnnouncements = async (req, res) => {
     });
 
     await Promise.all(updatePromises);
+
+    await delCacheByPattern(`student-announcements:${req.schoolId}:${studentId}:*`);
 
     res.json({
       success: true,

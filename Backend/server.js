@@ -19,6 +19,7 @@ import helmetOptions from './config/helmet.js';
 // import { apiLimiter, authLimiter } from './config/rateLimit.js';
 import logger from './config/logger.js';
 import swaggerSpec from './docs/swagger.js';
+import { initRedis } from './services/cacheService.js';
 
 // Import routes
 import authRoutes from './routes/authRoutes.js';
@@ -31,6 +32,7 @@ import enrollmentRoutes from './routes/enrollmentRoutes.js';
 import quizRoutes from './routes/quizRoutes.js';
 import feedbackRoutes from './routes/feedbackRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
+import searchRoutes from './routes/searchRoutes.js';
 
 // Import middleware
 import errorHandler, { notFound } from './middleware/errorHandler.js';
@@ -54,6 +56,7 @@ const PORT = process.env.PORT || 5000;
 
 // Connect to MongoDB
 connectDB();
+initRedis();
 
 // Security Middleware (must be first)
 app.use(helmet(helmetOptions)); // Secure HTTP headers
@@ -196,6 +199,7 @@ app.use('/api/enrollments', enrollmentRoutes);
 app.use('/api/quiz', quizRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/search', searchRoutes);
 
 // 404 handler - must be after all routes
 app.use(notFound);

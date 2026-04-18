@@ -35,6 +35,7 @@ const libraryResourceSchema = new mongoose.Schema(
 );
 
 libraryResourceSchema.index({ title: 'text', description: 'text', author: 'text', tags: 'text' });
+libraryResourceSchema.index({ schoolId: 1, isActive: 1, grade: 1, category: 1, createdAt: -1 });
 
 const LibraryResource = mongoose.model('LibraryResource', libraryResourceSchema);
 export default LibraryResource;
