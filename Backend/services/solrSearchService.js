@@ -11,6 +11,15 @@ const getSolrConfig = () => ({
 
 const isSolrEnabled = () => process.env.SOLR_ENABLED === 'true';
 
+const getSolrBaseUrl = () => {
+  const cfg = getSolrConfig();
+  return `${cfg.protocol}://${cfg.host}:${cfg.port}/solr/${cfg.core}`;
+};
+
+const escapeSolrTerm = (term) => {
+  return String(term || '').replace(/([+\-!(){}\[\]^"~*?:\\/]|&&|\|\|)/g, '\\$1');
+};
+
 const getClient = () => {
   if (solrClient) {
     return solrClient;
@@ -26,10 +35,19 @@ export const searchWithSolr = async ({ term, schoolId, limit = 10, type }) => {
     return null;
   }
 
+  if (!schoolId) {
+    return [];
+  }
+
   const client = getClient();
+  const safeTerm = escapeSolrTerm(term);
+  const queryText = safeTerm
+    ? `text:${safeTerm}* OR name:${safeTerm}* OR title:${safeTerm}* OR code:${safeTerm}*`
+    : '*:*';
+
   const query = client
     .query()
-    .q(term ? `text:${term}*` : '*:*')
+    .q(queryText)
     .addParams({
       wt: 'json',
       rows: Math.min(Number(limit) || 10, 50),
@@ -52,3 +70,62 @@ export const searchWithSolr = async ({ term, schoolId, limit = 10, type }) => {
 };
 
 export const isSolrSearchEnabled = isSolrEnabled;
+
+export const pingSolr = async () => {
+  if (!isSolrEnabled()) {
+    return { enabled: false, reachable: false };
+  }
+
+  const response = await fetch(`${getSolrBaseUrl()}/admin/ping?wt=json`);
+  if (!response.ok) {
+    throw new Error(`Solr ping failed with status ${response.status}`);
+  }
+
+  const payload = await response.json();
+  return {
+    enabled: true,
+    reachable: payload?.status === 'OK'
+  };
+};
+
+export const deleteSolrByQuery = async (query) => {
+  if (!isSolrEnabled()) {
+    return { deleted: 0, skipped: true };
+  }
+
+  const response = await fetch(`${getSolrBaseUrl()}/update?commit=true`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ delete: { query } })
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Solr delete failed: ${response.status} ${text}`);
+  }
+
+  return { deleted: 1, skipped: false };
+};
+
+export const indexSolrDocuments = async (documents = []) => {
+  if (!isSolrEnabled()) {
+    return { indexed: 0, skipped: true };
+  }
+
+  if (!documents.length) {
+    return { indexed: 0, skipped: false };
+  }
+
+  const response = await fetch(`${getSolrBaseUrl()}/update?commit=true`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(documents)
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Solr index failed: ${response.status} ${text}`);
+  }
+
+  return { indexed: documents.length, skipped: false };
+};

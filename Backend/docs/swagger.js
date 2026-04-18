@@ -965,7 +965,18 @@ const openApiDefinition = {
         parameters: [
           { in: 'query', name: 'q', required: true, schema: { type: 'string' }, description: 'Search term (min 2 characters)' },
           { in: 'query', name: 'type', required: false, schema: { type: 'string', enum: ['all', 'users', 'courses', 'library'] }, description: 'Optional entity filter' },
-          { in: 'query', name: 'limit', required: false, schema: { type: 'integer', minimum: 1, maximum: 50 }, description: 'Max results to return' }
+          { in: 'query', name: 'limit', required: false, schema: { type: 'integer', minimum: 1, maximum: 50 }, description: 'Max results to return' },
+          { in: 'query', name: 'schoolId', required: false, schema: { type: 'string' }, description: 'Required for superadmin search context' }
+        ]
+      })
+    },
+
+    '/api/search/reindex': {
+      post: operation({
+        summary: 'Reindex school search data into Solr (admin/superadmin)',
+        tag: 'Search',
+        parameters: [
+          { in: 'query', name: 'schoolId', required: false, schema: { type: 'string' }, description: 'Required when caller is superadmin' }
         ]
       })
     }
