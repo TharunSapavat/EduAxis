@@ -22,7 +22,8 @@ export const configureMongoQueryProfiler = (connection) => {
   client.on('commandStarted', (event) => {
     inFlight.set(event.requestId, {
       commandName: event.commandName,
-      command: event.command
+      command: event.command,
+      startedAt: Date.now()
     });
   });
 
@@ -30,7 +31,9 @@ export const configureMongoQueryProfiler = (connection) => {
     const started = inFlight.get(event.requestId);
     inFlight.delete(event.requestId);
 
-    const elapsedMs = Number(event.duration || 0) / 1000;
+    const driverElapsedMs = Number(event.duration || 0) / 1000;
+    const fallbackElapsedMs = started?.startedAt ? (Date.now() - started.startedAt) : 0;
+    const elapsedMs = driverElapsedMs > 0 ? driverElapsedMs : fallbackElapsedMs;
     if (elapsedMs < thresholdMs) {
       return;
     }

@@ -5,6 +5,7 @@ const DEFAULT_TTL_SECONDS = 180;
 let redisClient;
 let redisReady = false;
 let redisInitStarted = false;
+let cacheErrorLogged = false;
 
 const isRedisEnabled = () => process.env.REDIS_ENABLED !== 'false';
 
@@ -39,6 +40,14 @@ export const initRedis = async () => {
   }
 };
 
+const handleCacheError = (error, operation) => {
+  redisReady = false;
+  if (!cacheErrorLogged) {
+    console.error(`[CACHE] ${operation} failed; falling back to DB-only mode:`, error.message);
+    cacheErrorLogged = true;
+  }
+};
+
 const parseJSON = (payload) => {
   try {
     return JSON.parse(payload);
@@ -52,12 +61,17 @@ export const getCache = async (key) => {
     return null;
   }
 
-  const payload = await redisClient.get(key);
-  if (!payload) {
+  try {
+    const payload = await redisClient.get(key);
+    if (!payload) {
+      return null;
+    }
+
+    return parseJSON(payload);
+  } catch (error) {
+    handleCacheError(error, 'GET');
     return null;
   }
-
-  return parseJSON(payload);
 };
 
 export const setCache = async (key, value, ttlSeconds = DEFAULT_TTL_SECONDS) => {
@@ -65,8 +79,13 @@ export const setCache = async (key, value, ttlSeconds = DEFAULT_TTL_SECONDS) => 
     return false;
   }
 
-  await redisClient.setEx(key, ttlSeconds, JSON.stringify(value));
-  return true;
+  try {
+    await redisClient.setEx(key, ttlSeconds, JSON.stringify(value));
+    return true;
+  } catch (error) {
+    handleCacheError(error, 'SET');
+    return false;
+  }
 };
 
 export const delCacheByPattern = async (pattern) => {
@@ -74,16 +93,21 @@ export const delCacheByPattern = async (pattern) => {
     return 0;
   }
 
-  const matchedKeys = [];
-  for await (const key of redisClient.scanIterator({ MATCH: pattern, COUNT: 100 })) {
-    matchedKeys.push(key);
-  }
+  try {
+    const matchedKeys = [];
+    for await (const key of redisClient.scanIterator({ MATCH: pattern, COUNT: 100 })) {
+      matchedKeys.push(key);
+    }
 
-  if (!matchedKeys.length) {
+    if (!matchedKeys.length) {
+      return 0;
+    }
+
+    return redisClient.del(matchedKeys);
+  } catch (error) {
+    handleCacheError(error, 'DEL_PATTERN');
     return 0;
   }
-
-  return redisClient.del(matchedKeys);
 };
 
 export const getOrSetCache = async (key, producer, ttlSeconds = DEFAULT_TTL_SECONDS) => {
