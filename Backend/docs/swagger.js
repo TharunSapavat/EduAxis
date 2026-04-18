@@ -23,6 +23,7 @@ const operation = ({
   summary,
   tag,
   secured = true,
+  security,
   parameters,
   requestBody,
   successCode = 200,
@@ -32,7 +33,7 @@ const operation = ({
 }) => ({
   tags: [tag],
   summary,
-  ...(secured ? { security: bearerAuth } : {}),
+  ...((security && security.length) ? { security } : (secured ? { security: bearerAuth } : {})),
   ...(parameters ? { parameters } : {}),
   ...(requestBody ? { requestBody } : {}),
   responses: {
@@ -93,7 +94,9 @@ const openApiDefinition = {
     { name: 'Quiz', description: 'Quiz lifecycle and attempts' },
     { name: 'Feedback', description: 'Feedback and moderation endpoints' },
     { name: 'Analytics', description: 'Performance analytics endpoints' },
-    { name: 'Search', description: 'Cross-entity search endpoints (Solr/Mongo fallback)' }
+    { name: 'Search', description: 'Cross-entity search endpoints (Solr/Mongo fallback)' },
+    { name: 'Integrations', description: 'B2C external service integrations consumed by EduAxis' },
+    { name: 'B2B', description: 'Partner-facing APIs exposed for third-party systems' }
   ],
   components: {
     securitySchemes: {
@@ -101,6 +104,11 @@ const openApiDefinition = {
         type: 'http',
         scheme: 'bearer',
         bearerFormat: 'JWT'
+      },
+      apiKeyAuth: {
+        type: 'apiKey',
+        in: 'header',
+        name: 'x-api-key'
       }
     },
     responses: {
@@ -978,6 +986,59 @@ const openApiDefinition = {
         parameters: [
           { in: 'query', name: 'schoolId', required: false, schema: { type: 'string' }, description: 'Required when caller is superadmin' }
         ]
+      })
+    },
+
+    '/api/integrations/public-holidays': {
+      get: operation({
+        summary: 'Get public holidays from external provider (B2C)',
+        tag: 'Integrations',
+        parameters: [
+          { in: 'query', name: 'countryCode', required: false, schema: { type: 'string', example: 'IN' }, description: 'ISO country code' },
+          { in: 'query', name: 'year', required: false, schema: { type: 'integer', example: 2026 }, description: 'Calendar year' }
+        ]
+      })
+    },
+
+    '/api/integrations/exchange-rates': {
+      get: operation({
+        summary: 'Get exchange rates from external provider (B2C)',
+        tag: 'Integrations',
+        parameters: [
+          { in: 'query', name: 'base', required: false, schema: { type: 'string', example: 'INR' }, description: 'Base currency code' },
+          { in: 'query', name: 'target', required: false, schema: { type: 'string', example: 'USD' }, description: 'Target currency code' }
+        ]
+      })
+    },
+
+    '/api/b2b/v1/schools/{schoolId}/summary': {
+      get: operation({
+        summary: 'Get school summary for partner integrations (B2B)',
+        tag: 'B2B',
+        secured: false,
+        security: [{ apiKeyAuth: [] }],
+        parameters: [idParam('schoolId', 'School id')],
+        extraResponses: {
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' }
+        }
+      })
+    },
+
+    '/api/b2b/v1/integrations/public-holidays': {
+      get: operation({
+        summary: 'Get public holidays feed for partner integrations (B2B)',
+        tag: 'B2B',
+        secured: false,
+        security: [{ apiKeyAuth: [] }],
+        parameters: [
+          { in: 'query', name: 'countryCode', required: false, schema: { type: 'string', example: 'IN' } },
+          { in: 'query', name: 'year', required: false, schema: { type: 'integer', example: 2026 } }
+        ],
+        extraResponses: {
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' }
+        }
       })
     }
   }

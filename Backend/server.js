@@ -33,6 +33,7 @@ import quizRoutes from './routes/quizRoutes.js';
 import feedbackRoutes from './routes/feedbackRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
 import searchRoutes from './routes/searchRoutes.js';
+import webServiceRoutes from './routes/webServiceRoutes.js';
 
 // Import middleware
 import errorHandler, { notFound } from './middleware/errorHandler.js';
@@ -200,6 +201,7 @@ app.use('/api/quiz', quizRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api', webServiceRoutes);
 
 // 404 handler - must be after all routes
 app.use(notFound);
