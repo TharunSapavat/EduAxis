@@ -1,6 +1,8 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { authAPI } from '../../services/api';
 
+const getStorage = () => (typeof localStorage !== 'undefined' ? localStorage : null);
+
 // Async thunks
 export const loginUser = createAsyncThunk(
   'auth/login',
@@ -40,7 +42,7 @@ export const logoutUser = createAsyncThunk(
 
 const initialState = {
   user: null,
-  token: localStorage.getItem('authToken') || null,
+  token: getStorage()?.getItem('authToken') || null,
   isAuthenticated: false,
   loading: false,
   error: null,
@@ -78,9 +80,9 @@ const authSlice = createSlice({
         state.isAuthenticated = true;
         state.error = null;
         // Store user in localStorage for persistence
-        localStorage.setItem('user', JSON.stringify(action.payload.user));
+        getStorage()?.setItem('user', JSON.stringify(action.payload.user));
         if (action.payload.token) {
-          localStorage.setItem('authToken', action.payload.token);
+          getStorage()?.setItem('authToken', action.payload.token);
         }
       })
       .addCase(loginUser.rejected, (state, action) => {
@@ -99,9 +101,9 @@ const authSlice = createSlice({
         state.token = action.payload.token || null;
         state.isAuthenticated = true;
         state.error = null;
-        localStorage.setItem('user', JSON.stringify(action.payload.user));
+        getStorage()?.setItem('user', JSON.stringify(action.payload.user));
         if (action.payload.token) {
-          localStorage.setItem('authToken', action.payload.token);
+          getStorage()?.setItem('authToken', action.payload.token);
         }
       })
       .addCase(registerUser.rejected, (state, action) => {
@@ -118,8 +120,8 @@ const authSlice = createSlice({
         state.token = null;
         state.isAuthenticated = false;
         state.error = null;
-        localStorage.removeItem('user');
-        localStorage.removeItem('authToken');
+        getStorage()?.removeItem('user');
+        getStorage()?.removeItem('authToken');
       })
       .addCase(logoutUser.rejected, (state) => {
         state.loading = false;
@@ -127,8 +129,8 @@ const authSlice = createSlice({
         state.user = null;
         state.token = null;
         state.isAuthenticated = false;
-        localStorage.removeItem('user');
-        localStorage.removeItem('authToken');
+        getStorage()?.removeItem('user');
+        getStorage()?.removeItem('authToken');
       });
   },
 });
