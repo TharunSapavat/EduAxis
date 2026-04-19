@@ -292,7 +292,7 @@ export default function TeacherSubjects() {
             <div className="p-8">
               {/* Header */}
               <div className="text-center mb-8">
-                <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="w-20 h-20 bg-linear-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
                   <span className="text-white font-bold text-3xl">{selectedTeacher.name.charAt(0)}</span>
                 </div>
                 <h2 className="text-2xl font-bold text-slate-900">{selectedTeacher.name}</h2>
@@ -353,7 +353,7 @@ export default function TeacherSubjects() {
                         {getGroupedSubjects(teacherSubjects.subjects).map((group, index) => (
                           <div
                             key={index}
-                            className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 px-4 py-2 rounded-lg flex items-center space-x-2"
+                            className="bg-linear-to-r from-purple-50 to-indigo-50 border border-purple-200 px-4 py-2 rounded-lg flex items-center space-x-2"
                           >
                             <span className="text-sm font-medium text-slate-900">{group.name}</span>
                             {group.count > 1 && (

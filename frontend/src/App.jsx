@@ -11,6 +11,21 @@ import TeacherDashboard from './pages/TeacherDashboard'
 import AdminDashboard from './pages/AdminDashboard'
 import SuperAdminDashboard from './pages/SuperAdminDashboard'
 
+const getDashboardPathByRole = (role) => {
+  switch (role) {
+    case 'student':
+      return '/student/home';
+    case 'teacher':
+      return '/teacher/home';
+    case 'admin':
+      return '/administrator/home';
+    case 'superadmin':
+      return '/superadmin/home';
+    default:
+      return '/';
+  }
+};
+
 function AppContent() {
   const { user, loading } = useAuth();
   const [showLogin, setShowLogin] = useState(false);
@@ -64,7 +79,7 @@ function AppContent() {
         path="/" 
         element={
           user ? (
-            <Navigate to={`/${user.role}/home`} replace />
+            <Navigate to={getDashboardPathByRole(user.role)} replace />
           ) : (
             <>
               <LandingPage 
@@ -141,7 +156,7 @@ function AppContent() {
         path="*" 
         element={
           user ? (
-            <Navigate to={`/${user.role}/home`} replace />
+            <Navigate to={getDashboardPathByRole(user.role)} replace />
           ) : (
             <Navigate to="/" replace />
           )
