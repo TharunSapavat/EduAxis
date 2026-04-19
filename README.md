@@ -220,6 +220,10 @@ To stop the stack:
 docker compose down
 ```
 
+### CI
+
+The repository includes a GitHub Actions workflow at [.github/workflows/ci.yml](.github/workflows/ci.yml). It runs backend tests, frontend tests, and a frontend production build on every push and pull request.
+
 ## Security & System Audit ⚠️
 
 **System Health: 85% ✅** | **Last Comprehensive Audit: January 2025**
