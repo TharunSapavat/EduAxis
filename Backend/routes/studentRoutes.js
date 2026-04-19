@@ -15,6 +15,8 @@ import {
   hideAnnouncement,
   clearAllAnnouncements,
   getFees,
+  createFeeRazorpayOrder,
+  verifyFeeRazorpayPayment,
   makePayment,
   downloadReceipt,
   getLibraryResources,
@@ -69,6 +71,8 @@ router.delete('/announcements', clearAllAnnouncements);
 
 // Fees & Payments
 router.get('/fees', getFees);
+router.post('/payment/razorpay/order', createFeeRazorpayOrder);
+router.post('/payment/razorpay/verify', verifyFeeRazorpayPayment);
 router.post('/payment', makePayment);
 router.get('/receipt/:paymentId', downloadReceipt);
 

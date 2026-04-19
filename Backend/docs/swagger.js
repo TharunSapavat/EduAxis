@@ -389,6 +389,38 @@ const openApiDefinition = {
         })
       })
     },
+    '/api/student/payment/razorpay/order': {
+      post: operation({
+        summary: 'Create Razorpay order for student fee payment',
+        tag: 'Student',
+        requestBody: jsonBody({
+          type: 'object',
+          required: ['feeId', 'amount'],
+          properties: {
+            feeId: { type: 'string' },
+            amount: { type: 'number', example: 2500 },
+            paymentMethod: { type: 'string', example: 'Online Payment' },
+            remarks: { type: 'string' }
+          }
+        })
+      })
+    },
+    '/api/student/payment/razorpay/verify': {
+      post: operation({
+        summary: 'Verify Razorpay payment for student fee',
+        tag: 'Student',
+        requestBody: jsonBody({
+          type: 'object',
+          required: ['paymentId', 'razorpayOrderId', 'razorpayPaymentId', 'razorpaySignature'],
+          properties: {
+            paymentId: { type: 'string' },
+            razorpayOrderId: { type: 'string' },
+            razorpayPaymentId: { type: 'string' },
+            razorpaySignature: { type: 'string' }
+          }
+        })
+      })
+    },
     '/api/student/receipt/{paymentId}': {
       get: operation({ summary: 'Download payment receipt', tag: 'Student', parameters: [idParam('paymentId')] })
     },
@@ -697,6 +729,39 @@ const openApiDefinition = {
     },
     '/api/administrator/subscription/plans': { get: operation({ summary: 'Get available plans', tag: 'Admin' }) },
     '/api/administrator/subscription/current': { get: operation({ summary: 'Get current subscription', tag: 'Admin' }) },
+    '/api/administrator/subscription/razorpay/order': {
+      post: operation({
+        summary: 'Create Razorpay order for subscription payment',
+        tag: 'Admin',
+        requestBody: jsonBody({
+          type: 'object',
+          required: ['newPlan'],
+          properties: {
+            newPlan: { type: 'string', enum: ['basic', 'premium', 'enterprise'] },
+            billingCycle: { type: 'string', enum: ['monthly', 'annual'] },
+            paymentMethod: { type: 'string', example: 'credit_card' }
+          }
+        })
+      })
+    },
+    '/api/administrator/subscription/razorpay/verify': {
+      post: operation({
+        summary: 'Verify Razorpay subscription payment and activate plan',
+        tag: 'Admin',
+        requestBody: jsonBody({
+          type: 'object',
+          required: ['paymentId', 'razorpayOrderId', 'razorpayPaymentId', 'razorpaySignature', 'newPlan'],
+          properties: {
+            paymentId: { type: 'string' },
+            razorpayOrderId: { type: 'string' },
+            razorpayPaymentId: { type: 'string' },
+            razorpaySignature: { type: 'string' },
+            newPlan: { type: 'string', enum: ['basic', 'premium', 'enterprise'] },
+            billingCycle: { type: 'string', enum: ['monthly', 'annual'] }
+          }
+        })
+      })
+    },
     '/api/administrator/subscription/upgrade': {
       post: operation({
         summary: 'Upgrade subscription',

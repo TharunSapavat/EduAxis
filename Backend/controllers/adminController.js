@@ -13,6 +13,7 @@ import School from '../models/School.js';
 import PricingPlan from '../models/PricingPlan.js';
 import { assertSameSchoolStudent } from '../middleware/tenantGuards.js';
 import { cacheKey, delCacheByPattern, getOrSetCache } from '../services/cacheService.js';
+import { getRazorpayClient, getRazorpayPublicKey, toPaise, verifyRazorpaySignature } from '../services/razorpayService.js';
 
 const parseCSVLine = (line) => {
   const values = [];
@@ -868,6 +869,8 @@ export const createFee = async (req, res) => {
       grades: appliesTo === 'grade-specific' ? grades : []
     });
 
+    await delCacheByPattern(`student-fees:${req.schoolId}:*`);
+
     res.json({ success: true, message: 'Fee created successfully', fee: newFee });
   } catch (error) {
     if (error.name === 'ValidationError') {
@@ -895,6 +898,8 @@ export const updateFee = async (req, res) => {
     if (!updatedFee) {
       return res.status(404).json({ success: false, message: 'Fee not found' });
     }
+
+    await delCacheByPattern(`student-fees:${req.schoolId}:*`);
 
     res.json({ success: true, message: 'Fee updated successfully', fee: updatedFee });
   } catch (error) {
@@ -937,6 +942,8 @@ export const deleteFee = async (req, res) => {
 
     // Also delete any pending/failed payments for this fee
     await Payment.deleteMany({ schoolId: req.schoolId, feeId: id, status: { $in: ['pending', 'failed'] } });
+
+    await delCacheByPattern(`student-fees:${req.schoolId}:*`);
 
     res.json({ 
       success: true, 
@@ -986,15 +993,34 @@ export const getPayments = async (req, res) => {
       .populate('feeId', 'title amount')
       .sort({ paymentDate: -1 });
 
+    const dedupedPayments = (() => {
+      const completedRazorpayPayments = payments.filter(
+        (payment) => payment.status === 'completed' && payment.razorpayPaymentId
+      );
+
+      const latestByEntity = new Map();
+      for (const payment of completedRazorpayPayments) {
+        const key = payment.paymentType === 'subscription'
+          ? `subscription:${String(payment.schoolId)}`
+          : `fee:${String(payment.studentId || '')}:${String(payment.feeId || payment.feeTitle || '')}`;
+
+        if (!latestByEntity.has(key)) {
+          latestByEntity.set(key, payment);
+        }
+      }
+
+      return Array.from(latestByEntity.values());
+    })();
+
     // Calculate stats
-    const totalAmount = payments.reduce((sum, p) => sum + p.amount, 0);
-    const completedPayments = payments.filter(p => p.status === 'completed').length;
+    const totalAmount = dedupedPayments.reduce((sum, p) => sum + p.amount, 0);
+    const completedPayments = dedupedPayments.filter(p => p.status === 'completed').length;
 
     res.json({
       success: true,
-      payments,
+      payments: dedupedPayments,
       stats: {
-        total: payments.length,
+        total: dedupedPayments.length,
         completed: completedPayments,
         totalAmount
       }
@@ -2035,6 +2061,237 @@ export const getCurrentSubscription = async (req, res) => {
 // @desc    Process plan upgrade/payment
 // @route   POST /api/administrator/subscription/upgrade
 // @access  Admin
+export const createSubscriptionRazorpayOrder = async (req, res) => {
+  try {
+    if (!req.schoolId) {
+      return res.status(401).json({ success: false, message: 'School ID not found in session' });
+    }
+
+    const { newPlan, billingCycle = 'monthly', paymentMethod = 'credit_card' } = req.body;
+    const validPlans = ['basic', 'premium', 'enterprise'];
+
+    if (!validPlans.includes(newPlan)) {
+      return res.status(400).json({ success: false, message: 'Invalid plan selected' });
+    }
+
+    let pricing = await PricingPlan.findOne({ code: newPlan, isActive: true });
+    if (!pricing) {
+      const fallbackPricing = {
+        basic: { monthlyPrice: 2999, annualPrice: 29990, maxStudents: 500 },
+        premium: { monthlyPrice: 5999, annualPrice: 59990, maxStudents: 2000 },
+        enterprise: { monthlyPrice: 9999, annualPrice: 99990, maxStudents: null }
+      };
+      pricing = fallbackPricing[newPlan];
+    }
+
+    if (!pricing) {
+      return res.status(400).json({ success: false, message: 'Selected plan is not available' });
+    }
+
+    const school = await School.findById(req.schoolId);
+    if (!school) {
+      return res.status(404).json({ success: false, message: 'School not found' });
+    }
+
+    const amountToPay = billingCycle === 'annual' ? pricing.annualPrice : pricing.monthlyPrice;
+
+    const paymentMethodMap = {
+      credit_card: 'Credit Card',
+      debit_card: 'Debit Card',
+      net_banking: 'Bank Transfer',
+      upi: 'UPI',
+      bank_transfer: 'Bank Transfer',
+      'Credit Card': 'Credit Card',
+      'Debit Card': 'Debit Card',
+      'Bank Transfer': 'Bank Transfer',
+      UPI: 'UPI'
+    };
+
+    await Payment.updateMany(
+      {
+        schoolId: req.schoolId,
+        paymentType: 'subscription',
+        status: 'pending'
+      },
+      {
+        $set: {
+          status: 'failed',
+          remarks: 'Superseded by a new Razorpay order attempt'
+        }
+      }
+    );
+
+    const pendingPayment = await Payment.create({
+      schoolId: req.schoolId,
+      studentId: null,
+      studentName: school.name,
+      amount: amountToPay,
+      paymentMethod: paymentMethodMap[paymentMethod] || 'Credit Card',
+      status: 'pending',
+      paymentType: 'subscription',
+      feeTitle: `${newPlan.charAt(0).toUpperCase() + newPlan.slice(1)} Plan - ${billingCycle === 'annual' ? 'Annual' : 'Monthly'}`,
+      description: `Subscription payment for ${newPlan} plan|${billingCycle}`
+    });
+
+    const razorpay = getRazorpayClient();
+    const order = await razorpay.orders.create({
+      amount: toPaise(amountToPay),
+      currency: 'INR',
+      receipt: String(pendingPayment._id),
+      notes: {
+        paymentId: String(pendingPayment._id),
+        schoolId: String(req.schoolId),
+        paymentType: 'subscription',
+        planCode: newPlan,
+        billingCycle
+      }
+    });
+
+    pendingPayment.razorpayOrderId = order.id;
+    await pendingPayment.save();
+
+    res.json({
+      success: true,
+      message: 'Razorpay order created',
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      key: getRazorpayPublicKey(),
+      paymentId: pendingPayment._id,
+      schoolName: school.name,
+      planName: newPlan
+    });
+  } catch (error) {
+    console.error('Create subscription razorpay order error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating Razorpay order',
+      error: error.message
+    });
+  }
+};
+
+export const verifySubscriptionRazorpayPayment = async (req, res) => {
+  try {
+    if (!req.schoolId) {
+      return res.status(401).json({ success: false, message: 'School ID not found in session' });
+    }
+
+    const { paymentId, razorpayOrderId, razorpayPaymentId, razorpaySignature, newPlan, billingCycle = 'monthly' } = req.body;
+
+    if (!paymentId || !razorpayOrderId || !razorpayPaymentId || !razorpaySignature || !newPlan) {
+      return res.status(400).json({ success: false, message: 'Missing payment verification fields' });
+    }
+
+    const payment = await Payment.findOne({
+      _id: paymentId,
+      schoolId: req.schoolId,
+      paymentType: 'subscription',
+      status: 'pending'
+    });
+
+    if (!payment) {
+      return res.status(404).json({ success: false, message: 'Pending subscription payment not found' });
+    }
+
+    if (payment.razorpayOrderId !== razorpayOrderId) {
+      return res.status(400).json({ success: false, message: 'Order mismatch' });
+    }
+
+    const isValid = verifyRazorpaySignature({
+      orderId: razorpayOrderId,
+      paymentId: razorpayPaymentId,
+      signature: razorpaySignature
+    });
+
+    if (!isValid) {
+      payment.status = 'failed';
+      await payment.save();
+      return res.status(400).json({ success: false, message: 'Invalid payment signature' });
+    }
+
+    const validPlans = ['basic', 'premium', 'enterprise'];
+    if (!validPlans.includes(newPlan)) {
+      return res.status(400).json({ success: false, message: 'Invalid plan selected' });
+    }
+
+    let pricing = await PricingPlan.findOne({ code: newPlan, isActive: true });
+    if (!pricing) {
+      const fallbackPricing = {
+        basic: { monthlyPrice: 2999, annualPrice: 29990, maxStudents: 500 },
+        premium: { monthlyPrice: 5999, annualPrice: 59990, maxStudents: 2000 },
+        enterprise: { monthlyPrice: 9999, annualPrice: 99990, maxStudents: null }
+      };
+      pricing = fallbackPricing[newPlan];
+    }
+
+    const school = await School.findById(req.schoolId);
+    if (!school) {
+      return res.status(404).json({ success: false, message: 'School not found' });
+    }
+
+    const startDate = new Date();
+    const endDate = new Date();
+    if (billingCycle === 'annual') {
+      endDate.setFullYear(endDate.getFullYear() + 1);
+    } else {
+      endDate.setMonth(endDate.getMonth() + 1);
+    }
+
+    payment.status = 'completed';
+    payment.transactionId = razorpayPaymentId;
+    payment.razorpayPaymentId = razorpayPaymentId;
+    payment.razorpaySignature = razorpaySignature;
+    payment.paymentDate = new Date();
+    await payment.save();
+
+    school.subscription.plan = newPlan;
+    school.subscription.startDate = startDate;
+    school.subscription.endDate = endDate;
+    school.subscription.maxStudents = pricing?.maxStudents;
+    school.billing.monthlyPrice = pricing?.monthlyPrice;
+    school.billing.annualPrice = pricing?.annualPrice;
+    school.billing.billingCycle = billingCycle;
+    school.billing.paymentStatus = 'active';
+    school.billing.lastPaymentDate = new Date();
+    school.billing.nextPaymentDate = endDate;
+    school.billing.failedPaymentAttempts = 0;
+    await school.save();
+
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('plan:upgraded', {
+        schoolId: req.schoolId,
+        schoolName: school.name,
+        newPlan,
+        amount: payment.amount,
+        billingCycle,
+        timestamp: new Date()
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Successfully upgraded to ${newPlan} plan`,
+      data: {
+        plan: newPlan,
+        startDate,
+        endDate,
+        amountPaid: payment.amount,
+        billingCycle,
+        paymentId: payment._id
+      }
+    });
+  } catch (error) {
+    console.error('Verify subscription razorpay payment error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error verifying subscription payment',
+      error: error.message
+    });
+  }
+};
+
 export const upgradePlan = async (req, res) => {
   try {
     // Validate request data

@@ -13,6 +13,7 @@ import Schedule from '../models/Schedule.js';
 import Grade from '../models/Grade.js';
 import { assertSameSchoolStudent } from '../middleware/tenantGuards.js';
 import { cacheKey, delCacheByPattern, getOrSetCache } from '../services/cacheService.js';
+import { getRazorpayClient, getRazorpayPublicKey, toPaise, verifyRazorpaySignature } from '../services/razorpayService.js';
 
 const CACHE_TTL = {
   DASHBOARD: 180,
@@ -577,11 +578,24 @@ export const getFees = async (req, res) => {
 
         const payments = await Payment.find({ schoolId: req.schoolId, studentId }).sort({ paymentDate: -1 }).lean();
 
+        const activeFeeIds = new Set(activeFees.map((fee) => String(fee._id)));
+        const completedActiveFeePayments = payments.filter(
+          (payment) => payment.status === 'completed' && payment.feeId && activeFeeIds.has(String(payment.feeId))
+        );
+
+        const paidByFeeId = new Map();
+        for (const payment of completedActiveFeePayments) {
+          const feeKey = String(payment.feeId);
+          const existing = paidByFeeId.get(feeKey) || 0;
+          paidByFeeId.set(feeKey, existing + Number(payment.amount || 0));
+        }
+
         const totalFeeAmount = activeFees.reduce((sum, fee) => sum + fee.amount, 0);
-        const totalPaid = payments
-          .filter((payment) => payment.status === 'completed')
-          .reduce((sum, payment) => sum + payment.amount, 0);
-        const pending = totalFeeAmount - totalPaid;
+        const totalPaid = activeFees.reduce((sum, fee) => {
+          const feePaidAmount = paidByFeeId.get(String(fee._id)) || 0;
+          return sum + Math.min(Number(fee.amount || 0), feePaidAmount);
+        }, 0);
+        const pending = Math.max(0, totalFeeAmount - totalPaid);
 
         const now = new Date();
         const lateFeesAmount = activeFees
@@ -600,13 +614,29 @@ export const getFees = async (req, res) => {
           studentGrade: student.grade,
           studentSection: student.section,
           fees: activeFees,
-          payments,
+          payments: (() => {
+            const completedPayments = payments.filter((payment) => payment.status === 'completed');
+            const latestByFeeKey = new Map();
+
+            for (const payment of completedPayments) {
+              const feeKey = payment.feeId
+                ? String(payment.feeId)
+                : `title:${String(payment.feeTitle || '')}`;
+
+              if (!latestByFeeKey.has(feeKey)) {
+                latestByFeeKey.set(feeKey, payment);
+              }
+            }
+
+            return Array.from(latestByFeeKey.values());
+          })(),
           summary: {
             totalFees: totalFeeAmount,
             totalPaid,
             pending,
+            lateFee: lateFeesAmount,
             lateFees: lateFeesAmount,
-            totalDue: pending + lateFeesAmount
+            totalDue: Math.max(0, pending + lateFeesAmount)
           }
         };
       },
@@ -622,6 +652,182 @@ export const getFees = async (req, res) => {
 };
 
 // Make payment
+export const createFeeRazorpayOrder = async (req, res) => {
+  try {
+    const studentId = req.user._id;
+    const student = req.user;
+    const { feeId, amount, paymentMethod = 'Online Payment', remarks } = req.body;
+
+    if (!studentId || !feeId || !amount) {
+      return res.status(400).json({
+        success: false,
+        message: 'Student ID, Fee ID, and amount are required'
+      });
+    }
+
+    const fee = await Fee.findOne({ _id: feeId, schoolId: req.schoolId });
+    if (!fee) {
+      return res.status(404).json({ success: false, message: 'Fee not found' });
+    }
+
+    const existingPayment = await Payment.findOne({
+      schoolId: req.schoolId,
+      studentId,
+      feeId,
+      status: 'completed'
+    });
+
+    if (existingPayment) {
+      return res.status(400).json({
+        success: false,
+        message: 'This fee has already been paid'
+      });
+    }
+
+    const now = new Date();
+    const dueDate = new Date(fee.dueDate);
+    let lateFee = 0;
+    if (now > dueDate) {
+      const daysLate = Math.floor((now - dueDate) / (1000 * 60 * 60 * 24));
+      lateFee = daysLate * 10;
+    }
+
+    const totalAmount = Number(amount) + lateFee;
+
+    await Payment.updateMany(
+      {
+        schoolId: req.schoolId,
+        studentId,
+        feeId,
+        status: 'pending'
+      },
+      {
+        $set: {
+          status: 'failed',
+          remarks: 'Superseded by a new Razorpay order attempt'
+        }
+      }
+    );
+
+    const pendingPayment = await Payment.create({
+      schoolId: req.schoolId,
+      studentId,
+      studentName: student.name,
+      studentEmail: student.email,
+      feeId,
+      feeTitle: fee.title,
+      amount: totalAmount,
+      paymentMethod,
+      status: 'pending',
+      remarks: remarks || (lateFee > 0 ? `Includes late fee: ₹${lateFee}` : undefined)
+    });
+
+    const razorpay = getRazorpayClient();
+    const order = await razorpay.orders.create({
+      amount: toPaise(totalAmount),
+      currency: 'INR',
+      receipt: String(pendingPayment._id),
+      notes: {
+        paymentId: String(pendingPayment._id),
+        schoolId: String(req.schoolId),
+        studentId: String(studentId),
+        feeId: String(feeId),
+        paymentType: 'fee'
+      }
+    });
+
+    pendingPayment.razorpayOrderId = order.id;
+    await pendingPayment.save();
+
+    res.json({
+      success: true,
+      message: 'Razorpay order created',
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      key: getRazorpayPublicKey(),
+      paymentId: pendingPayment._id,
+      feeTitle: fee.title,
+      studentName: student.name,
+      studentEmail: student.email
+    });
+  } catch (error) {
+    console.error('Create fee razorpay order error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+export const verifyFeeRazorpayPayment = async (req, res) => {
+  try {
+    const { paymentId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
+
+    if (!paymentId || !razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
+      return res.status(400).json({ success: false, message: 'Missing Razorpay verification fields' });
+    }
+
+    const payment = await Payment.findOne({
+      _id: paymentId,
+      schoolId: req.schoolId,
+      studentId: req.user._id,
+      status: 'pending'
+    });
+
+    if (!payment) {
+      return res.status(404).json({ success: false, message: 'Pending payment not found' });
+    }
+
+    if (payment.razorpayOrderId !== razorpayOrderId) {
+      return res.status(400).json({ success: false, message: 'Order mismatch' });
+    }
+
+    const isValid = verifyRazorpaySignature({
+      orderId: razorpayOrderId,
+      paymentId: razorpayPaymentId,
+      signature: razorpaySignature
+    });
+
+    if (!isValid) {
+      payment.status = 'failed';
+      await payment.save();
+      return res.status(400).json({ success: false, message: 'Invalid payment signature' });
+    }
+
+    payment.status = 'completed';
+    payment.transactionId = razorpayPaymentId;
+    payment.razorpayPaymentId = razorpayPaymentId;
+    payment.razorpaySignature = razorpaySignature;
+    payment.paymentDate = new Date();
+    await payment.save();
+
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('payment:created', {
+        schoolId: req.schoolId,
+        payment: {
+          _id: payment._id,
+          studentName: payment.studentName,
+          amount: payment.amount,
+          paymentMethod: payment.paymentMethod,
+          feeTitle: payment.feeTitle,
+          paymentDate: payment.paymentDate
+        }
+      });
+    }
+
+    await delCacheByPattern(`student-fees:${req.schoolId}:${req.user._id}:*`);
+    await delCacheByPattern(`student-dashboard:${req.schoolId}:${req.user._id}`);
+
+    res.json({
+      success: true,
+      message: 'Payment verified successfully',
+      payment
+    });
+  } catch (error) {
+    console.error('Verify fee razorpay payment error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
 export const makePayment = async (req, res) => {
   try {
     const studentId = req.user._id; // Get from authenticated user

@@ -116,6 +116,8 @@ export const studentAPI = {
   hideAnnouncement: (id) => api.delete(`/student/announcements/${id}`),
   clearAllAnnouncements: () => api.delete('/student/announcements'),
   getFees: () => api.get('/student/fees'),
+  createFeeRazorpayOrder: (paymentData) => api.post('/student/payment/razorpay/order', paymentData),
+  verifyFeeRazorpayPayment: (verifyData) => api.post('/student/payment/razorpay/verify', verifyData),
   makePayment: (paymentData) => api.post('/student/payment', paymentData),
   downloadReceipt: (paymentId) => api.get(`/student/receipt/${paymentId}`),
   getLibrary: (params) => api.get('/student/library', { params }),
@@ -253,6 +255,8 @@ export const adminAPI = {
   // NEW: Subscription/Plan APIs
   getAvailablePlans: () => api.get('/administrator/subscription/plans'),
   getCurrentSubscription: () => api.get('/administrator/subscription/current'),
+  createSubscriptionRazorpayOrder: (planData) => api.post('/administrator/subscription/razorpay/order', planData),
+  verifySubscriptionRazorpayPayment: (verifyData) => api.post('/administrator/subscription/razorpay/verify', verifyData),
   upgradePlan: (planData) => api.post('/administrator/subscription/upgrade', planData),
 };
 
