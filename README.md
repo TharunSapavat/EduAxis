@@ -8,6 +8,8 @@ A comprehensive School Management System built with **Node.js**, **Express**, **
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [Getting Started](#getting-started)
+- [CI](#ci)
+- [Production Deployment](#production-deployment)
 - [API Documentation](#api-documentation)
 - [Testing](#testing)
 - [Authentication](#authentication)
@@ -238,6 +240,17 @@ The repository includes a GitHub Actions workflow at [.github/workflows/ci.yml](
 - **Database**: MongoDB Atlas (production cluster)
 - **Real-time**: Socket.IO configured for production CORS
 
+### Production Environment Settings
+- **Render environment variable**: `CORS_ORIGINS=http://localhost:5173,http://localhost:5174,https://edu-axis.vercel.app`
+- **Render environment variable**: `NODE_ENV=production`
+- **Frontend environment variable**: `VITE_API_URL=https://eduaxis-backend.onrender.com/api`
+- **Frontend environment variable**: `VITE_SOCKET_URL=https://eduaxis-backend.onrender.com`
+
+### Authentication Stability Note
+- The backend supports secure cross-site cookies for Vercel -> Render deployments.
+- The backend also accepts Bearer tokens as a fallback for protected routes.
+- This prevents post-login redirect loops when browsers restrict third-party cookies.
+
 ### Testing the Live Deployment
 1. Open https://edu-axis.vercel.app/
 2. Log in with a user from your MongoDB Atlas database
@@ -299,6 +312,11 @@ The repository includes a GitHub Actions workflow at [.github/workflows/ci.yml](
 ### Base URL
 ```
 http://localhost:5000/api
+```
+
+### Production Base URL
+```
+https://eduaxis-backend.onrender.com/api
 ```
 
 ### Authentication Routes
