@@ -6,8 +6,11 @@ import { catchAsync } from './errorHandler.js';
 
 // Middleware to verify JWT token from cookie
 export const authMiddleware = catchAsync(async (req, res, next) => {
-  // Get token from cookie
-  const token = req.cookies.authToken;
+  // Prefer cookie token, but fall back to Authorization: Bearer <token>
+  const cookieToken = req.cookies.authToken;
+  const authHeader = req.headers.authorization || '';
+  const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  const token = cookieToken || bearerToken;
 
   if (!token) {
     throw new AppError('No authentication token, access denied', 401);

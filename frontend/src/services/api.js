@@ -14,6 +14,17 @@ const api = axios.create({
 
 let isRedirectingUnauthorized = false;
 
+// Request interceptor - attach bearer token as fallback for environments where
+// cross-site cookies may be blocked or stripped.
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('authToken');
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 // CSRF DISABLED - Causing too many issues with delete/send operations
 
 // Response interceptor - Handle errors globally
@@ -37,6 +48,7 @@ api.interceptors.response.use(
             // User is not authenticated for a protected route - clear session
             console.error('Unauthorized access - logging out');
             localStorage.removeItem('user');
+            localStorage.removeItem('authToken');
             localStorage.removeItem('persist:root');
             window.location.href = '/';
           }
