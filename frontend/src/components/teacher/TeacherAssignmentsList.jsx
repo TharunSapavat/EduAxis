@@ -3,6 +3,7 @@ import { teacherAPI } from '../../services/api';
 import { useSocket } from '../../context/SocketContext';
 import { useAuth } from '../../context/AuthContext';
 import { FileText, ListChecks, X, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
+import { resolveAssetUrl } from '../../config/runtime';
 
 export default function TeacherAssignmentsList() {
   const [items, setItems] = useState([]);
@@ -359,7 +360,7 @@ export default function TeacherAssignmentsList() {
                                   <p className="text-xs font-semibold text-slate-700 mb-2">📎 Attached Files:</p>
                                   <ul className="space-y-2 bg-white p-2 rounded border border-slate-300">
                                     {(s.files || s.attachments || []).map((att, i) => {
-                                      const fileUrl = att.path ? `http://localhost:5000${att.path}` : att.url;
+                                      const fileUrl = att.path ? resolveAssetUrl(att.path) : att.url;
                                       const fileName = att.name || att.filename || `Attachment ${i + 1}`;
                                       const fileSize = att.size ? ` (${(att.size / 1024).toFixed(1)} KB)` : '';
                                       return (

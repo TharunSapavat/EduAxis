@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Calendar, FileText, Download, Eye, X } from 'lucide-react';
 import { studentAPI } from '../../services/api';
+import { resolveAssetUrl } from '../../config/runtime';
 
 export default function StudentTimetable() {
   const [loading, setLoading] = useState(false);
@@ -28,7 +29,7 @@ export default function StudentTimetable() {
 
   const handleDownload = () => {
     if (timetable?.file?.path) {
-      window.open(`http://localhost:5000${timetable.file.path}`, '_blank');
+      window.open(resolveAssetUrl(timetable.file.path), '_blank');
     }
   };
 
@@ -125,13 +126,13 @@ export default function StudentTimetable() {
                 <div className="flex-1 overflow-auto p-4">
                   {timetable.file?.mimetype?.includes('pdf') ? (
                     <iframe
-                      src={`http://localhost:5000${timetable.file.path}`}
+                      src={resolveAssetUrl(timetable.file.path)}
                       className="w-full h-full border-0 rounded"
                       title="Timetable PDF"
                     />
                   ) : (
                     <img
-                      src={`http://localhost:5000${timetable.file.path}`}
+                      src={resolveAssetUrl(timetable.file.path)}
                       alt="Timetable"
                       className="max-w-full h-auto mx-auto"
                     />

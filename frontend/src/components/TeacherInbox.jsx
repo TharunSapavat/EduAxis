@@ -11,6 +11,7 @@ import {
   MoreVertical
 } from 'lucide-react';
 import axios from 'axios';
+import { getApiBaseUrl } from '../config/runtime';
 
 export default function TeacherInbox({ user, socket }) {
   const [conversations, setConversations] = useState([]);
@@ -44,7 +45,7 @@ export default function TeacherInbox({ user, socket }) {
   }, [selectedConversation]);
 
   const API_BASE =
-    import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    getApiBaseUrl();
 
   // Auto-scroll inside the messages panel only to avoid page scroll jumps
   const scrollToBottom = () => {

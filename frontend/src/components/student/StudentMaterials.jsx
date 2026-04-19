@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { studentAPI } from '../../services/api';
 import { Download, FileText, Search, Filter } from 'lucide-react';
+import { resolveAssetUrl } from '../../config/runtime';
 
 export default function StudentMaterials() {
   const [materials, setMaterials] = useState([]);
@@ -65,7 +66,7 @@ export default function StudentMaterials() {
 
   const handleDownload = (material) => {
     const link = document.createElement('a');
-    link.href = `http://localhost:5000${material.fileUrl}`;
+    link.href = resolveAssetUrl(material.fileUrl);
     link.download = material.fileName;
     document.body.appendChild(link);
     link.click();

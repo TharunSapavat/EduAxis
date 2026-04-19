@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Calendar, Upload, Trash2, Eye, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 import { adminAPI } from '../../services/api';
+import { resolveAssetUrl } from '../../config/runtime';
 
 const sections = ['All','A','B','C','D','E'];
 const semesters = ['Fall','Spring','Summer'];
@@ -226,7 +227,7 @@ export default function AdminTimetableManagement({ showNotification }) {
                           {tt.isActive? 'Yes':'No'}
                         </span>
                       </td>
-                      <td className="p-2">{tt.file?.filename? <a className="text-blue-600 underline flex items-center gap-1" href={`http://localhost:5000${tt.file.path}`} target="_blank" rel="noreferrer"><Eye className="w-3 h-3"/>{tt.file.filename}</a> : '—'}</td>
+                      <td className="p-2">{tt.file?.filename? <a className="text-blue-600 underline flex items-center gap-1" href={resolveAssetUrl(tt.file.path)} target="_blank" rel="noreferrer"><Eye className="w-3 h-3"/>{tt.file.filename}</a> : '—'}</td>
                       <td className="p-2 text-right">
                         <button onClick={()=>deleteTimetable(tt._id)} className="px-3 py-1 text-white bg-red-600 hover:bg-red-700 rounded flex items-center gap-1 text-xs"><Trash2 className="w-3 h-3"/>Delete</button>
                       </td>

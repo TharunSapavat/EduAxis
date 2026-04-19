@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { studentAPI } from '../services/api';
 import { Send, User } from 'lucide-react';
 import axios from 'axios';
+import { getApiBaseUrl } from '../config/runtime';
 
 export default function StudentMessage({ user, socket, onClose }) {
   const [teachers, setTeachers] = useState([]);
@@ -16,7 +17,7 @@ export default function StudentMessage({ user, socket, onClose }) {
     const fetchTeachers = async () => {
       try {
         setLoadingTeachers(true);
-        const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/student/teachers`, {
+        const res = await axios.get(`${getApiBaseUrl()}/student/teachers`, {
           withCredentials: true
         });
         if (res.data.success) {

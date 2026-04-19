@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { MessageSquare, Send, User, X, Plus, Search, Trash2, Check, CheckCheck, MoreVertical } from 'lucide-react';
 import axios from 'axios';
+import { getApiBaseUrl } from '../config/runtime';
 
 export default function StudentInbox({ user, socket }) {
   const [conversations, setConversations] = useState([]);
@@ -147,7 +148,7 @@ export default function StudentInbox({ user, socket }) {
 
   const fetchConversations = async () => {
     try {
-      const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/messages/conversations`, {
+      const res = await axios.get(`${getApiBaseUrl()}/messages/conversations`, {
         withCredentials: true
       });
       if (res.data.success) {
@@ -165,7 +166,7 @@ export default function StudentInbox({ user, socket }) {
 
   const fetchTeachers = async () => {
     try {
-      const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/student/teachers`, {
+      const res = await axios.get(`${getApiBaseUrl()}/student/teachers`, {
         withCredentials: true
       });
       if (res.data.success) {
@@ -183,7 +184,7 @@ export default function StudentInbox({ user, socket }) {
     try {
       setLoading(true);
       setSelectedConversation({ userId, userName, userRole });
-      const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/messages/${userId}`, {
+      const res = await axios.get(`${getApiBaseUrl()}/messages/${userId}`, {
         withCredentials: true
       });
       if (res.data.success) {
@@ -200,11 +201,7 @@ export default function StudentInbox({ user, socket }) {
 
   const markConversationAsRead = async (senderId) => {
     try {
-      await axios.post(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/messages/read`,
-        { senderId },
-        { withCredentials: true }
-      );
+      await axios.post(`${getApiBaseUrl()}/messages/read`, { senderId }, { withCredentials: true });
       // Update local conversation unread count
       setConversations(prev =>
         prev.map(conv =>
@@ -269,7 +266,7 @@ export default function StudentInbox({ user, socket }) {
       setNewMessage(''); // Clear input immediately for better UX
       
       const res = await axios.post(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/messages`,
+        `${getApiBaseUrl()}/messages`,
         {
           recipientId: selectedConversation.userId,
           text: messageText
@@ -305,7 +302,7 @@ export default function StudentInbox({ user, socket }) {
     try {
       setSending(true);
       const res = await axios.post(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/messages`,
+        `${getApiBaseUrl()}/messages`,
         {
           recipientId: selectedTeacher,
           text: newMessageText
@@ -342,7 +339,7 @@ export default function StudentInbox({ user, socket }) {
 
     try {
       await axios.delete(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/messages/${messageId}`,
+        `${getApiBaseUrl()}/messages/${messageId}`,
         { withCredentials: true }
       );
       setMessages(prev => prev.filter(msg => msg._id !== messageId));
@@ -361,7 +358,7 @@ export default function StudentInbox({ user, socket }) {
 
     try {
       await axios.delete(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/messages/conversation/${selectedConversation.userId}`,
+        `${getApiBaseUrl()}/messages/conversation/${selectedConversation.userId}`,
         { withCredentials: true }
       );
       

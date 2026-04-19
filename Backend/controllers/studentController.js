@@ -984,7 +984,7 @@ export const getLibraryResources = async (req, res) => {
           author: resource.author,
           category: resource.category,
           available: 1,
-          downloadUrl: resource.isExternal ? resource.linkUrl : (resource.file?.path ? `http://localhost:5000${resource.file.path}` : ''),
+          downloadUrl: resource.isExternal ? resource.linkUrl : (resource.file?.path || ''),
           fileType: resource.isExternal ? 'link' : (resource.file?.mimetype || 'file'),
           tags: resource.tags
         }));

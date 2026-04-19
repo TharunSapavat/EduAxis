@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { X } from 'lucide-react';
+import { getSocketBaseUrl } from '../config/runtime';
 
 // Context & AP
 import { useAuth } from '../context/AuthContext';
@@ -118,7 +119,7 @@ export default function StudentDashboard() {
   // Initialize Socket.IO connection once
   useEffect(() => {
     if (!socketRef.current) {
-      const socket = io('http://localhost:5000', { withCredentials: true });
+      const socket = io(getSocketBaseUrl(), { withCredentials: true });
       socketRef.current = socket;
       socket.on('connect', () => setSocketConnected(true));
       socket.on('disconnect', () => setSocketConnected(false));

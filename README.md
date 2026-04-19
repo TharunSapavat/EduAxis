@@ -203,6 +203,23 @@ EduAxis implements a **multi-tenant architecture** where:
    - Backend API: `http://localhost:5000`
    - Super Admin: `http://localhost:5173/system-access`
 
+### Docker Run
+
+The app can also be started fully inside containers from the repository root:
+
+```bash
+docker compose up --build
+```
+
+This starts Redis, Solr, the backend API on `http://localhost:5001`, and the frontend on `http://localhost:5173`.
+The backend uses the MongoDB Atlas URI from [Backend/.env](Backend/.env) instead of a local Mongo container.
+
+To stop the stack:
+
+```bash
+docker compose down
+```
+
 ## Security & System Audit ⚠️
 
 **System Health: 85% ✅** | **Last Comprehensive Audit: January 2025**
