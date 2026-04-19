@@ -1,6 +1,18 @@
 import User from '../models/User.js';
 import School from '../models/School.js';
 
+const getAuthCookieOptions = () => {
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  return {
+    httpOnly: true,
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    sameSite: isProduction ? 'none' : 'lax',
+    secure: isProduction,
+    path: '/'
+  };
+};
+
 // Helper function to extract domain from email
 const extractDomain = (email) => {
   const parts = email.toLowerCase().split('@');
@@ -138,12 +150,8 @@ export const register = async (req, res) => {
     // Generate JWT token
     const token = newUser.generateAuthToken();
 
-    // Set cookie with the token
-    res.cookie('authToken', token, {
-      httpOnly: true,      // Cookie cannot be accessed by JavaScript (secure)
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      sameSite: 'lax'      // CSRF protection
-    });
+    // Use cross-site compatible cookie options in production (Vercel -> Render)
+    res.cookie('authToken', token, getAuthCookieOptions());
 
     res.status(201).json({
       success: true,
@@ -258,12 +266,8 @@ export const login = async (req, res) => {
     // Generate JWT token
     const token = user.generateAuthToken();
 
-    // Set cookie with the token
-    res.cookie('authToken', token, {
-      httpOnly: true,      // Cookie cannot be accessed by JavaScript (secure)
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      sameSite: 'lax'      // CSRF protection
-    });
+    // Use cross-site compatible cookie options in production (Vercel -> Render)
+    res.cookie('authToken', token, getAuthCookieOptions());
 
     res.json({
       success: true,
@@ -283,10 +287,7 @@ export const login = async (req, res) => {
 
 // Logout user
 export const logout = async (req, res) => {
-  res.clearCookie('authToken', {
-    httpOnly: true,
-    sameSite: 'lax'
-  });
+  res.clearCookie('authToken', getAuthCookieOptions());
   
   res.json({ 
     success: true, 
