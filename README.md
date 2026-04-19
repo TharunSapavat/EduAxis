@@ -9,6 +9,7 @@ A comprehensive School Management System built with **Node.js**, **Express**, **
 - [Project Structure](#project-structure)
 - [Getting Started](#getting-started)
 - [API Documentation](#api-documentation)
+- [Testing](#testing)
 - [Authentication](#authentication)
 - [Contributing](#contributing)
 - [License](#license)
@@ -315,6 +316,56 @@ All super admin routes require authentication and superadmin role.
 - `PATCH /schools/:id/subscription` - Update subscription plan
 
 See **[SUPERADMIN_USER_GUIDE.md](SUPERADMIN_USER_GUIDE.md)** for detailed usage instructions.
+
+## Testing
+
+Phase 3 adds on-demand unit testing for the backend and frontend.
+
+### What is covered
+- Backend B2B API-key authentication
+- Backend holiday integration fallback behavior
+- Backend cache helper behavior
+- Backend school summary lookup by school code
+- Frontend auth slice reducers and selectors
+- Frontend UI slice reducers and selectors
+
+### Run the tests
+
+Backend:
+```bash
+cd Backend
+npm run test
+```
+
+Frontend:
+```bash
+cd frontend
+npm run test
+```
+
+### Generate reports
+
+Backend report:
+```bash
+cd Backend
+npm run test:report
+```
+
+Frontend report:
+```bash
+cd frontend
+npm run test:report
+```
+
+### Report locations
+- [Backend/test-reports/backend-test-report.json](Backend/test-reports/backend-test-report.json)
+- [frontend/test-reports/frontend-test-report.json](frontend/test-reports/frontend-test-report.json)
+
+### Current status
+- Backend: 9/9 tests passing
+- Frontend: 9/9 tests passing
+
+The report files can be regenerated at any time before evaluation by rerunning the commands above.
 
 ## Authentication
 

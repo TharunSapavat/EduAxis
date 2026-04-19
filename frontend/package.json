@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:report": "vitest run --reporter=default --reporter=json --outputFile=test-reports/frontend-test-report.json"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -32,6 +34,7 @@
     "@types/react-dom": "^18.3.3",
     "@vitejs/plugin-react": "^5.0.4",
     "baseline-browser-mapping": "^2.9.19",
-    "vite": "^7.1.7"
+    "vite": "^7.1.7",
+    "vitest": "^3.2.4"
   }
 }
