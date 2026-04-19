@@ -2,6 +2,23 @@ import Course from '../models/Course.js';
 import School from '../models/School.js';
 import User from '../models/User.js';
 
+const DEFAULT_HOLIDAY_API_BASE = 'https://date.nager.at/api/v3/PublicHolidays';
+const DEFAULT_EXCHANGE_API_BASE = 'https://api.frankfurter.app/latest';
+
+const FALLBACK_HOLIDAYS = {
+  IN: [
+    { date: '2026-01-26', localName: 'Republic Day', name: 'Republic Day', countryCode: 'IN', fixed: true, global: true },
+    { date: '2026-08-15', localName: 'Independence Day', name: 'Independence Day', countryCode: 'IN', fixed: true, global: true },
+    { date: '2026-10-02', localName: 'Gandhi Jayanti', name: 'Gandhi Jayanti', countryCode: 'IN', fixed: true, global: true },
+    { date: '2026-11-12', localName: 'Diwali', name: 'Diwali', countryCode: 'IN', fixed: false, global: true }
+  ],
+  US: [
+    { date: '2026-07-04', localName: 'Independence Day', name: 'Independence Day', countryCode: 'US', fixed: true, global: true },
+    { date: '2026-11-26', localName: 'Thanksgiving Day', name: 'Thanksgiving Day', countryCode: 'US', fixed: false, global: true },
+    { date: '2026-12-25', localName: 'Christmas Day', name: 'Christmas Day', countryCode: 'US', fixed: true, global: true }
+  ]
+};
+
 const fetchWithTimeout = async (url, timeoutMs = 7000) => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -9,13 +26,33 @@ const fetchWithTimeout = async (url, timeoutMs = 7000) => {
   try {
     const response = await fetch(url, { signal: controller.signal });
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+      const bodyText = await response.text().catch(() => '');
+      throw new Error(`HTTP ${response.status}${bodyText ? `: ${bodyText.slice(0, 180)}` : ''}`);
     }
 
-    return response.json();
+    const contentType = response.headers.get('content-type') || '';
+    const bodyText = await response.text();
+
+    if (!bodyText.trim()) {
+      throw new Error('Empty response body from external service');
+    }
+
+    if (!contentType.includes('application/json')) {
+      throw new Error(`Unexpected content type: ${contentType || 'unknown'}`);
+    }
+
+    try {
+      return JSON.parse(bodyText);
+    } catch (parseError) {
+      throw new Error(`Invalid JSON from external service: ${parseError.message}`);
+    }
   } finally {
     clearTimeout(timeout);
   }
+};
+
+const getFallbackHolidays = (countryCode) => {
+  return FALLBACK_HOLIDAYS[countryCode] || FALLBACK_HOLIDAYS.IN;
 };
 
 const normalizeCountryCode = (countryCode) => {
@@ -34,7 +71,13 @@ const normalizeYear = (yearValue) => {
 };
 
 const buildHolidayEndpoint = (year, countryCode) => {
-  return `https://date.nager.at/api/v3/PublicHolidays/${year}/${countryCode}`;
+  const baseUrl = String(process.env.EXTERNAL_HOLIDAY_API_BASE || DEFAULT_HOLIDAY_API_BASE).replace(/\/$/, '');
+  return `${baseUrl}/${year}/${countryCode}`;
+};
+
+const buildExchangeEndpoint = (baseCurrency, targetCurrency) => {
+  const baseUrl = String(process.env.EXTERNAL_EXCHANGE_API_BASE || DEFAULT_EXCHANGE_API_BASE).replace(/\/$/, '');
+  return `${baseUrl}?from=${baseCurrency}&to=${targetCurrency}`;
 };
 
 export const getPublicHolidaysB2C = async (req, res) => {
@@ -43,12 +86,26 @@ export const getPublicHolidaysB2C = async (req, res) => {
     const year = normalizeYear(req.query.year);
     const endpoint = buildHolidayEndpoint(year, countryCode);
 
-    const holidays = await fetchWithTimeout(endpoint);
+    let holidays = [];
+    let source = 'external';
+    let integration = 'nager-public-holidays';
+
+    try {
+      holidays = await fetchWithTimeout(endpoint);
+    } catch (error) {
+      console.warn('B2C holidays external provider failed; using fallback data:', error.message);
+      holidays = getFallbackHolidays(countryCode).map((holiday) => ({
+        ...holiday,
+        date: holiday.date.replace(/^\d{4}/, String(year))
+      }));
+      source = 'fallback';
+      integration = 'eduaxis-static-holidays';
+    }
 
     return res.json({
       success: true,
-      source: 'external',
-      integration: 'nager-public-holidays',
+      source,
+      integration,
       filters: { year, countryCode },
       total: holidays.length,
       items: holidays
@@ -67,7 +124,7 @@ export const getExchangeRatesB2C = async (req, res) => {
   try {
     const baseCurrency = String(req.query.base || 'INR').trim().toUpperCase();
     const targetCurrency = String(req.query.target || 'USD').trim().toUpperCase();
-    const endpoint = `https://api.frankfurter.app/latest?from=${baseCurrency}&to=${targetCurrency}`;
+    const endpoint = buildExchangeEndpoint(baseCurrency, targetCurrency);
 
     const rates = await fetchWithTimeout(endpoint);
 
@@ -142,13 +199,27 @@ export const getPublicHolidaysB2B = async (req, res) => {
     const year = normalizeYear(req.query.year);
     const endpoint = buildHolidayEndpoint(year, countryCode);
 
-    const holidays = await fetchWithTimeout(endpoint);
+    let holidays = [];
+    let source = 'external';
+    let integration = 'nager-public-holidays';
+
+    try {
+      holidays = await fetchWithTimeout(endpoint);
+    } catch (error) {
+      console.warn('B2B holidays external provider failed; using fallback data:', error.message);
+      holidays = getFallbackHolidays(countryCode).map((holiday) => ({
+        ...holiday,
+        date: holiday.date.replace(/^\d{4}/, String(year))
+      }));
+      source = 'fallback';
+      integration = 'eduaxis-static-holidays';
+    }
 
     return res.json({
       success: true,
       b2b: true,
-      source: 'external',
-      integration: 'nager-public-holidays',
+      source,
+      integration,
       client: req.b2bClient,
       filters: { year, countryCode },
       total: holidays.length,
