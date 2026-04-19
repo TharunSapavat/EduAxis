@@ -165,6 +165,15 @@ io.on('connection', (socket) => {
 app.set('io', io);
 
 // Health check endpoint (no rate limit)
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: 'EduAxis backend is running',
+    health: '/api/health',
+    docs: '/api-docs'
+  });
+});
+
 app.get('/api/health', (req, res) => {
   res.json({ 
     success: true,
