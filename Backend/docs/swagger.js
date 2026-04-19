@@ -74,12 +74,22 @@ const openApiDefinition = {
   info: {
     title: 'EduAxis API',
     version: '1.0.0',
-    description: 'Comprehensive API documentation for EduAxis school management backend.'
+    description: 'Comprehensive API documentation for EduAxis school management backend.',
+    contact: {
+      name: 'EduAxis API Support'
+    },
+    license: {
+      name: 'ISC'
+    }
   },
   servers: [
     {
       url: `http://localhost:${process.env.PORT || 5000}`,
       description: 'Development server'
+    },
+    {
+      url: 'https://eduaxis-backend.onrender.com',
+      description: 'Production server'
     }
   ],
   tags: [

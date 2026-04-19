@@ -309,6 +309,19 @@ The repository includes a GitHub Actions workflow at [.github/workflows/ci.yml](
 
 ## API Documentation
 
+### Swagger UI
+
+- Local Swagger UI: `http://localhost:5000/api-docs`
+- Local OpenAPI JSON: `http://localhost:5000/api-docs.json`
+- Production Swagger UI: `https://eduaxis-backend.onrender.com/api-docs`
+- Production OpenAPI JSON: `https://eduaxis-backend.onrender.com/api-docs.json`
+
+### Swagger Authentication
+
+- Use **Authorize** in Swagger UI for JWT-protected endpoints.
+- Format: `Bearer <your_jwt_token>`
+- B2B partner endpoints use `x-api-key` header.
+
 ### Base URL
 ```
 http://localhost:5000/api
