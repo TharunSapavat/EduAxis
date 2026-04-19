@@ -1011,13 +1011,13 @@ const openApiDefinition = {
       })
     },
 
-    '/api/b2b/v1/schools/{schoolId}/summary': {
+    '/api/b2b/v1/schools/{schoolCode}/summary': {
       get: operation({
         summary: 'Get school summary for partner integrations (B2B)',
         tag: 'B2B',
         secured: false,
         security: [{ apiKeyAuth: [] }],
-        parameters: [idParam('schoolId', 'School id')],
+        parameters: [idParam('schoolCode', 'School code, or Mongo id if you already have it')],
         extraResponses: {
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' }

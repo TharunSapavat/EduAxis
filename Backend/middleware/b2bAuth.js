@@ -40,7 +40,7 @@ export const b2bApiKeyAuth = (req, res, next) => {
   if (!providedKey) {
     return res.status(401).json({
       success: false,
-      message: 'Missing API key. Provide x-api-key header.'
+      message: 'Missing API key. Provide x-api-key header or Authorization: ApiKey <key>. School code/id belongs in the URL path, not the header.'
     });
   }
 

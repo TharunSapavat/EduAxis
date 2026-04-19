@@ -15,7 +15,7 @@ router.get('/integrations/public-holidays', authMiddleware, getPublicHolidaysB2C
 router.get('/integrations/exchange-rates', authMiddleware, getExchangeRatesB2C);
 
 // B2B partner endpoints: API-key based access for third-party systems
-router.get('/b2b/v1/schools/:schoolId/summary', b2bApiKeyAuth, getSchoolSummaryB2B);
+router.get('/b2b/v1/schools/:schoolCode/summary', b2bApiKeyAuth, getSchoolSummaryB2B);
 router.get('/b2b/v1/integrations/public-holidays', b2bApiKeyAuth, getPublicHolidaysB2B);
 
 export default router;

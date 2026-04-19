@@ -70,6 +70,25 @@ const normalizeYear = (yearValue) => {
   return parsed;
 };
 
+const isMongoObjectId = (value) => /^[a-f\d]{24}$/i.test(String(value || '').trim());
+
+const resolveSchoolForB2B = async (schoolIdentifier) => {
+  const candidate = String(schoolIdentifier || '').trim();
+
+  if (!candidate) {
+    return null;
+  }
+
+  if (isMongoObjectId(candidate)) {
+    const schoolById = await School.findById(candidate).select('name code status stats subscription.plan createdAt').lean();
+    if (schoolById) {
+      return schoolById;
+    }
+  }
+
+  return School.findOne({ code: candidate.toUpperCase() }).select('name code status stats subscription.plan createdAt').lean();
+};
+
 const buildHolidayEndpoint = (year, countryCode) => {
   const baseUrl = String(process.env.EXTERNAL_HOLIDAY_API_BASE || DEFAULT_HOLIDAY_API_BASE).replace(/\/$/, '');
   return `${baseUrl}/${year}/${countryCode}`;
@@ -146,9 +165,9 @@ export const getExchangeRatesB2C = async (req, res) => {
 
 export const getSchoolSummaryB2B = async (req, res) => {
   try {
-    const { schoolId } = req.params;
+    const { schoolCode } = req.params;
 
-    const school = await School.findById(schoolId).select('name code status stats subscription.plan createdAt').lean();
+    const school = await resolveSchoolForB2B(schoolCode);
     if (!school) {
       return res.status(404).json({
         success: false,
@@ -156,10 +175,12 @@ export const getSchoolSummaryB2B = async (req, res) => {
       });
     }
 
+    const schoolId = String(school._id);
+
     const [activeStudents, activeTeachers, activeCourses] = await Promise.all([
-      User.countDocuments({ schoolId, role: 'student', status: 'active' }),
-      User.countDocuments({ schoolId, role: 'teacher', status: 'active' }),
-      Course.countDocuments({ schoolId, status: 'active' })
+      User.countDocuments({ schoolId: school._id, role: 'student', status: 'active' }),
+      User.countDocuments({ schoolId: school._id, role: 'teacher', status: 'active' }),
+      Course.countDocuments({ schoolId: school._id, status: 'active' })
     ]);
 
     return res.json({
