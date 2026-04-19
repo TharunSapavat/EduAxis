@@ -224,6 +224,26 @@ docker compose down
 
 The repository includes a GitHub Actions workflow at [.github/workflows/ci.yml](.github/workflows/ci.yml). It runs backend tests, frontend tests, and a frontend production build on every push and pull request.
 
+## Production Deployment
+
+### Live URLs
+- **Frontend (Vercel)**: https://edu-axis.vercel.app/
+- **Backend (Render)**: https://eduaxis-backend.onrender.com/
+- **API Base URL**: https://eduaxis-backend.onrender.com/api
+- **API Documentation**: https://eduaxis-backend.onrender.com/api-docs
+
+### Deployment Architecture
+- **Frontend**: Deployed on Vercel with automatic deployments from GitHub
+- **Backend**: Deployed on Render with Node.js runtime and MongoDB Atlas
+- **Database**: MongoDB Atlas (production cluster)
+- **Real-time**: Socket.IO configured for production CORS
+
+### Testing the Live Deployment
+1. Open https://edu-axis.vercel.app/
+2. Log in with a user from your MongoDB Atlas database
+3. Verify API calls in DevTools Network tab point to `eduaxis-backend.onrender.com/api`
+4. Check health endpoint: https://eduaxis-backend.onrender.com/api/health
+
 ## Security & System Audit ⚠️
 
 **System Health: 85% ✅** | **Last Comprehensive Audit: January 2025**
