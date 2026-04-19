@@ -17,7 +17,7 @@ const getAllowedOrigins = () => {
     'http://127.0.0.1:5174'
   ];
 
-  const envOrigins = process.env.CORS_ORIGINS;
+  const envOrigins = process.env.CORS_ORIGINS || process.env.CORS_ORIGIN;
 
   if (envOrigins) {
     const parsedEnvOrigins = envOrigins

@@ -1,14 +1,18 @@
 import User from '../models/User.js';
 import School from '../models/School.js';
 
-const getAuthCookieOptions = () => {
+const getAuthCookieOptions = (req) => {
+  const origin = req?.headers?.origin || '';
+  const isLocalOrigin = /localhost|127\.0\.0\.1/i.test(origin);
+  const isHttpsOrigin = /^https:\/\//i.test(origin);
   const isProduction = process.env.NODE_ENV === 'production';
+  const useCrossSiteCookie = isHttpsOrigin && !isLocalOrigin;
 
   return {
     httpOnly: true,
     maxAge: 7 * 24 * 60 * 60 * 1000,
-    sameSite: isProduction ? 'none' : 'lax',
-    secure: isProduction,
+    sameSite: useCrossSiteCookie || isProduction ? 'none' : 'lax',
+    secure: useCrossSiteCookie || isProduction,
     path: '/'
   };
 };
@@ -151,7 +155,7 @@ export const register = async (req, res) => {
     const token = newUser.generateAuthToken();
 
     // Use cross-site compatible cookie options in production (Vercel -> Render)
-    res.cookie('authToken', token, getAuthCookieOptions());
+    res.cookie('authToken', token, getAuthCookieOptions(req));
 
     res.status(201).json({
       success: true,
@@ -267,7 +271,7 @@ export const login = async (req, res) => {
     const token = user.generateAuthToken();
 
     // Use cross-site compatible cookie options in production (Vercel -> Render)
-    res.cookie('authToken', token, getAuthCookieOptions());
+    res.cookie('authToken', token, getAuthCookieOptions(req));
 
     res.json({
       success: true,
@@ -287,7 +291,7 @@ export const login = async (req, res) => {
 
 // Logout user
 export const logout = async (req, res) => {
-  res.clearCookie('authToken', getAuthCookieOptions());
+  res.clearCookie('authToken', getAuthCookieOptions(req));
   
   res.json({ 
     success: true, 
