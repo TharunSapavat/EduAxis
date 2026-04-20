@@ -23,6 +23,7 @@ const operation = ({
   summary,
   tag,
   secured = true,
+  security,
   parameters,
   requestBody,
   successCode = 200,
@@ -32,7 +33,7 @@ const operation = ({
 }) => ({
   tags: [tag],
   summary,
-  ...(secured ? { security: bearerAuth } : {}),
+  ...((security && security.length) ? { security } : (secured ? { security: bearerAuth } : {})),
   ...(parameters ? { parameters } : {}),
   ...(requestBody ? { requestBody } : {}),
   responses: {
@@ -73,12 +74,22 @@ const openApiDefinition = {
   info: {
     title: 'EduAxis API',
     version: '1.0.0',
-    description: 'Comprehensive API documentation for EduAxis school management backend.'
+    description: 'Comprehensive API documentation for EduAxis school management backend.',
+    contact: {
+      name: 'EduAxis API Support'
+    },
+    license: {
+      name: 'ISC'
+    }
   },
   servers: [
     {
       url: `http://localhost:${process.env.PORT || 5000}`,
       description: 'Development server'
+    },
+    {
+      url: 'https://eduaxis-backend.onrender.com',
+      description: 'Production server'
     }
   ],
   tags: [
@@ -92,7 +103,10 @@ const openApiDefinition = {
     { name: 'Enrollments', description: 'Enrollment management endpoints' },
     { name: 'Quiz', description: 'Quiz lifecycle and attempts' },
     { name: 'Feedback', description: 'Feedback and moderation endpoints' },
-    { name: 'Analytics', description: 'Performance analytics endpoints' }
+    { name: 'Analytics', description: 'Performance analytics endpoints' },
+    { name: 'Search', description: 'Cross-entity search endpoints (Solr/Mongo fallback)' },
+    { name: 'Integrations', description: 'B2C external service integrations consumed by EduAxis' },
+    { name: 'B2B', description: 'Partner-facing APIs exposed for third-party systems' }
   ],
   components: {
     securitySchemes: {
@@ -100,6 +114,11 @@ const openApiDefinition = {
         type: 'http',
         scheme: 'bearer',
         bearerFormat: 'JWT'
+      },
+      apiKeyAuth: {
+        type: 'apiKey',
+        in: 'header',
+        name: 'x-api-key'
       }
     },
     responses: {
@@ -366,6 +385,38 @@ const openApiDefinition = {
             feeId: { type: 'string' },
             amount: { type: 'number', example: 2500 },
             method: { type: 'string', example: 'card' }
+          }
+        })
+      })
+    },
+    '/api/student/payment/razorpay/order': {
+      post: operation({
+        summary: 'Create Razorpay order for student fee payment',
+        tag: 'Student',
+        requestBody: jsonBody({
+          type: 'object',
+          required: ['feeId', 'amount'],
+          properties: {
+            feeId: { type: 'string' },
+            amount: { type: 'number', example: 2500 },
+            paymentMethod: { type: 'string', example: 'Online Payment' },
+            remarks: { type: 'string' }
+          }
+        })
+      })
+    },
+    '/api/student/payment/razorpay/verify': {
+      post: operation({
+        summary: 'Verify Razorpay payment for student fee',
+        tag: 'Student',
+        requestBody: jsonBody({
+          type: 'object',
+          required: ['paymentId', 'razorpayOrderId', 'razorpayPaymentId', 'razorpaySignature'],
+          properties: {
+            paymentId: { type: 'string' },
+            razorpayOrderId: { type: 'string' },
+            razorpayPaymentId: { type: 'string' },
+            razorpaySignature: { type: 'string' }
           }
         })
       })
@@ -678,6 +729,39 @@ const openApiDefinition = {
     },
     '/api/administrator/subscription/plans': { get: operation({ summary: 'Get available plans', tag: 'Admin' }) },
     '/api/administrator/subscription/current': { get: operation({ summary: 'Get current subscription', tag: 'Admin' }) },
+    '/api/administrator/subscription/razorpay/order': {
+      post: operation({
+        summary: 'Create Razorpay order for subscription payment',
+        tag: 'Admin',
+        requestBody: jsonBody({
+          type: 'object',
+          required: ['newPlan'],
+          properties: {
+            newPlan: { type: 'string', enum: ['basic', 'premium', 'enterprise'] },
+            billingCycle: { type: 'string', enum: ['monthly', 'annual'] },
+            paymentMethod: { type: 'string', example: 'credit_card' }
+          }
+        })
+      })
+    },
+    '/api/administrator/subscription/razorpay/verify': {
+      post: operation({
+        summary: 'Verify Razorpay subscription payment and activate plan',
+        tag: 'Admin',
+        requestBody: jsonBody({
+          type: 'object',
+          required: ['paymentId', 'razorpayOrderId', 'razorpayPaymentId', 'razorpaySignature', 'newPlan'],
+          properties: {
+            paymentId: { type: 'string' },
+            razorpayOrderId: { type: 'string' },
+            razorpayPaymentId: { type: 'string' },
+            razorpaySignature: { type: 'string' },
+            newPlan: { type: 'string', enum: ['basic', 'premium', 'enterprise'] },
+            billingCycle: { type: 'string', enum: ['monthly', 'annual'] }
+          }
+        })
+      })
+    },
     '/api/administrator/subscription/upgrade': {
       post: operation({
         summary: 'Upgrade subscription',
@@ -955,6 +1039,82 @@ const openApiDefinition = {
     },
     '/api/analytics/trend/{studentId}': {
       get: operation({ summary: 'Get overall trend', tag: 'Analytics', parameters: [idParam('studentId')] })
+    },
+
+    '/api/search': {
+      get: operation({
+        summary: 'Global search across users, courses and library',
+        tag: 'Search',
+        parameters: [
+          { in: 'query', name: 'q', required: true, schema: { type: 'string' }, description: 'Search term (min 2 characters)' },
+          { in: 'query', name: 'type', required: false, schema: { type: 'string', enum: ['all', 'users', 'courses', 'library'] }, description: 'Optional entity filter' },
+          { in: 'query', name: 'limit', required: false, schema: { type: 'integer', minimum: 1, maximum: 50 }, description: 'Max results to return' },
+          { in: 'query', name: 'schoolId', required: false, schema: { type: 'string' }, description: 'Required for superadmin search context' }
+        ]
+      })
+    },
+
+    '/api/search/reindex': {
+      post: operation({
+        summary: 'Reindex school search data into Solr (admin/superadmin)',
+        tag: 'Search',
+        parameters: [
+          { in: 'query', name: 'schoolId', required: false, schema: { type: 'string' }, description: 'Required when caller is superadmin' }
+        ]
+      })
+    },
+
+    '/api/integrations/public-holidays': {
+      get: operation({
+        summary: 'Get public holidays from external provider (B2C)',
+        tag: 'Integrations',
+        parameters: [
+          { in: 'query', name: 'countryCode', required: false, schema: { type: 'string', example: 'IN' }, description: 'ISO country code' },
+          { in: 'query', name: 'year', required: false, schema: { type: 'integer', example: 2026 }, description: 'Calendar year' }
+        ]
+      })
+    },
+
+    '/api/integrations/exchange-rates': {
+      get: operation({
+        summary: 'Get exchange rates from external provider (B2C)',
+        tag: 'Integrations',
+        parameters: [
+          { in: 'query', name: 'base', required: false, schema: { type: 'string', example: 'INR' }, description: 'Base currency code' },
+          { in: 'query', name: 'target', required: false, schema: { type: 'string', example: 'USD' }, description: 'Target currency code' }
+        ]
+      })
+    },
+
+    '/api/b2b/v1/schools/{schoolCode}/summary': {
+      get: operation({
+        summary: 'Get school summary for partner integrations (B2B)',
+        tag: 'B2B',
+        secured: false,
+        security: [{ apiKeyAuth: [] }],
+        parameters: [idParam('schoolCode', 'School code, or Mongo id if you already have it')],
+        extraResponses: {
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' }
+        }
+      })
+    },
+
+    '/api/b2b/v1/integrations/public-holidays': {
+      get: operation({
+        summary: 'Get public holidays feed for partner integrations (B2B)',
+        tag: 'B2B',
+        secured: false,
+        security: [{ apiKeyAuth: [] }],
+        parameters: [
+          { in: 'query', name: 'countryCode', required: false, schema: { type: 'string', example: 'IN' } },
+          { in: 'query', name: 'year', required: false, schema: { type: 'integer', example: 2026 } }
+        ],
+        extraResponses: {
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' }
+        }
+      })
     }
   }
 };

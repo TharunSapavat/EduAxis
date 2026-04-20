@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { IndianRupee, X } from 'lucide-react';
 
 const StudentFees = ({ 
@@ -15,6 +15,52 @@ const StudentFees = ({
   handlePaymentSubmit,
   handleDownloadReceipt
 }) => {
+  const [feeSearch, setFeeSearch] = useState('');
+  const [feeStatusFilter, setFeeStatusFilter] = useState('all');
+  const [feePage, setFeePage] = useState(1);
+  const [historyStatusFilter, setHistoryStatusFilter] = useState('all');
+  const [historyPage, setHistoryPage] = useState(1);
+
+  const FEES_PER_PAGE = 6;
+  const HISTORY_PER_PAGE = 8;
+
+  const getFeePaymentStatus = (fee) => {
+    const isPaid = payments.some((p) => String(p.feeId) === String(fee._id) && p.status === 'completed');
+    const isOverdue = new Date(fee.dueDate) < new Date() && !isPaid;
+    if (isPaid) return 'paid';
+    if (isOverdue) return 'overdue';
+    return 'pending';
+  };
+
+  const filteredFees = useMemo(() => {
+    return fees.filter((fee) => {
+      const status = getFeePaymentStatus(fee);
+      const search = feeSearch.trim().toLowerCase();
+      const matchesSearch = !search
+        || String(fee.title || '').toLowerCase().includes(search)
+        || String(fee.description || '').toLowerCase().includes(search);
+      const matchesStatus = feeStatusFilter === 'all' || status === feeStatusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [fees, payments, feeSearch, feeStatusFilter]);
+
+  const totalFeePages = Math.max(1, Math.ceil(filteredFees.length / FEES_PER_PAGE));
+  const currentFeePage = Math.min(feePage, totalFeePages);
+  const paginatedFees = filteredFees.slice((currentFeePage - 1) * FEES_PER_PAGE, currentFeePage * FEES_PER_PAGE);
+
+  const filteredPayments = useMemo(() => {
+    return payments.filter((payment) => {
+      return historyStatusFilter === 'all' || payment.status === historyStatusFilter;
+    });
+  }, [payments, historyStatusFilter]);
+
+  const totalHistoryPages = Math.max(1, Math.ceil(filteredPayments.length / HISTORY_PER_PAGE));
+  const currentHistoryPage = Math.min(historyPage, totalHistoryPages);
+  const paginatedPayments = filteredPayments.slice(
+    (currentHistoryPage - 1) * HISTORY_PER_PAGE,
+    currentHistoryPage * HISTORY_PER_PAGE
+  );
+
   return (
     <div>
       <h1 className="text-3xl font-bold text-slate-900 mb-6">Fee Management</h1>
@@ -45,21 +91,49 @@ const StudentFees = ({
       
       {/* Active Fees */}
       <div className="mb-8">
-        <h2 className="text-xl font-bold text-slate-900 mb-4">Active Fees</h2>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+          <h2 className="text-xl font-bold text-slate-900">Active Fees</h2>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="text"
+              value={feeSearch}
+              onChange={(e) => {
+                setFeeSearch(e.target.value);
+                setFeePage(1);
+              }}
+              placeholder="Search fee title..."
+              className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
+            />
+            <select
+              value={feeStatusFilter}
+              onChange={(e) => {
+                setFeeStatusFilter(e.target.value);
+                setFeePage(1);
+              }}
+              className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
+            >
+              <option value="all">All Status</option>
+              <option value="pending">Pending</option>
+              <option value="overdue">Overdue</option>
+              <option value="paid">Paid</option>
+            </select>
+          </div>
+        </div>
         {feesLoading ? (
           <div className="text-center py-8">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             <p className="text-slate-600 mt-2">Loading fees...</p>
           </div>
-        ) : fees.length === 0 ? (
+        ) : filteredFees.length === 0 ? (
           <div className="bg-white rounded-xl shadow-md p-8 text-center border border-slate-100">
             <IndianRupee className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-            <p className="text-slate-600">No active fees at the moment</p>
+            <p className="text-slate-600">No fees match current filters</p>
           </div>
         ) : (
+          <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {fees.map((fee) => {
-              const isPaid = payments.some(p => p.feeId === fee._id && p.status === 'completed');
+            {paginatedFees.map((fee) => {
+              const isPaid = payments.some(p => String(p.feeId) === String(fee._id) && p.status === 'completed');
               const isOverdue = new Date(fee.dueDate) < new Date() && !isPaid;
               
               return (
@@ -114,13 +188,48 @@ const StudentFees = ({
               );
             })}
           </div>
+          {totalFeePages > 1 && (
+            <div className="flex items-center justify-end gap-2 mt-4">
+              <button
+                onClick={() => setFeePage((prev) => Math.max(1, prev - 1))}
+                disabled={currentFeePage === 1}
+                className="px-3 py-1 border border-slate-300 rounded disabled:opacity-50"
+              >
+                Prev
+              </button>
+              <span className="text-sm text-slate-600">Page {currentFeePage} / {totalFeePages}</span>
+              <button
+                onClick={() => setFeePage((prev) => Math.min(totalFeePages, prev + 1))}
+                disabled={currentFeePage === totalFeePages}
+                className="px-3 py-1 border border-slate-300 rounded disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          )}
+          </>
         )}
       </div>
 
       {/* Payment History */}
       <div>
-        <h2 className="text-xl font-bold text-slate-900 mb-4">Payment History</h2>
-        {payments.length === 0 ? (
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+          <h2 className="text-xl font-bold text-slate-900">Payment History</h2>
+          <select
+            value={historyStatusFilter}
+            onChange={(e) => {
+              setHistoryStatusFilter(e.target.value);
+              setHistoryPage(1);
+            }}
+            className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
+          >
+            <option value="all">All Status</option>
+            <option value="completed">Completed</option>
+            <option value="pending">Pending</option>
+            <option value="failed">Failed</option>
+          </select>
+        </div>
+        {filteredPayments.length === 0 ? (
           <div className="bg-white rounded-xl shadow-md p-8 text-center border border-slate-100">
             <p className="text-slate-600">No payment history</p>
           </div>
@@ -140,7 +249,7 @@ const StudentFees = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
-                  {payments.map((payment) => (
+                  {paginatedPayments.map((payment) => (
                     <tr key={payment._id} className="hover:bg-slate-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
                         {payment.receiptNumber}
@@ -181,6 +290,25 @@ const StudentFees = ({
                 </tbody>
               </table>
             </div>
+            {totalHistoryPages > 1 && (
+              <div className="flex items-center justify-end gap-2 p-4 border-t border-slate-200">
+                <button
+                  onClick={() => setHistoryPage((prev) => Math.max(1, prev - 1))}
+                  disabled={currentHistoryPage === 1}
+                  className="px-3 py-1 border border-slate-300 rounded disabled:opacity-50"
+                >
+                  Prev
+                </button>
+                <span className="text-sm text-slate-600">Page {currentHistoryPage} / {totalHistoryPages}</span>
+                <button
+                  onClick={() => setHistoryPage((prev) => Math.min(totalHistoryPages, prev + 1))}
+                  disabled={currentHistoryPage === totalHistoryPages}
+                  className="px-3 py-1 border border-slate-300 rounded disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

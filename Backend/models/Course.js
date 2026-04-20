@@ -67,6 +67,8 @@ const courseSchema = new mongoose.Schema({
 
 // Index for faster queries
 courseSchema.index({ teacherId: 1 });
+courseSchema.index({ schoolId: 1, grade: 1, status: 1, createdAt: -1 });
+courseSchema.index({ schoolId: 1, name: 'text', code: 'text', description: 'text' });
 // Note: code field already has unique: true which creates an index automatically
 
 // Post-save hook to update school stats

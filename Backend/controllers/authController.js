@@ -1,6 +1,22 @@
 import User from '../models/User.js';
 import School from '../models/School.js';
 
+const getAuthCookieOptions = (req) => {
+  const origin = req?.headers?.origin || '';
+  const isLocalOrigin = /localhost|127\.0\.0\.1/i.test(origin);
+  const isHttpsOrigin = /^https:\/\//i.test(origin);
+  const isProduction = process.env.NODE_ENV === 'production';
+  const useCrossSiteCookie = isHttpsOrigin && !isLocalOrigin;
+
+  return {
+    httpOnly: true,
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    sameSite: useCrossSiteCookie || isProduction ? 'none' : 'lax',
+    secure: useCrossSiteCookie || isProduction,
+    path: '/'
+  };
+};
+
 // Helper function to extract domain from email
 const extractDomain = (email) => {
   const parts = email.toLowerCase().split('@');
@@ -138,12 +154,8 @@ export const register = async (req, res) => {
     // Generate JWT token
     const token = newUser.generateAuthToken();
 
-    // Set cookie with the token
-    res.cookie('authToken', token, {
-      httpOnly: true,      // Cookie cannot be accessed by JavaScript (secure)
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      sameSite: 'lax'      // CSRF protection
-    });
+    // Use cross-site compatible cookie options in production (Vercel -> Render)
+    res.cookie('authToken', token, getAuthCookieOptions(req));
 
     res.status(201).json({
       success: true,
@@ -258,12 +270,8 @@ export const login = async (req, res) => {
     // Generate JWT token
     const token = user.generateAuthToken();
 
-    // Set cookie with the token
-    res.cookie('authToken', token, {
-      httpOnly: true,      // Cookie cannot be accessed by JavaScript (secure)
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      sameSite: 'lax'      // CSRF protection
-    });
+    // Use cross-site compatible cookie options in production (Vercel -> Render)
+    res.cookie('authToken', token, getAuthCookieOptions(req));
 
     res.json({
       success: true,
@@ -283,10 +291,7 @@ export const login = async (req, res) => {
 
 // Logout user
 export const logout = async (req, res) => {
-  res.clearCookie('authToken', {
-    httpOnly: true,
-    sameSite: 'lax'
-  });
+  res.clearCookie('authToken', getAuthCookieOptions(req));
   
   res.json({ 
     success: true, 

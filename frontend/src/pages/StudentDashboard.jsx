@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { X } from 'lucide-react';
+import { getSocketBaseUrl } from '../config/runtime';
 
 // Context & AP
 import { useAuth } from '../context/AuthContext';
@@ -118,7 +119,7 @@ export default function StudentDashboard() {
   // Initialize Socket.IO connection once
   useEffect(() => {
     if (!socketRef.current) {
-      const socket = io('http://localhost:5000', { withCredentials: true });
+      const socket = io(getSocketBaseUrl(), { withCredentials: true });
       socketRef.current = socket;
       socket.on('connect', () => setSocketConnected(true));
       socket.on('disconnect', () => setSocketConnected(false));
@@ -305,6 +306,21 @@ export default function StudentDashboard() {
     }
   };
 
+  const ensureRazorpayLoaded = () => {
+    if (window.Razorpay) {
+      return Promise.resolve(true);
+    }
+
+    return new Promise((resolve) => {
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
   const handlePaymentSubmit = async (e) => {
     e.preventDefault();
     
@@ -313,40 +329,69 @@ export default function StudentDashboard() {
     try {
       setFeesLoading(true);
       
-      // Calculate late fee
-      const now = new Date();
-      const dueDate = new Date(selectedFee.dueDate);
-      let lateFee = 0;
-      
-      if (now > dueDate) {
-        const daysLate = Math.floor((now - dueDate) / (1000 * 60 * 60 * 24));
-        lateFee = daysLate * 10; // ₹10 per day
+      const razorpayReady = await ensureRazorpayLoaded();
+      if (!razorpayReady) {
+        showNotification('Unable to load Razorpay checkout. Please try again.', 'error');
+        return;
       }
-      
+
       const paymentData = {
         feeId: selectedFee._id,
         amount: selectedFee.amount,
-        paymentMethod: paymentFormData.paymentMethod,
-        transactionId: paymentFormData.transactionId,
+        paymentMethod: 'Online Payment',
         remarks: paymentFormData.remarks
       };
 
-      const response = await studentAPI.makePayment(paymentData);
+      const response = await studentAPI.createFeeRazorpayOrder(paymentData);
       
       if (response.data.success) {
-        const totalPaid = selectedFee.amount + (response.data.lateFee || 0);
-        showNotification(
-          `Payment successful! Total paid: ₹${totalPaid.toLocaleString()} | Receipt #: ${response.data.payment.receiptNumber}`,
-          'success'
-        );
-        setShowPaymentForm(false);
-        setSelectedFee(null);
-        setPaymentFormData({
-          paymentMethod: 'Cash',
-          transactionId: '',
-          remarks: ''
+        const options = {
+          key: response.data.key,
+          amount: response.data.amount,
+          currency: response.data.currency,
+          name: 'EduAxis',
+          description: selectedFee.title || 'Fee Payment',
+          order_id: response.data.orderId,
+          prefill: {
+            name: user?.name || response.data.studentName,
+            email: user?.email || response.data.studentEmail,
+            contact: user?.phone || ''
+          },
+          theme: {
+            color: '#dc2626'
+          },
+          handler: async (rzpResponse) => {
+            try {
+              const verifyResponse = await studentAPI.verifyFeeRazorpayPayment({
+                paymentId: response.data.paymentId,
+                razorpayOrderId: rzpResponse.razorpay_order_id,
+                razorpayPaymentId: rzpResponse.razorpay_payment_id,
+                razorpaySignature: rzpResponse.razorpay_signature
+              });
+
+              if (verifyResponse.data.success) {
+                showNotification('Payment successful and verified!', 'success');
+                setShowPaymentForm(false);
+                setSelectedFee(null);
+                setPaymentFormData({
+                  paymentMethod: 'Cash',
+                  transactionId: '',
+                  remarks: ''
+                });
+                fetchFeeData();
+              }
+            } catch (verifyError) {
+              console.error('Error verifying payment:', verifyError);
+              showNotification(verifyError.response?.data?.message || 'Payment verification failed', 'error');
+            }
+          }
+        };
+
+        const razorpayCheckout = new window.Razorpay(options);
+        razorpayCheckout.on('payment.failed', () => {
+          showNotification('Payment failed. Please try again.', 'error');
         });
-        fetchFeeData(); // Refresh fee data
+        razorpayCheckout.open();
       }
     } catch (error) {
       console.error('Error submitting payment:', error);

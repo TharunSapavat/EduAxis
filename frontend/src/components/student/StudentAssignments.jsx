@@ -1,6 +1,7 @@
 import { FileText, X, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 import { studentAPI } from '../../services/api';
+import { resolveAssetUrl } from '../../config/runtime';
 
 export default function StudentAssignments({ 
   assignments, 
@@ -236,7 +237,7 @@ export default function StudentAssignments({
                         <ul className="space-y-1">
                           {assignment.attachments.map((att, idx) => {
                             const fileUrl = att.path 
-                              ? `http://localhost:5000${att.path}` 
+                              ? resolveAssetUrl(att.path) 
                               : att.url;
                             const fileName = att.name || `Attachment ${idx + 1}`;
                             const fileSize = att.size ? ` (${(att.size / 1024).toFixed(1)} KB)` : '';
@@ -499,14 +500,14 @@ export default function StudentAssignments({
                     <ul className="space-y-2">
                       {activeAssignment.attachments.map((att, idx) => {
                         const fileUrl = att.path 
-                          ? `http://localhost:5000${att.path}` 
+                          ? resolveAssetUrl(att.path) 
                           : att.url;
                         const fileName = att.name || `Attachment ${idx + 1}`;
                         const fileSize = att.size ? ` (${(att.size / 1024).toFixed(1)} KB)` : '';
                         
                         return (
                           <li key={idx} className="flex items-center gap-2">
-                            <FileText className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                            <FileText className="w-5 h-5 text-blue-600 shrink-0" />
                             <a
                               href={fileUrl}
                               target="_blank"

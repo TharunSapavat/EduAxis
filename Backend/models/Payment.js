@@ -62,6 +62,20 @@ const paymentSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  razorpayOrderId: {
+    type: String,
+    trim: true,
+    index: true
+  },
+  razorpayPaymentId: {
+    type: String,
+    trim: true,
+    index: true
+  },
+  razorpaySignature: {
+    type: String,
+    trim: true
+  },
   status: {
     type: String,
     enum: ['pending', 'completed', 'failed', 'refunded'],

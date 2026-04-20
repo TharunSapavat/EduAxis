@@ -1,6 +1,7 @@
 import axios from 'axios';
+import { getApiBaseUrl } from '../config/runtime';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = getApiBaseUrl();
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -12,6 +13,17 @@ const api = axios.create({
 });
 
 let isRedirectingUnauthorized = false;
+
+// Request interceptor - attach bearer token as fallback for environments where
+// cross-site cookies may be blocked or stripped.
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('authToken');
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
 // CSRF DISABLED - Causing too many issues with delete/send operations
 
@@ -36,6 +48,7 @@ api.interceptors.response.use(
             // User is not authenticated for a protected route - clear session
             console.error('Unauthorized access - logging out');
             localStorage.removeItem('user');
+            localStorage.removeItem('authToken');
             localStorage.removeItem('persist:root');
             window.location.href = '/';
           }
@@ -103,6 +116,8 @@ export const studentAPI = {
   hideAnnouncement: (id) => api.delete(`/student/announcements/${id}`),
   clearAllAnnouncements: () => api.delete('/student/announcements'),
   getFees: () => api.get('/student/fees'),
+  createFeeRazorpayOrder: (paymentData) => api.post('/student/payment/razorpay/order', paymentData),
+  verifyFeeRazorpayPayment: (verifyData) => api.post('/student/payment/razorpay/verify', verifyData),
   makePayment: (paymentData) => api.post('/student/payment', paymentData),
   downloadReceipt: (paymentId) => api.get(`/student/receipt/${paymentId}`),
   getLibrary: (params) => api.get('/student/library', { params }),
@@ -240,6 +255,8 @@ export const adminAPI = {
   // NEW: Subscription/Plan APIs
   getAvailablePlans: () => api.get('/administrator/subscription/plans'),
   getCurrentSubscription: () => api.get('/administrator/subscription/current'),
+  createSubscriptionRazorpayOrder: (planData) => api.post('/administrator/subscription/razorpay/order', planData),
+  verifySubscriptionRazorpayPayment: (verifyData) => api.post('/administrator/subscription/razorpay/verify', verifyData),
   upgradePlan: (planData) => api.post('/administrator/subscription/upgrade', planData),
 };
 

@@ -3,6 +3,7 @@ import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, L
 import { DollarSign, TrendingUp, AlertCircle, RefreshCw } from 'lucide-react';
 import { adminAPI } from '../../services/api';
 import io from 'socket.io-client';
+import { getSocketBaseUrl } from '../../config/runtime';
 
 export default function FinancialAnalytics({ showNotification }) {
   const [paymentData, setPaymentData] = useState(null);
@@ -35,7 +36,7 @@ export default function FinancialAnalytics({ showNotification }) {
     fetchFinancialData();
 
     // Connect to socket for real-time updates
-    const socket = io('http://localhost:5000', { withCredentials: true });
+    const socket = io(getSocketBaseUrl(), { withCredentials: true });
 
     socket.on('connect', () => {
       console.log('Financial analytics connected to socket');

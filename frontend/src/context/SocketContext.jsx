@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import io from 'socket.io-client';
 import { useAuth } from './AuthContext';
+import { getSocketBaseUrl } from '../config/runtime';
 
 const SocketContext = createContext(null);
 
@@ -15,7 +16,7 @@ export const SocketProvider = ({ children }) => {
   useEffect(() => {
     if (user) {
       // Connect to the socket server
-      const newSocket = io('http://localhost:5000', {
+      const newSocket = io(getSocketBaseUrl(), {
         query: { userId: user.id },
       });
 

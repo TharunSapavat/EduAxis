@@ -7,6 +7,7 @@ import DashboardHeader from '../components/DashboardHeader';
 import DashboardFooter from '../components/DashboardFooter';
 import TeacherInbox from '../components/TeacherInbox';
 import io from 'socket.io-client';
+import { getSocketBaseUrl } from '../config/runtime';
 
 // Check
 import { useNotification } from '../hooks/useNotification';
@@ -88,7 +89,7 @@ export default function TeacherDashboard() {
   useEffect(() => {
     if (!user?.id) return;
 
-    const socket = io(import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000', {
+    const socket = io(getSocketBaseUrl(), {
       withCredentials: true,
       transports: ['websocket', 'polling']
     });
@@ -127,7 +128,7 @@ export default function TeacherDashboard() {
     socketRef.current = socket;
     // Initialize once
     if (!socketRef.current) {
-      const socket = io(import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000', {
+      const socket = io(getSocketBaseUrl(), {
         withCredentials: true,
         transports: ['websocket', 'polling']
       });

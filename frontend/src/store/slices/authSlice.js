@@ -1,6 +1,8 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { authAPI } from '../../services/api';
 
+const getStorage = () => (typeof localStorage !== 'undefined' ? localStorage : null);
+
 // Async thunks
 export const loginUser = createAsyncThunk(
   'auth/login',
@@ -40,6 +42,7 @@ export const logoutUser = createAsyncThunk(
 
 const initialState = {
   user: null,
+  token: getStorage()?.getItem('authToken') || null,
   isAuthenticated: false,
   loading: false,
   error: null,
@@ -58,6 +61,7 @@ const authSlice = createSlice({
     },
     clearAuth: (state) => {
       state.user = null;
+      state.token = null;
       state.isAuthenticated = false;
       state.error = null;
     },
@@ -72,10 +76,14 @@ const authSlice = createSlice({
       .addCase(loginUser.fulfilled, (state, action) => {
         state.loading = false;
         state.user = action.payload.user;
+        state.token = action.payload.token || null;
         state.isAuthenticated = true;
         state.error = null;
         // Store user in localStorage for persistence
-        localStorage.setItem('user', JSON.stringify(action.payload.user));
+        getStorage()?.setItem('user', JSON.stringify(action.payload.user));
+        if (action.payload.token) {
+          getStorage()?.setItem('authToken', action.payload.token);
+        }
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
@@ -90,9 +98,13 @@ const authSlice = createSlice({
       .addCase(registerUser.fulfilled, (state, action) => {
         state.loading = false;
         state.user = action.payload.user;
+        state.token = action.payload.token || null;
         state.isAuthenticated = true;
         state.error = null;
-        localStorage.setItem('user', JSON.stringify(action.payload.user));
+        getStorage()?.setItem('user', JSON.stringify(action.payload.user));
+        if (action.payload.token) {
+          getStorage()?.setItem('authToken', action.payload.token);
+        }
       })
       .addCase(registerUser.rejected, (state, action) => {
         state.loading = false;
@@ -105,16 +117,20 @@ const authSlice = createSlice({
       .addCase(logoutUser.fulfilled, (state) => {
         state.loading = false;
         state.user = null;
+        state.token = null;
         state.isAuthenticated = false;
         state.error = null;
-        localStorage.removeItem('user');
+        getStorage()?.removeItem('user');
+        getStorage()?.removeItem('authToken');
       })
       .addCase(logoutUser.rejected, (state) => {
         state.loading = false;
         // Still clear auth on logout failure
         state.user = null;
+        state.token = null;
         state.isAuthenticated = false;
-        localStorage.removeItem('user');
+        getStorage()?.removeItem('user');
+        getStorage()?.removeItem('authToken');
       });
   },
 });

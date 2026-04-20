@@ -32,6 +32,8 @@ import {
   bulkImportCSV,
   getAvailablePlans,
   getCurrentSubscription,
+  createSubscriptionRazorpayOrder,
+  verifySubscriptionRazorpayPayment,
   upgradePlan
 } from '../controllers/adminController.js';
 import { authMiddleware, roleMiddleware } from '../middleware/auth.js';
@@ -98,6 +100,8 @@ router.post('/bulk-import', uploadCSVFile.single('file'), bulkImportCSV);
 // Subscription/Plan Management Routes
 router.get('/subscription/plans', getAvailablePlans);
 router.get('/subscription/current', getCurrentSubscription);
+router.post('/subscription/razorpay/order', createSubscriptionRazorpayOrder);
+router.post('/subscription/razorpay/verify', verifySubscriptionRazorpayPayment);
 router.post('/subscription/upgrade', upgradePlan);
 
 export default router;

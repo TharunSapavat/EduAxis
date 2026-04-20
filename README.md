@@ -8,7 +8,10 @@ A comprehensive School Management System built with **Node.js**, **Express**, **
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [Getting Started](#getting-started)
+- [CI](#ci)
+- [Production Deployment](#production-deployment)
 - [API Documentation](#api-documentation)
+- [Testing](#testing)
 - [Authentication](#authentication)
 - [Contributing](#contributing)
 - [License](#license)
@@ -202,6 +205,58 @@ EduAxis implements a **multi-tenant architecture** where:
    - Backend API: `http://localhost:5000`
    - Super Admin: `http://localhost:5173/system-access`
 
+### Docker Run
+
+The app can also be started fully inside containers from the repository root:
+
+```bash
+docker compose up --build
+```
+
+This starts Redis, Solr, the backend API on `http://localhost:5001`, and the frontend on `http://localhost:5173`.
+The backend uses the MongoDB Atlas URI from [Backend/.env](Backend/.env) instead of a local Mongo container.
+
+To stop the stack:
+
+```bash
+docker compose down
+```
+
+### CI
+
+The repository includes a GitHub Actions workflow at [.github/workflows/ci.yml](.github/workflows/ci.yml). It runs backend tests, frontend tests, and a frontend production build on every push and pull request.
+
+## Production Deployment
+
+### Live URLs
+- **Frontend (Vercel)**: https://edu-axis.vercel.app/
+- **Backend (Render)**: https://eduaxis-backend.onrender.com/
+- **API Base URL**: https://eduaxis-backend.onrender.com/api
+- **API Documentation**: https://eduaxis-backend.onrender.com/api-docs
+
+### Deployment Architecture
+- **Frontend**: Deployed on Vercel with automatic deployments from GitHub
+- **Backend**: Deployed on Render with Node.js runtime and MongoDB Atlas
+- **Database**: MongoDB Atlas (production cluster)
+- **Real-time**: Socket.IO configured for production CORS
+
+### Production Environment Settings
+- **Render environment variable**: `CORS_ORIGINS=http://localhost:5173,http://localhost:5174,https://edu-axis.vercel.app`
+- **Render environment variable**: `NODE_ENV=production`
+- **Frontend environment variable**: `VITE_API_URL=https://eduaxis-backend.onrender.com/api`
+- **Frontend environment variable**: `VITE_SOCKET_URL=https://eduaxis-backend.onrender.com`
+
+### Authentication Stability Note
+- The backend supports secure cross-site cookies for Vercel -> Render deployments.
+- The backend also accepts Bearer tokens as a fallback for protected routes.
+- This prevents post-login redirect loops when browsers restrict third-party cookies.
+
+### Testing the Live Deployment
+1. Open https://edu-axis.vercel.app/
+2. Log in with a user from your MongoDB Atlas database
+3. Verify API calls in DevTools Network tab point to `eduaxis-backend.onrender.com/api`
+4. Check health endpoint: https://eduaxis-backend.onrender.com/api/health
+
 ## Security & System Audit ⚠️
 
 **System Health: 85% ✅** | **Last Comprehensive Audit: January 2025**
@@ -254,9 +309,27 @@ EduAxis implements a **multi-tenant architecture** where:
 
 ## API Documentation
 
+### Swagger UI
+
+- Local Swagger UI: `http://localhost:5000/api-docs`
+- Local OpenAPI JSON: `http://localhost:5000/api-docs.json`
+- Production Swagger UI: `https://eduaxis-backend.onrender.com/api-docs`
+- Production OpenAPI JSON: `https://eduaxis-backend.onrender.com/api-docs.json`
+
+### Swagger Authentication
+
+- Use **Authorize** in Swagger UI for JWT-protected endpoints.
+- Format: `Bearer <your_jwt_token>`
+- B2B partner endpoints use `x-api-key` header.
+
 ### Base URL
 ```
 http://localhost:5000/api
+```
+
+### Production Base URL
+```
+https://eduaxis-backend.onrender.com/api
 ```
 
 ### Authentication Routes
@@ -315,6 +388,56 @@ All super admin routes require authentication and superadmin role.
 - `PATCH /schools/:id/subscription` - Update subscription plan
 
 See **[SUPERADMIN_USER_GUIDE.md](SUPERADMIN_USER_GUIDE.md)** for detailed usage instructions.
+
+## Testing
+
+Phase 3 adds on-demand unit testing for the backend and frontend.
+
+### What is covered
+- Backend B2B API-key authentication
+- Backend holiday integration fallback behavior
+- Backend cache helper behavior
+- Backend school summary lookup by school code
+- Frontend auth slice reducers and selectors
+- Frontend UI slice reducers and selectors
+
+### Run the tests
+
+Backend:
+```bash
+cd Backend
+npm run test
+```
+
+Frontend:
+```bash
+cd frontend
+npm run test
+```
+
+### Generate reports
+
+Backend report:
+```bash
+cd Backend
+npm run test:report
+```
+
+Frontend report:
+```bash
+cd frontend
+npm run test:report
+```
+
+### Report locations
+- [Backend/test-reports/backend-test-report.json](Backend/test-reports/backend-test-report.json)
+- [frontend/test-reports/frontend-test-report.json](frontend/test-reports/frontend-test-report.json)
+
+### Current status
+- Backend: 9/9 tests passing
+- Frontend: 9/9 tests passing
+
+The report files can be regenerated at any time before evaluation by rerunning the commands above.
 
 ## Authentication
 

@@ -52,6 +52,21 @@ const AdminPaymentPlans = () => {
     setPaymentSuccess('');
   };
 
+  const ensureRazorpayLoaded = () => {
+    if (window.Razorpay) {
+      return Promise.resolve(true);
+    }
+
+    return new Promise((resolve) => {
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
   const handleProcessPayment = async () => {
     if (!selectedPlan) return;
 
@@ -60,29 +75,63 @@ const AdminPaymentPlans = () => {
       setPaymentError('');
       setPaymentSuccess('');
 
-      const amountToPay = billingCycle === 'annual' 
-        ? selectedPlan.annualPrice 
-        : selectedPlan.monthlyPrice;
+      const razorpayReady = await ensureRazorpayLoaded();
+      if (!razorpayReady) {
+        setPaymentError('Unable to load Razorpay checkout. Please try again.');
+        return;
+      }
 
-      // In a real application, you would integrate with a payment gateway here
-      // For now, we'll simulate a successful payment
-      const response = await adminAPI.upgradePlan({
+      const response = await adminAPI.createSubscriptionRazorpayOrder({
         newPlan: selectedPlan.id,
         billingCycle: billingCycle,
-        paymentMethod: paymentMethod,
-        transactionId: transactionId || undefined
+        paymentMethod: paymentMethod
       });
 
       if (response.data.success) {
-        setPaymentSuccess(`Successfully upgraded to ${selectedPlan.name} plan!`);
-        setTimeout(() => {
-          setSelectedPlan(null);
-          setPaymentError('');
-          setPaymentSuccess('');
-          setPaymentMethod('credit_card');
-          setTransactionId('');
-          fetchPlansAndSubscription();
-        }, 2000);
+        const options = {
+          key: response.data.key,
+          amount: response.data.amount,
+          currency: response.data.currency,
+          name: 'EduAxis',
+          description: `${selectedPlan.name} Plan Subscription`,
+          order_id: response.data.orderId,
+          theme: {
+            color: '#dc2626'
+          },
+          handler: async (rzpResponse) => {
+            try {
+              const verifyResponse = await adminAPI.verifySubscriptionRazorpayPayment({
+                paymentId: response.data.paymentId,
+                razorpayOrderId: rzpResponse.razorpay_order_id,
+                razorpayPaymentId: rzpResponse.razorpay_payment_id,
+                razorpaySignature: rzpResponse.razorpay_signature,
+                newPlan: selectedPlan.id,
+                billingCycle
+              });
+
+              if (verifyResponse.data.success) {
+                setPaymentSuccess(`Successfully upgraded to ${selectedPlan.name} plan!`);
+                setTimeout(() => {
+                  setSelectedPlan(null);
+                  setPaymentError('');
+                  setPaymentSuccess('');
+                  setPaymentMethod('credit_card');
+                  setTransactionId('');
+                  fetchPlansAndSubscription();
+                }, 1500);
+              }
+            } catch (verifyError) {
+              console.error('Subscription verify error:', verifyError);
+              setPaymentError(verifyError.response?.data?.message || 'Payment verification failed.');
+            }
+          }
+        };
+
+        const razorpayCheckout = new window.Razorpay(options);
+        razorpayCheckout.on('payment.failed', () => {
+          setPaymentError('Payment failed. Please try again.');
+        });
+        razorpayCheckout.open();
       }
     } catch (error) {
       console.error('Payment error:', error);
